@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HR JEBAR — ระบบลงเวลา & คำนวณเงินพนักงาน</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --accent: #0E7C66;
+    --accent-soft: #E6F4EF;
+    --ink: #15191E;
+    --muted: #6B7280;
+    --bg: #F3F4F6;
+    --surface: #FFFFFF;
+    --line: #E5E7EB;
+    --font: 'IBM Plex Sans Thai', 'IBM Plex Sans', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    color: var(--ink);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    font-variant-numeric: tabular-nums;
+  }
+  button, input, select, textarea { font-family: var(--font); }
+  input[type="date"], input[type="time"] { font-family: var(--font); }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 9px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  @keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @keyframes bannerDrop { from { transform: translateY(-120%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes pulseAlert { 0%,100% { box-shadow: 0 6px 18px rgba(220,38,38,0.32); } 50% { box-shadow: 0 6px 26px rgba(220,38,38,0.55); } }
+  @keyframes popIn { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes spin360 { to { transform: rotate(360deg); } }
+  .spin { animation: spin360 1.2s linear infinite; }
+  select { -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B7280' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px !important; }
+  .emp-detail-grid { display: grid; grid-template-columns: minmax(280px, 320px) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 980px) { .emp-detail-grid { grid-template-columns: 1fr; } }
+</style>
+<template id="__bundler_thumbnail">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+    <rect width="100" height="100" fill="#0E7C66"/>
+    <g transform="translate(50 50)" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+      <circle r="22"/>
+      <path d="M0 -11 V0 L9 6"/>
+    </g>
+  </svg>
+</template>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="frames/ios-frame.jsx"></script>
+<script type="text/babel" src="app/tweaks-panel.jsx"></script>
+<script type="text/babel" src="app/store.jsx"></script>
+<script type="text/babel" src="app/ui.jsx"></script>
+<script type="text/babel" src="app/notify.jsx"></script>
+<script type="text/babel" src="app/employee-checkin.jsx"></script>
+<script type="text/babel" src="app/employee.jsx"></script>
+<script type="text/babel" src="app/admin.jsx"></script>
+<script type="text/babel" src="app/admin-ops.jsx"></script>
+<script type="text/babel" src="app/main.jsx"></script>
+</body>
+</html>
