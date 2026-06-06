@@ -6,7 +6,7 @@
     "enabled": true
   },
   "assets": {
-    "directory": "design_handoff_hr_jebar"
+    "directory": "design_handoff_hr_jebar/design_handoff_hr_jebar"
   },
   "compatibility_flags": [
     "nodejs_compat"
