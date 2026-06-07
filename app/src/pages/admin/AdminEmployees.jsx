@@ -438,7 +438,7 @@ function EmpFormModal({ emp, branches, orgId, onClose }) {
             </div>
           </div>
 
-          <Field label="หมายเหตุ (แอดมิน)" value={form.notes} onChange={(v) => set('notes', v)} />
+          <div> value={form.notes} onChange={(v) => set('notes', v)} />
 
           <div className="card" style={{ padding: 14, background: 'var(--bg)' }}>
             <div style={{ fontWeight: 600, marginBottom: 10 }}>ข้อมูลธนาคาร / ผู้ติดต่อฉุกเฉิน</div>
