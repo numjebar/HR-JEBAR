@@ -293,7 +293,7 @@ function EmpFormModal({ emp, branches, orgId, onClose }) {
     color: emp?.color || COLORS[0],
     notes: emp?.notes || '',
     closing_tasks_text: isEdit ? (emp?.closing_tasks || []).join('\n') : DEFAULT_CLOSING_TASKS.join('\n'),
-    pin: currentPin,
+    day_off: emp?.day_off || [], currentPin,
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -332,7 +332,7 @@ function EmpFormModal({ emp, branches, orgId, onClose }) {
         if (form.pin && form.pin !== currentPin) {
           const { error: pinError } = await supabase.rpc('admin_set_employee_pin', {
             p_emp_id: emp.id,
-            p_pin: form.pin,
+            p_day_off: emp?.day_off || [], form.pin,
           });
           if (pinError) throw pinError;
         }
@@ -348,7 +348,7 @@ function EmpFormModal({ emp, branches, orgId, onClose }) {
 
         const { error: pinError } = await supabase.rpc('admin_set_employee_pin', {
           p_emp_id: empId,
-          p_pin: form.pin,
+          p_day_off: emp?.day_off || [], form.pin,
         });
         if (pinError) throw pinError;
       }
@@ -510,7 +510,7 @@ function PinRecoveryModal({ emp, onClose }) {
     try {
       const { error } = await supabase.rpc('admin_set_employee_pin', {
         p_emp_id: emp.id,
-        p_pin: pin,
+        p_day_off: emp?.day_off || [], pin,
       });
       if (error) throw error;
       setShownPin(pin);
