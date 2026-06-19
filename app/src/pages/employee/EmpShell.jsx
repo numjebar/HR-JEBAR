@@ -28,6 +28,7 @@ export default function EmpShell() {
           <Route path="ops/bills" element={<EmpOps />} />
           <Route path="ops/production" element={<EmpOps />} />
           <Route path="ops/inventory" element={<EmpOps />} />
+          <Route path="ops/cake-stock" element={<EmpOps />} />
           <Route path="ops/supplies-count" element={<EmpOps />} />
           <Route path="ops/purchase-list" element={<EmpOps />} />
           <Route path="messages" element={<EmpMessages />} />

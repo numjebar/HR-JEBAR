@@ -174,7 +174,7 @@ export default function EmpHome() {
           <div>
             <div style={{ fontWeight: 800, fontSize: 16, color: '#2f241f' }}>งานร้าน / เมนูปฏิบัติงาน</div>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>
-              รวมเมนูถ่ายบิล ผลิตขนม วัตถุดิบ ของใช้ และใบสั่งซื้อไว้หน้าเดียว
+              รวมเมนูถ่ายบิล ผลิตขนม วัตถุดิบ เช็กสต๊อกเค้ก ของใช้ และใบสั่งซื้อไว้หน้าเดียว
             </div>
           </div>
           <div style={{ fontSize: 26, color: '#9b7a5a' }}>›</div>

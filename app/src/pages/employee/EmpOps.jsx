@@ -30,6 +30,13 @@ const TASKS = [
     icon: '📦',
   },
   {
+    key: 'cake-stock',
+    path: '/emp/ops/cake-stock',
+    title: 'เช็คสต๊อกเค้ก',
+    subtitle: 'นับเค้กหน้าตู้แยกตามสาขา พร้อมสถานะพร้อมขาย จอง หรือเสียหาย',
+    icon: '🍰',
+  },
+  {
     key: 'supplies-count',
     path: '/emp/ops/supplies-count',
     title: 'นับสต๊อกของใช้',
@@ -70,6 +77,15 @@ const DEFAULT_DRAFTS = {
     status: 'ปกติ',
     note: '',
   },
+  'cake-stock': {
+    branchName: 'สาขากาดน้ำทอง',
+    cakeName: '',
+    available: '',
+    reserved: '',
+    damaged: '',
+    status: 'พร้อมขาย',
+    note: '',
+  },
   'supplies-count': {
     area: 'หน้าร้าน',
     itemName: '',
@@ -105,7 +121,7 @@ function OpsHome({ navigate }) {
         <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>งานร้านของพนักงาน</div>
         <div style={{ fontWeight: 800, fontSize: 28, color: '#2f241f' }}>JEBAR OPS</div>
         <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 8, lineHeight: 1.6 }}>
-          ใช้ส่งบิล บันทึกการผลิต เช็กวัตถุดิบ สต๊อกของใช้ และเตรียมรายการซื้อ
+          ใช้ส่งบิล บันทึกการผลิต เช็กวัตถุดิบ เช็กสต๊อกเค้ก สต๊อกของใช้ และเตรียมรายการซื้อ
         </div>
       </section>
 
@@ -414,6 +430,69 @@ function renderFormFields(taskKey, draft, setDraft) {
           </Field>
         </div>
       );
+    case 'cake-stock':
+      return (
+        <div style={fieldGridStyle}>
+          <Field label="สาขาที่เช็ก">
+            <select value={draft.branchName} onChange={(e) => setDraft({ ...draft, branchName: e.target.value })}>
+              <option>สาขากาดน้ำทอง</option>
+              <option>สาขากาดกองเก่า</option>
+            </select>
+          </Field>
+          <Field label="ชื่อเค้ก / เมนู">
+            <input
+              value={draft.cakeName}
+              onChange={(e) => setDraft({ ...draft, cakeName: e.target.value })}
+              placeholder="เช่น เค้กส้ม / ช็อกโกแลต / Red velvet"
+            />
+          </Field>
+          <TwoColRow>
+            <Field label="พร้อมขาย">
+              <input
+                value={draft.available}
+                onChange={(e) => setDraft({ ...draft, available: e.target.value })}
+                placeholder="0"
+                inputMode="numeric"
+              />
+            </Field>
+            <Field label="จอง">
+              <input
+                value={draft.reserved}
+                onChange={(e) => setDraft({ ...draft, reserved: e.target.value })}
+                placeholder="0"
+                inputMode="numeric"
+              />
+            </Field>
+          </TwoColRow>
+          <TwoColRow>
+            <Field label="เสียหาย / หมดอายุ">
+              <input
+                value={draft.damaged}
+                onChange={(e) => setDraft({ ...draft, damaged: e.target.value })}
+                placeholder="0"
+                inputMode="numeric"
+              />
+            </Field>
+            <Field label="สถานะ">
+              <select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value })}>
+                <option>พร้อมขาย</option>
+                <option>ใกล้หมด</option>
+                <option>หมด</option>
+                <option>ต้องเติมจากครัว</option>
+                <option>มีปัญหา</option>
+              </select>
+            </Field>
+          </TwoColRow>
+          <Field label="หมายเหตุ">
+            <textarea
+              rows={4}
+              value={draft.note}
+              onChange={(e) => setDraft({ ...draft, note: e.target.value })}
+              placeholder="เช่น สาขานี้ต้องเติมเค้กส้ม 2 ชิ้นก่อนบ่าย"
+            />
+          </Field>
+        </div>
+      );
     case 'supplies-count':
       return (
         <div style={fieldGridStyle}>
@@ -705,6 +784,8 @@ function summarizeDraft(taskKey, draft) {
       return `${draft.product || '-'} / ${draft.quantity || '0'} ${draft.unit || ''} / ${draft.batch || '-'}`;
     case 'inventory':
       return `${draft.itemName || '-'} / ${draft.stockLeft || '0'} ${draft.unit || ''} / ${draft.status || '-'}`;
+    case 'cake-stock':
+      return `${draft.branchName || '-'} / ${draft.cakeName || '-'} / พร้อมขาย ${draft.available || '0'} จอง ${draft.reserved || '0'} เสีย ${draft.damaged || '0'}`;
     case 'supplies-count':
       return `${draft.area || '-'} / ${draft.itemName || '-'} / ${draft.count || '0'} ${draft.unit || ''}`;
     case 'purchase-list':
@@ -722,6 +803,8 @@ function renderHistoryLine(taskKey, payload) {
       return `${payload.product || '-'} / ${payload.quantity || '0'} ${payload.unit || ''} / ${payload.batch || '-'}`;
     case 'inventory':
       return `${payload.itemName || '-'} / ${payload.stockLeft || '0'} ${payload.unit || ''} / ${payload.status || '-'}`;
+    case 'cake-stock':
+      return `${payload.branchName || '-'} / ${payload.cakeName || '-'} / พร้อมขาย ${payload.available || '0'} จอง ${payload.reserved || '0'} เสีย ${payload.damaged || '0'} / ${payload.status || '-'}`;
     case 'supplies-count':
       return `${payload.area || '-'} / ${payload.itemName || '-'} / ${payload.count || '0'} ${payload.unit || ''}`;
     case 'purchase-list':
@@ -757,6 +840,7 @@ function shortTabLabel(taskKey) {
     bills: 'ถ่ายบิล',
     production: 'ผลิตขนม',
     inventory: 'วัตถุดิบ',
+    'cake-stock': 'สต๊อกเค้ก',
     'supplies-count': 'ของใช้',
     'purchase-list': 'ใบซื้อ',
   };
