@@ -1,9 +1,9 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
-import { fmtDateFull, fmtDate, ymd, nowHM, dayRate, rulesFor } from '../../lib/payroll';
+import { fmtDateFull, fmtDate, ymd, dayRate, rulesFor } from '../../lib/payroll';
 
-const STATUS_LABEL = { present: 'เธกเธฒเธ—เธณเธเธฒเธ', late: 'เธกเธฒเธชเธฒเธข', leave: 'เธฅเธฒ', absent: 'เธเธฒเธ”' };
+const STATUS_LABEL = { present: 'มาทำงาน', late: 'มาสาย', leave: 'ลา', absent: 'ขาด' };
 const STATUS_COLOR = { present: 'var(--accent)', late: 'var(--late-fg)', leave: 'var(--leave-fg)', absent: 'var(--danger-fg)' };
 const STATUS_BG = { present: 'var(--accent-soft)', late: 'var(--late-bg)', leave: 'var(--leave-bg)', absent: 'var(--danger-bg)' };
 
@@ -28,7 +28,7 @@ export default function EmpHistory() {
 
   return (
     <div style={{ padding: '20px 16px' }}>
-      <h2 style={{ fontWeight: 700, fontSize: 20, marginBottom: 16 }}>เธเธฃเธฐเธงเธฑเธ•เธด</h2>
+      <h2 style={{ fontWeight: 700, fontSize: 20, marginBottom: 16 }}>ประวัติ</h2>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
         {['att', 'leave'].map((t) => (
@@ -37,7 +37,7 @@ export default function EmpHistory() {
             color: tab === t ? '#fff' : 'var(--muted)',
             border: '1px solid var(--line)', padding: '8px 20px', fontSize: 14,
           }}>
-            {t === 'att' ? 'เธเธฒเธฃเธฅเธเน€เธงเธฅเธฒ' : 'เธเธฒเธฃเธฅเธฒ'}
+            {t === 'att' ? 'การลงเวลา' : 'การลา'}
           </button>
         ))}
       </div>
@@ -48,7 +48,7 @@ export default function EmpHistory() {
             <div key={a.id} className="card" style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{fmtDateFull(a.date)}</div>
-                {a.clock_in && <div className="num" style={{ color: 'var(--muted)', fontSize: 13 }}>{a.clock_in} โ€“ {a.clock_out || 'โ€”'}</div>}
+                {a.clock_in && <div className="num" style={{ color: 'var(--muted)', fontSize: 13 }}>{a.clock_in} – {a.clock_out || '–'}</div>}
                 {a.status === 'leave' && <div style={{ fontSize: 13, color: 'var(--leave-fg)' }}>{a.leave_type}</div>}
               </div>
               <span className="badge" style={{ background: STATUS_BG[a.status], color: STATUS_COLOR[a.status] }}>
@@ -56,14 +56,14 @@ export default function EmpHistory() {
               </span>
             </div>
           ))}
-          {att.length === 0 && <div style={{ color: 'var(--muted)', textAlign: 'center', marginTop: 40 }}>เธขเธฑเธเนเธกเนเธกเธตเธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเธฅเธเน€เธงเธฅเธฒ</div>}
+          {att.length === 0 && <div style={{ color: 'var(--muted)', textAlign: 'center', marginTop: 40 }}>ยังไม่มีประวัติการลงเวลา</div>}
         </div>
       )}
 
       {tab === 'leave' && (
         <>
           <button className="btn btn-primary" style={{ width: '100%', marginBottom: 14 }} onClick={() => setShowLeaveForm(true)}>
-            + เธเธญเธฅเธฒเนเธซเธกเน
+            + ขอลาใหม่
           </button>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {leaves.map((l) => (
@@ -74,10 +74,10 @@ export default function EmpHistory() {
                     background: l.status === 'approved' ? 'var(--accent-soft)' : l.status === 'rejected' ? 'var(--danger-bg)' : 'var(--late-bg)',
                     color: l.status === 'approved' ? 'var(--accent)' : l.status === 'rejected' ? 'var(--danger-fg)' : 'var(--late-fg)',
                   }}>
-                    {l.status === 'approved' ? 'เธญเธเธธเธกเธฑเธ•เธด' : l.status === 'rejected' ? 'เนเธกเนเธญเธเธธเธกเธฑเธ•เธด' : 'เธฃเธญเธเธดเธเธฒเธฃเธ“เธฒ'}
+                    {l.status === 'approved' ? 'อนุมัติ' : l.status === 'rejected' ? 'ไม่อนุมัติ' : 'รอพิจารณา'}
                   </span>
                 </div>
-                <div style={{ fontSize: 13, color: 'var(--muted)' }}>{fmtDate(l.date_from)} โ€“ {fmtDate(l.date_to)}</div>
+                <div style={{ fontSize: 13, color: 'var(--muted)' }}>{fmtDate(l.date_from)} – {fmtDate(l.date_to)}</div>
                 {l.reason && <div style={{ fontSize: 13, marginTop: 4 }}>{l.reason}</div>}
               </div>
             ))}
@@ -101,7 +101,7 @@ export default function EmpHistory() {
 
 function LeaveForm({ employee, orgId, branch, settings, employeeSessionToken, onClose }) {
   const rules = rulesFor(settings?.rules, branch, employee);
-  const [type, setType] = useState('เธฅเธฒเธเนเธงเธข');
+  const [type, setType] = useState('ลาป่วย');
   const [dateFrom, setDateFrom] = useState(ymd(new Date()));
   const [dateTo, setDateTo] = useState(ymd(new Date()));
   const [reason, setReason] = useState('');
@@ -128,39 +128,38 @@ function LeaveForm({ employee, orgId, branch, settings, employeeSessionToken, on
     onClose();
   }
 
-
   return (
     <div className="sheet-overlay">
       <div className="sheet">
-        <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 16 }}>เธเธญเธฅเธฒ</div>
+        <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 16 }}>ขอลา</div>
         {isUrgent && (
           <div style={{ background: 'var(--late-bg)', border: '1px solid #fcd34d', borderRadius: 12, padding: '12px 14px', marginBottom: 14, fontSize: 13, color: 'var(--late-fg)' }}>
-            โ ๏ธ เธเธฒเธฃเธฅเธฒเธงเธฑเธเธเธตเนเนเธ”เธขเนเธกเนเธกเธตเน€เธซเธ•เธธเธเธฅ เธเธฐเธ–เธนเธเธซเธฑเธเน€เธเธดเธ เธฟ{deductAmt.toLocaleString()} ({rules.urgentLeaveDeductDays} เนเธฃเธ)
+            ⚠️ การลาวันนี้โดยไม่มีเหตุผล จะถูกหักเงิน ฿{deductAmt.toLocaleString()} ({rules.urgentLeaveDeductDays} วัน)
           </div>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>เธเธฃเธฐเน€เธ เธ—เธเธฒเธฃเธฅเธฒ</label>
+            <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>ประเภทการลา</label>
             <select value={type} onChange={(e) => setType(e.target.value)}>
-              {['เธฅเธฒเธเนเธงเธข', 'เธฅเธฒเธเธดเธ', 'เธฅเธฒเธเธฑเธเธฃเนเธญเธ'].map((t) => <option key={t}>{t}</option>)}
+              {['ลาป่วย', 'ลากิจ', 'ลาพักร้อน'].map((t) => <option key={t}>{t}</option>)}
             </select>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
-              <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>เธงเธฑเธเธ—เธตเนเน€เธฃเธดเนเธก</label>
+              <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>วันที่เริ่ม</label>
               <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} min={today} />
             </div>
             <div>
-              <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>เธงเธฑเธเธ—เธตเนเธชเธดเนเธเธชเธธเธ”</label>
+              <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>วันที่สิ้นสุด</label>
               <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} min={dateFrom} />
             </div>
           </div>
           <div>
-            <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>เน€เธซเธ•เธธเธเธฅ</label>
-            <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="เธฃเธฐเธเธธเน€เธซเธ•เธธเธเธฅ..." rows={3} />
+            <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>เหตุผล</label>
+            <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="ระบุเหตุผล..." rows={3} />
           </div>
-          <button className="btn btn-primary" onClick={submit} disabled={busy}>{busy ? 'เธเธณเธฅเธฑเธเธชเนเธ...' : 'เธชเนเธเธเธณเธเธญ'}</button>
-          <button className="btn btn-ghost" onClick={onClose}>เธขเธเน€เธฅเธดเธ</button>
+          <button className="btn btn-primary" onClick={submit} disabled={busy}>{busy ? 'กำลังส่ง...' : 'ส่งคำขอ'}</button>
+          <button className="btn btn-ghost" onClick={onClose}>ยกเลิก</button>
         </div>
       </div>
     </div>
