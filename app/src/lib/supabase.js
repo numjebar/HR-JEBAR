@@ -3,8 +3,15 @@ import { createClient } from '@supabase/supabase-js';
 const url = import.meta.env.VITE_SUPABASE_URL;
 const anon = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!url || !anon) {
-  console.warn('[supabase] กรุณาตั้งค่า VITE_SUPABASE_URL และ VITE_SUPABASE_ANON_KEY ใน .env.local');
+const cleanUrl = String(url || '').trim();
+const isValidSupabaseUrl = /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(cleanUrl);
+
+if (!isValidSupabaseUrl || !anon) {
+  console.error('[supabase] Missing or invalid VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY');
 }
 
-export const supabase = createClient(url || '', anon || '');
+export const supabaseConfigError = !isValidSupabaseUrl || !anon;
+export const supabase = createClient(
+  isValidSupabaseUrl ? cleanUrl : 'https://invalid.supabase.co',
+  anon || 'missing-anon-key',
+);
