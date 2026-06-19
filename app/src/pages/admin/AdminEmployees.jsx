@@ -1,9 +1,175 @@
 ﻿import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
-import { computePay, rulesFor, rangeFor, THB, ymd } from '../../lib/payroll';
+import { addDays, computePay, parseYmd, rulesFor, rangeForEmployee, THB, ymd } from '../../lib/payroll';
 
 const EMPLOYEE_APP_URL = 'https://hr-jebar.pages.dev';
+const PAY_TYPE_LABEL = {
+  daily: 'รายวัน',
+  weekly: 'รายสัปดาห์',
+  monthly: 'รายเดือน',
+};
+const DAY_OFF_OPTIONS = [
+  { value: 0, label: 'อาทิตย์' },
+  { value: 1, label: 'จันทร์' },
+  { value: 2, label: 'อังคาร' },
+  { value: 3, label: 'พุธ' },
+  { value: 4, label: 'พฤหัส' },
+  { value: 5, label: 'ศุกร์' },
+  { value: 6, label: 'เสาร์' },
+];
+const WEEKDAY_OPTIONS = [
+  { value: 0, label: 'อาทิตย์' },
+  { value: 1, label: 'จันทร์' },
+  { value: 2, label: 'อังคาร' },
+  { value: 3, label: 'พุธ' },
+  { value: 4, label: 'พฤหัส' },
+  { value: 5, label: 'ศุกร์' },
+  { value: 6, label: 'เสาร์' },
+];
+const MONTH_DAY_OPTIONS = Array.from({ length: 31 }, (_, idx) => idx + 1);
+
+function payrollPeriodForEmployee(emp, requestedPeriod) {
+  if (!emp) return requestedPeriod || 'month';
+  if (emp.pay_type === 'weekly') return 'week';
+  if (emp.pay_type === 'monthly') return 'month';
+  return requestedPeriod || 'day';
+}
+
+function allowedPeriodsForEmployee(emp) {
+  if (!emp) return [
+    { k: 'day', l: 'วันนี้' },
+    { k: 'week', l: 'สัปดาห์' },
+    { k: 'month', l: 'เดือน' },
+  ];
+  if (emp.pay_type === 'weekly') return [{ k: 'week', l: 'สัปดาห์' }];
+  if (emp.pay_type === 'monthly') return [{ k: 'month', l: 'เดือน' }];
+  return [
+    { k: 'day', l: 'วันนี้' },
+    { k: 'week', l: 'สัปดาห์' },
+    { k: 'month', l: 'เดือน' },
+  ];
+}
+
+function dayOffLabel(days) {
+  const active = new Set((days || []).map(Number));
+  const labels = DAY_OFF_OPTIONS.filter((day) => active.has(day.value)).map((day) => day.label);
+  return labels.length ? labels.join(', ') : 'ไม่มี';
+}
+
+function fullThaiDate(iso) {
+  const d = parseYmd(iso);
+  if (!d) return iso || '—';
+  return d.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function attendanceStatusMeta(status) {
+  if (status === 'present') return { label: 'มา', color: 'var(--accent)', bg: 'var(--accent-soft)' };
+  if (status === 'late') return { label: 'สาย', color: 'var(--late-fg)', bg: 'var(--late-bg)' };
+  if (status === 'leave') return { label: 'ลา', color: 'var(--danger-fg)', bg: '#fee2e2' };
+  if (status === 'paid_leave') return { label: 'ลาจ่าย', color: '#0f766e', bg: '#ccfbf1' };
+  if (status === 'absent') return { label: 'ขาด', color: 'var(--danger-fg)', bg: '#fee2e2' };
+  if (status === 'off') return { label: 'หยุด', color: 'var(--muted)', bg: 'var(--bg)' };
+  return { label: status || '—', color: 'var(--muted)', bg: 'var(--bg)' };
+}
+
+function buildAttendanceTimeline(range, attendanceRows, dayOff) {
+  if (!range?.from || !range?.to) return [];
+  const byDate = new Map((attendanceRows || []).map((row) => [row.date, row]));
+  const blockedDays = new Set((dayOff || []).map(Number));
+  const items = [];
+  for (let cursor = parseYmd(range.from); cursor && cursor <= parseYmd(range.to); cursor = addDays(cursor, 1)) {
+    const date = ymd(cursor);
+    const row = byDate.get(date);
+    if (row) {
+      items.push({
+        date,
+        kind: row.status === 'leave' && row.paid ? 'paid_leave' : row.status,
+        row,
+      });
+      continue;
+    }
+    items.push({
+      date,
+      kind: blockedDays.has(cursor.getDay()) ? 'off' : 'absent',
+      row: null,
+    });
+  }
+  return items.reverse();
+}
+
+function groupAdjustmentsByDate(adjustments) {
+  const map = new Map();
+  (adjustments || []).forEach((item) => {
+    if (!item?.date) return;
+    if (!map.has(item.date)) map.set(item.date, []);
+    map.get(item.date).push(item);
+  });
+  return map;
+}
+
+function summarizeTimeline(items) {
+  const summary = {
+    workedDays: 0,
+    leaveDays: 0,
+    paidLeaveDays: 0,
+    absentDays: 0,
+    offDays: 0,
+    payableDays: 0,
+  };
+  (items || []).forEach((item) => {
+    if (item.kind === 'present' || item.kind === 'late') {
+      summary.workedDays += 1;
+      summary.payableDays += 1;
+      return;
+    }
+    if (item.kind === 'paid_leave') {
+      summary.leaveDays += 1;
+      summary.paidLeaveDays += 1;
+      summary.payableDays += 1;
+      return;
+    }
+    if (item.kind === 'leave') {
+      summary.leaveDays += 1;
+      return;
+    }
+    if (item.kind === 'off') {
+      summary.offDays += 1;
+      return;
+    }
+    summary.absentDays += 1;
+  });
+  return summary;
+}
+
+function toSyntheticAttendance(items) {
+  return (items || [])
+    .filter((item) => item.kind !== 'off')
+    .map((item) => {
+      if (item.row) {
+        return {
+          ...item.row,
+          status: item.kind === 'paid_leave' ? 'leave' : item.row.status,
+          paid: item.kind === 'paid_leave' ? true : item.row.paid,
+        };
+      }
+      return {
+        date: item.date,
+        status: item.kind === 'paid_leave' ? 'leave' : item.kind,
+        paid: item.kind === 'paid_leave',
+        clock_in: null,
+        clock_out: null,
+        ot_min: 0,
+      };
+    });
+}
+
+function adjustmentTypeLabel(type) {
+  if (type === 'bonus') return 'โบนัส';
+  if (type === 'damage') return 'หักเสียหาย';
+  if (type === 'advance') return 'เบิกล่วงหน้า';
+  return 'รายการอื่น';
+}
 
 function Avatar({ emp, size = 48 }) {
   const displayName = emp.nickname || emp.name || 'พนักงาน';
@@ -74,7 +240,8 @@ export default function AdminEmployees() {
 }
 
 function EmpDetail({ emp, branches, orgId, onBack }) {
-  const [period, setPeriod] = useState('month');
+  const naturalPeriod = payrollPeriodForEmployee(emp, 'month');
+  const [period, setPeriod] = useState(naturalPeriod);
   const [att, setAtt] = useState([]);
   const [adj, setAdj] = useState([]);
   const [pay, setPay] = useState(null);
@@ -82,11 +249,20 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
   const [showAddAdj, setShowAddAdj] = useState(false);
   const [showMsg, setShowMsg] = useState(false);
   const [showPinRecovery, setShowPinRecovery] = useState(false);
+  const [editingDay, setEditingDay] = useState(null);
+  const [payRange, setPayRange] = useState(null);
+  const effectivePeriod = payrollPeriodForEmployee(emp, period);
+  const periodOptions = allowedPeriodsForEmployee(emp);
 
   const br = branches.find((b) => b.id === emp.branch_id);
+  const attendanceTimeline = buildAttendanceTimeline(payRange, att, emp.day_off);
+  const timelineSummary = summarizeTimeline(attendanceTimeline);
+  const adjustmentsByDate = groupAdjustmentsByDate(adj);
+  const offDaysInTimeline = attendanceTimeline.filter((entry) => entry.kind === 'off');
 
   async function load() {
-    const range = rangeFor(period);
+    const range = rangeForEmployee(effectivePeriod, emp);
+    setPayRange(range);
     const [{ data: st }, { data: a }, { data: s }, { data: d }] = await Promise.all([
       supabase.from('org_settings').select('*').eq('org_id', orgId).single(),
       supabase.from('attendance').select('*').eq('emp_id', emp.id).gte('date', range.from).lte('date', range.to).order('date', { ascending: false }),
@@ -96,10 +272,15 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
     setAtt(a || []);
     setAdj(d || []);
     const rules = rulesFor(st?.rules, br, emp);
-    setPay(computePay(emp, a || [], s || [], d || [], rules));
+    const syntheticAttendance = toSyntheticAttendance(buildAttendanceTimeline(range, a || [], emp.day_off));
+    setPay(computePay(emp, syntheticAttendance, s || [], d || [], rules, range));
   }
 
-  useEffect(() => { load(); }, [period]);
+  useEffect(() => {
+    setPeriod(naturalPeriod);
+  }, [emp?.id, naturalPeriod]);
+
+  useEffect(() => { load(); }, [effectivePeriod, emp?.id]);
 
   async function deleteEmp() {
     if (!confirm(`ลบพนักงาน "${emp.name}" ออกจากระบบ?`)) return;
@@ -129,8 +310,19 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
           {emp.nickname && <div style={{ color: 'var(--muted)' }}>"{emp.nickname}"</div>}
           <div style={{ color: 'var(--muted)', fontSize: 14, marginTop: 4 }}>{emp.position} · {emp.department} · {br?.label || '—'}</div>
           <div style={{ marginTop: 4, fontSize: 14 }}>
-            {emp.pay_type === 'daily' ? `รายวัน ${THB(emp.rate)}/วัน` : `รายเดือน ${THB(emp.rate)}/เดือน`}
+            {`${PAY_TYPE_LABEL[emp.pay_type] || PAY_TYPE_LABEL.monthly} · ค่าจ้าง ${THB(emp.rate)}/วัน`}
           </div>
+          {emp.pay_type === 'weekly' && emp.weekly_cycle_start_day != null && (
+            <div style={{ marginTop: 4, fontSize: 13, color: 'var(--muted)' }}>
+              เริ่มรอบสัปดาห์: {WEEKDAY_OPTIONS.find((d) => d.value === Number(emp.weekly_cycle_start_day))?.label || '—'}
+            </div>
+          )}
+          {emp.pay_type === 'monthly' && emp.monthly_cycle_start_day != null && (
+            <div style={{ marginTop: 4, fontSize: 13, color: 'var(--muted)' }}>
+              เริ่มรอบเดือน: วันที่ {emp.monthly_cycle_start_day}
+            </div>
+          )}
+          <div style={{ marginTop: 4, fontSize: 14, color: 'var(--muted)' }}>วันหยุดประจำ: {dayOffLabel(emp.day_off)}</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn" style={{ background: 'var(--accent-soft)', color: 'var(--accent)', fontSize: 13 }} onClick={() => setShowEdit(true)}>แก้ไข</button>
@@ -163,6 +355,7 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
           ['รูปบัตรประชาชน', emp.id_card_url ? <a href={emp.id_card_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', fontWeight: 700 }}>เปิดดูรูป</a> : null],
           ['ธนาคาร', emp.bank_name],
           ['เลขบัญชี', emp.bank_account],
+          ['วันหยุดประจำ', dayOffLabel(emp.day_off)],
           ['ผู้ติดต่อฉุกเฉิน', emp.em_name && `${emp.em_name} (${emp.em_rel || '-'}) ${emp.em_phone || ''}`],
         ].map(([label, value]) => (
           <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--line)', fontSize: 14 }}>
@@ -174,10 +367,18 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
 
       {/* period toggle */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {[{ k: 'day', l: 'วันนี้' }, { k: 'week', l: 'สัปดาห์' }, { k: 'month', l: 'เดือน' }].map((p) => (
+        {periodOptions.map((p) => (
           <button key={p.k} onClick={() => setPeriod(p.k)} className="btn" style={{ background: period === p.k ? 'var(--accent)' : 'var(--surface)', color: period === p.k ? '#fff' : 'var(--muted)', border: '1px solid var(--line)', padding: '7px 18px', fontSize: 14 }}>{p.l}</button>
         ))}
       </div>
+
+      {payRange && (
+        <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 16 }}>
+          รอบคำนวณของพนักงานนี้ ({emp.pay_type === 'weekly' ? 'รายสัปดาห์' : emp.pay_type === 'monthly' ? 'รายเดือน' : 'ปัจจุบัน'}):
+          {' '}
+          <span className="num">{payRange.from}</span> - <span className="num">{payRange.to}</span>
+        </div>
+      )}
 
       {/* pay breakdown */}
       {pay && (
@@ -185,11 +386,23 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
           <div style={{ background: 'var(--accent)', borderRadius: 16, padding: '20px', color: '#fff' }}>
             <div style={{ fontSize: 13, opacity: .8 }}>เงินสุทธิ</div>
             <div className="num" style={{ fontSize: 34, fontWeight: 700, marginTop: 4 }}>{THB(pay.net)}</div>
-            <div style={{ fontSize: 13, opacity: .8, marginTop: 8 }}>{pay.daysWorked} วันทำงาน · {pay.leaveDays} วันลา</div>
+            <div style={{ fontSize: 13, opacity: .8, marginTop: 8 }}>
+              {timelineSummary.workedDays} วันทำงาน · {timelineSummary.leaveDays} วันลา · {timelineSummary.absentDays} วันขาด
+            </div>
+            {emp.pay_type !== 'daily' && (
+              <div style={{ fontSize: 12, opacity: .8, marginTop: 6 }}>
+                รอบนี้ {pay.cycleDaysTotal || 0} วัน · หยุด {timelineSummary.offDays} วัน · ตารางงาน {pay.scheduledDaysInCycle || 0} วัน
+              </div>
+            )}
+            {emp.pay_type !== 'daily' && (
+              <div style={{ fontSize: 12, opacity: .8, marginTop: 4 }}>
+                ถึงวันนี้ผ่านไป {pay.cycleDaysElapsed || 0} วัน · วันมีสิทธิ์รับค่าจ้าง {timelineSummary.payableDays} วัน
+              </div>
+            )}
           </div>
           <div className="card" style={{ padding: '16px 18px', fontSize: 14 }}>
             {[
-              ['ค่าแรงฐาน', pay.base, '+'],
+              ['ค่าแรงงวดนี้', pay.base, '+'],
               ['OT', pay.otPay, '+'],
               ['คอมมิชชั่น', pay.commission, '+'],
               ['โบนัส', pay.bonus, '+'],
@@ -201,9 +414,50 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
                 <span className="num" style={{ color: t === '+' ? 'var(--accent)' : 'var(--danger-fg)', fontWeight: 600 }}>{t}{THB(v)}</span>
               </div>
             ))}
+            <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 10 }}>
+              {emp.pay_type === 'weekly' && 'พนักงานรายสัปดาห์จะแสดงเฉพาะงวดสัปดาห์ปัจจุบันของพนักงานคนนี้'}
+              {emp.pay_type === 'monthly' && 'พนักงานรายเดือนจะแสดงเฉพาะงวดเดือนปัจจุบันของพนักงานคนนี้'}
+            </div>
           </div>
         </div>
       )}
+
+      <div className="card" style={{ padding: '20px', marginBottom: 20 }}>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>ตารางสรุปรายวัน</div>
+        <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 14 }}>
+          ใช้วันที่จริงเป็นตัวอ้างอิงว่าแต่ละวันเป็นวันทำงาน วันหยุด วันลา วันขาด และมีรายการเบิก/โบนัสวันไหนบ้าง
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 10, marginBottom: 14 }}>
+          <div className="card" style={{ padding: 14 }}>
+            <div style={{ color: 'var(--muted)', fontSize: 12 }}>วันทำงานจริง</div>
+            <div className="num" style={{ fontSize: 24, fontWeight: 700 }}>{timelineSummary.workedDays}</div>
+          </div>
+          <div className="card" style={{ padding: 14 }}>
+            <div style={{ color: 'var(--muted)', fontSize: 12 }}>วันลา</div>
+            <div className="num" style={{ fontSize: 24, fontWeight: 700 }}>{timelineSummary.leaveDays}</div>
+          </div>
+          <div className="card" style={{ padding: 14 }}>
+            <div style={{ color: 'var(--muted)', fontSize: 12 }}>วันหยุด</div>
+            <div className="num" style={{ fontSize: 24, fontWeight: 700 }}>{timelineSummary.offDays}</div>
+          </div>
+          <div className="card" style={{ padding: 14 }}>
+            <div style={{ color: 'var(--muted)', fontSize: 12 }}>วันมีสิทธิ์รับค่าจ้าง</div>
+            <div className="num" style={{ fontSize: 24, fontWeight: 700 }}>{timelineSummary.payableDays}</div>
+          </div>
+        </div>
+        <div style={{ fontWeight: 600, marginBottom: 8 }}>รายการวันหยุดในรอบนี้</div>
+        {offDaysInTimeline.length === 0 ? (
+          <div style={{ color: 'var(--muted)', fontSize: 13 }}>ไม่มีวันหยุดที่ระบบคำนวณได้จากรอบนี้</div>
+        ) : (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {offDaysInTimeline.map((entry) => (
+              <span key={entry.date} className="badge" style={{ background: 'var(--bg)', color: 'var(--muted)' }}>
+                {fullThaiDate(entry.date)}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* adjustments */}
       <div className="card" style={{ padding: '20px', marginBottom: 20 }}>
@@ -230,37 +484,59 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
 
       {/* attendance */}
       <div className="card" style={{ padding: '20px' }}>
-        <div style={{ fontWeight: 600, marginBottom: 12 }}>ประวัติการลงเวลา</div>
-        {att.map((a) => (
-          <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--line)', fontSize: 14 }}>
+        <div style={{ fontWeight: 600, marginBottom: 12 }}>ประวัติรายวัน / ลงเวลา</div>
+        {attendanceTimeline.map((entry) => {
+          const meta = attendanceStatusMeta(entry.kind);
+          const a = entry.row;
+          const dateAdjustments = adjustmentsByDate.get(entry.date) || [];
+          return (
+          <div key={entry.date} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--line)', fontSize: 14 }}>
             <div>
-              <span style={{ fontWeight: 500 }}>{a.date}</span>
-              {a.clock_in && <span className="num" style={{ color: 'var(--muted)', marginLeft: 10 }}>{a.clock_in} – {a.clock_out || '—'}</span>}
+              <span style={{ fontWeight: 500 }}>{fullThaiDate(entry.date)}</span>
+              {a?.clock_in && <span className="num" style={{ color: 'var(--muted)', marginLeft: 10 }}>{a.clock_in} – {a.clock_out || '—'}</span>}
+              {!a?.clock_in && <span style={{ color: 'var(--muted)', marginLeft: 10 }}>{entry.kind === 'off' ? 'วันหยุดประจำ' : entry.kind === 'absent' ? 'ไม่มีการลงเวลา' : entry.kind === 'leave' || entry.kind === 'paid_leave' ? 'ลางาน' : '—'}</span>}
+              {dateAdjustments.length > 0 && (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                  {dateAdjustments.map((item) => (
+                    <span
+                      key={item.id}
+                      className="badge"
+                      style={{
+                        background: item.type === 'bonus' ? 'var(--accent-soft)' : '#fff4e5',
+                        color: item.type === 'bonus' ? 'var(--accent)' : '#9a3412',
+                      }}
+                    >
+                      {adjustmentTypeLabel(item.type)} {item.type === 'bonus' ? '+' : '-'}{THB(item.amount)}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {a.checkin_dist != null && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{a.checkin_dist}ม.</span>}
-              {a.checkin_selfie_url ? (
+              {a?.checkin_dist != null && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{a.checkin_dist}ม.</span>}
+              {a?.checkin_selfie_url ? (
                 <a href={a.checkin_selfie_url} target="_blank" rel="noreferrer"><img src={a.checkin_selfie_url} alt="selfie" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} /></a>
               ) : (
                 <div title="ยังไม่มีรูปเซลฟี่ของรายการนี้" style={{ width: 28, height: 28, borderRadius: '50%', background: emp.color || 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700 }}>
                   {(emp.nickname || emp.name || 'ไม่มีรูป').slice(0, 2)}
                 </div>
               )}
-              <span className="badge" style={{
-                background: a.status === 'present' ? 'var(--accent-soft)' : a.status === 'late' ? 'var(--late-bg)' : 'var(--danger-bg)',
-                color: a.status === 'present' ? 'var(--accent)' : a.status === 'late' ? 'var(--late-fg)' : 'var(--danger-fg)',
-              }}>
-                {a.status === 'present' ? 'มา' : a.status === 'late' ? 'สาย' : a.status === 'leave' ? 'ลา' : 'ขาด'}
+              <span className="badge" style={{ background: meta.bg, color: meta.color }}>
+                {meta.label}
               </span>
+              <button className="btn btn-ghost" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => setEditingDay(entry)}>
+                แก้วัน
+              </button>
             </div>
           </div>
-        ))}
+        )})}
       </div>
 
       {showEdit && <EmpFormModal emp={emp} branches={branches} orgId={orgId} onClose={() => { setShowEdit(false); onBack(); }} />}
       {showPinRecovery && <PinRecoveryModal emp={emp} onClose={() => setShowPinRecovery(false)} />}
       {showAddAdj && <AddAdjModal emp={emp} orgId={orgId} onClose={() => { setShowAddAdj(false); load(); }} />}
       {showMsg && <SendMsgModal emp={emp} orgId={orgId} onClose={() => setShowMsg(false)} />}
+      {editingDay && <AttendanceDayModal emp={emp} orgId={orgId} entry={editingDay} onClose={() => setEditingDay(null)} onSaved={() => { setEditingDay(null); load(); }} />}
     </div>
   );
 }
@@ -289,11 +565,14 @@ function EmpFormModal({ emp, branches, orgId, onClose }) {
     pay_type: emp?.pay_type || 'daily',
     rate: emp?.rate || 480,
     start_date: emp?.start_date || ymd(new Date()),
+    weekly_cycle_start_day: emp?.weekly_cycle_start_day ?? new Date((emp?.start_date || ymd(new Date())) + 'T00:00').getDay(),
+    monthly_cycle_start_day: emp?.monthly_cycle_start_day ?? new Date((emp?.start_date || ymd(new Date())) + 'T00:00').getDate(),
     commission: emp?.commission || { type: 'none', value: 0 },
     color: emp?.color || COLORS[0],
     notes: emp?.notes || '',
     closing_tasks_text: isEdit ? (emp?.closing_tasks || []).join('\n') : DEFAULT_CLOSING_TASKS.join('\n'),
-    day_off: emp?.day_off || [], currentPin,
+    day_off: Array.isArray(emp?.day_off) ? emp.day_off : [],
+    currentPin,
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -308,6 +587,15 @@ function EmpFormModal({ emp, branches, orgId, onClose }) {
     setTimeout(() => setCopied(false), 1600);
   }
 
+  function toggleDayOff(day) {
+    setForm((prev) => {
+      const current = new Set((prev.day_off || []).map(Number));
+      if (current.has(day)) current.delete(day);
+      else current.add(day);
+      return { ...prev, day_off: Array.from(current).sort((a, b) => a - b) };
+    });
+  }
+
   async function save() {
     if (!pinReady) {
       setErr('กรุณาตั้ง PIN เป็นตัวเลข 4 หลัก');
@@ -316,13 +604,19 @@ function EmpFormModal({ emp, branches, orgId, onClose }) {
 
     setBusy(true);
     setErr('');
-    const payload = { ...form, org_id: orgId };
+      const payload = {
+        ...form,
+        org_id: orgId,
+        weekly_cycle_start_day: form.pay_type === 'weekly' ? Number(form.weekly_cycle_start_day) : null,
+        monthly_cycle_start_day: form.pay_type === 'monthly' ? Number(form.monthly_cycle_start_day) : null,
+      };
     payload.closing_tasks = form.closing_tasks_text
       .split('\n')
       .map((task) => task.trim())
       .filter(Boolean);
     delete payload.pin;
     delete payload.closing_tasks_text;
+    delete payload.currentPin;
 
     try {
       if (isEdit) {
@@ -332,7 +626,7 @@ function EmpFormModal({ emp, branches, orgId, onClose }) {
         if (form.pin && form.pin !== currentPin) {
           const { error: pinError } = await supabase.rpc('admin_set_employee_pin', {
             p_emp_id: emp.id,
-            p_day_off: emp?.day_off || [], form.pin,
+            p_pin: form.pin,
           });
           if (pinError) throw pinError;
         }
@@ -348,7 +642,7 @@ function EmpFormModal({ emp, branches, orgId, onClose }) {
 
         const { error: pinError } = await supabase.rpc('admin_set_employee_pin', {
           p_emp_id: empId,
-          p_day_off: emp?.day_off || [], form.pin,
+          p_pin: form.pin,
         });
         if (pinError) throw pinError;
       }
@@ -381,14 +675,64 @@ function EmpFormModal({ emp, branches, orgId, onClose }) {
               </select>
             </div>
             <div>
-              <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 5 }}>ประเภทค่าจ้าง</label>
+              <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 5 }}>รอบจ่ายเงิน</label>
               <select value={form.pay_type} onChange={(e) => set('pay_type', e.target.value)}>
                 <option value="daily">รายวัน</option>
+                <option value="weekly">รายสัปดาห์</option>
                 <option value="monthly">รายเดือน</option>
               </select>
             </div>
-            <Field label={`อัตราค่าจ้าง (${form.pay_type === 'daily' ? 'บาท/วัน' : 'บาท/เดือน'})`} value={form.rate} onChange={(v) => set('rate', +v)} type="number" />
+            <Field
+              label="อัตราค่าจ้าง (บาท/วัน)"
+              value={form.rate}
+              onChange={(v) => set('rate', +v)}
+              type="number"
+            />
             <Field label="วันเริ่มงาน" value={form.start_date} onChange={(v) => set('start_date', v)} type="date" />
+            {form.pay_type === 'weekly' && (
+              <div>
+                <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 5 }}>วันเริ่มรอบสัปดาห์</label>
+                <select value={form.weekly_cycle_start_day} onChange={(e) => set('weekly_cycle_start_day', Number(e.target.value))}>
+                  {WEEKDAY_OPTIONS.map((day) => <option key={day.value} value={day.value}>{day.label}</option>)}
+                </select>
+                <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 6 }}>เช่น บางคนเริ่มนับรอบทุกวันอังคาร บางคนทุกวันพุธ</div>
+              </div>
+            )}
+            {form.pay_type === 'monthly' && (
+              <div>
+                <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 5 }}>วันที่เริ่มรอบเดือน</label>
+                <select value={form.monthly_cycle_start_day} onChange={(e) => set('monthly_cycle_start_day', Number(e.target.value))}>
+                  {MONTH_DAY_OPTIONS.map((day) => <option key={day} value={day}>วันที่ {day}</option>)}
+                </select>
+                <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 6 }}>เช่น บางคนเริ่มรอบวันที่ 10 บางคนวันที่ 15</div>
+              </div>
+            )}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 8 }}>วันหยุดประจำของพนักงาน</label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {DAY_OFF_OPTIONS.map((day) => {
+                  const active = (form.day_off || []).map(Number).includes(day.value);
+                  return (
+                    <button
+                      key={day.value}
+                      type="button"
+                      className="btn"
+                      onClick={() => toggleDayOff(day.value)}
+                      style={{
+                        padding: '7px 12px',
+                        fontSize: 13,
+                        background: active ? 'var(--accent)' : 'var(--surface)',
+                        color: active ? '#fff' : 'var(--muted)',
+                        border: '1px solid var(--line)',
+                      }}
+                    >
+                      {day.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 6 }}>เลือกได้มากกว่า 1 วัน ถ้าไม่เลือกถือว่าไม่มีวันหยุดประจำ</div>
+            </div>
             {showPinField && (
               <Field
                 label={isEdit ? (currentPin ? 'PIN พนักงาน (4 หลัก)' : (needsLoginPin ? 'ตั้ง PIN เพื่อเปิดใช้งานล็อกอิน (4 หลัก)' : 'PIN พนักงาน (ตั้งใหม่เพื่อให้แสดง)')) : 'PIN (4 หลัก)'}
@@ -438,7 +782,7 @@ function EmpFormModal({ emp, branches, orgId, onClose }) {
             </div>
           </div>
 
-          <div> value={form.notes} onChange={(v) => set('notes', v)} />
+          <Field label="หมายเหตุ (แอดมิน)" value={form.notes} onChange={(v) => set('notes', v)} />
 
           <div className="card" style={{ padding: 14, background: 'var(--bg)' }}>
             <div style={{ fontWeight: 600, marginBottom: 10 }}>ข้อมูลธนาคาร / ผู้ติดต่อฉุกเฉิน</div>
@@ -510,7 +854,7 @@ function PinRecoveryModal({ emp, onClose }) {
     try {
       const { error } = await supabase.rpc('admin_set_employee_pin', {
         p_emp_id: emp.id,
-        p_day_off: emp?.day_off || [], pin,
+        p_pin: pin,
       });
       if (error) throw error;
       setShownPin(pin);
@@ -568,14 +912,125 @@ function PinRecoveryModal({ emp, onClose }) {
   );
 }
 
+function AttendanceDayModal({ emp, orgId, entry, onClose, onSaved }) {
+  const initialStatus = entry.kind === 'paid_leave' ? 'leave' : entry.kind === 'off' ? 'absent' : entry.kind;
+  const [form, setForm] = useState({
+    status: initialStatus,
+    paid: entry.kind === 'paid_leave' ? true : !!entry.row?.paid,
+    clock_in: entry.row?.clock_in || '',
+    clock_out: entry.row?.clock_out || '',
+    ot_min: entry.row?.ot_min || 0,
+  });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  function set(key, value) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function save() {
+    setBusy(true);
+    setErr('');
+    try {
+      const payload = {
+        emp_id: emp.id,
+        org_id: orgId,
+        date: entry.date,
+        status: form.status,
+        paid: form.status === 'leave' ? !!form.paid : form.status === 'absent' ? false : true,
+        clock_in: form.status === 'present' || form.status === 'late' ? (form.clock_in || null) : null,
+        clock_out: form.status === 'present' || form.status === 'late' ? (form.clock_out || null) : null,
+        ot_min: Number(form.ot_min || 0),
+      };
+      const { error } = await supabase.from('attendance').upsert(payload, { onConflict: 'emp_id,date' });
+      if (error) throw error;
+      onSaved();
+    } catch (ex) {
+      setErr(ex.message || 'บันทึกสถานะรายวันไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resetToDefault() {
+    setBusy(true);
+    setErr('');
+    try {
+      const { error } = await supabase.from('attendance').delete().eq('emp_id', emp.id).eq('date', entry.date);
+      if (error) throw error;
+      onSaved();
+    } catch (ex) {
+      setErr(ex.message || 'คืนค่าวันนี้ไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal" style={{ padding: 28, maxWidth: 560 }}>
+        <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 6 }}>แก้สถานะรายวัน</div>
+        <div style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 18 }}>{fullThaiDate(entry.date)}</div>
+        <div style={{ display: 'grid', gap: 14 }}>
+          <div>
+            <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 5 }}>สถานะวันนี้</label>
+            <select value={form.status} onChange={(e) => set('status', e.target.value)}>
+              <option value="present">มาทำงาน</option>
+              <option value="late">มาสาย</option>
+              <option value="leave">ลา</option>
+              <option value="absent">ขาด</option>
+            </select>
+          </div>
+
+          {(form.status === 'present' || form.status === 'late') && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <Field label="เวลาเข้า" value={form.clock_in} onChange={(v) => set('clock_in', v)} placeholder="09:00" />
+              <Field label="เวลาออก" value={form.clock_out} onChange={(v) => set('clock_out', v)} placeholder="18:00" />
+              <Field label="OT (นาที)" value={form.ot_min} onChange={(v) => set('ot_min', +v)} type="number" />
+            </div>
+          )}
+
+          {form.status === 'leave' && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+              <input type="checkbox" checked={!!form.paid} onChange={(e) => set('paid', e.target.checked)} />
+              ลานี้ยังได้รับค่าจ้าง
+            </label>
+          )}
+
+          <div className="card" style={{ padding: 14, background: 'var(--bg)' }}>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>วิธีใช้</div>
+            <div style={{ color: 'var(--muted)', fontSize: 13, lineHeight: 1.5 }}>
+              ใช้หน้าต่างนี้แก้รายวันเป็นวันที่จริงเลย เช่น วันหยุด วันลา วันขาด หรือวันที่มาทำงาน แล้วระบบจะนำไปสรุปจำนวนวันและค่าแรงของงวดนั้นใหม่
+            </div>
+          </div>
+
+          {err && <div style={{ color: 'var(--danger-fg)', fontSize: 13 }}>{err}</div>}
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="btn btn-primary" style={{ flex: 1 }} onClick={save} disabled={busy}>
+              {busy ? 'กำลังบันทึก...' : 'บันทึกวันนี้'}
+            </button>
+            <button className="btn" style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--line)' }} onClick={resetToDefault} disabled={busy}>
+              คืนค่าอัตโนมัติ
+            </button>
+            <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose} disabled={busy}>
+              ปิด
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AddAdjModal({ emp, orgId, onClose }) {
-  const [form, setForm] = useState({ type: 'bonus', amount: 0, note: '' });
+  const [form, setForm] = useState({ type: 'bonus', amount: 0, note: '', date: ymd(new Date()) });
   const [busy, setBusy] = useState(false);
 
   async function save() {
     if (!form.note.trim()) { alert('กรุณาระบุเหตุผล'); return; }
     setBusy(true);
-    await supabase.from('adjustments').insert({ emp_id: emp.id, org_id: orgId, date: ymd(new Date()), ...form });
+    await supabase.from('adjustments').insert({ emp_id: emp.id, org_id: orgId, ...form });
     setBusy(false);
     onClose();
   }
@@ -595,6 +1050,7 @@ function AddAdjModal({ emp, orgId, onClose }) {
             </select>
           </div>
           <Field label="จำนวน (บาท)" value={form.amount} onChange={(v) => setForm((p) => ({ ...p, amount: +v }))} type="number" />
+          <Field label="วันที่รายการนี้มีผล" value={form.date} onChange={(v) => setForm((p) => ({ ...p, date: v }))} type="date" />
           <Field label="เหตุผล (บังคับ)" value={form.note} onChange={(v) => setForm((p) => ({ ...p, note: v }))} required />
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn btn-primary" style={{ flex: 1 }} onClick={save} disabled={busy}>{busy ? 'กำลังบันทึก...' : 'บันทึก'}</button>
@@ -659,3 +1115,4 @@ function Field({ label, value, onChange, type = 'text', required, placeholder, .
     </div>
   );
 }
+

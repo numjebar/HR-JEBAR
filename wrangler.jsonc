@@ -5,8 +5,9 @@
   "observability": {
     "enabled": true
   },
+  "pages_build_output_dir": "app/dist",
   "assets": {
-    "directory": "design_handoff_hr_jebar/design_handoff_hr_jebar"
+    "directory": "app/dist"
   },
   "compatibility_flags": [
     "nodejs_compat"

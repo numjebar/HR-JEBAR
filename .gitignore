@@ -4,3 +4,10 @@
 !.dev.vars.example
 .env*
 !.env.example
+
+# build and backup artifacts
+*.zip
+*-dist-*/
+HRJEBARassets/
+app/dist/
+app/node_modules/
