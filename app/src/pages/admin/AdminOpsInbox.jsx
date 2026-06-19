@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 
@@ -18,10 +19,12 @@ const TASK_OPTIONS = [
 
 export default function AdminOpsInbox() {
   const { orgId } = useAuthStore();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [branches, setBranches] = useState([]);
-  const [taskFilter, setTaskFilter] = useState('all');
+  const [taskFilter, setTaskFilter] = useState(searchParams.get('task') || 'all');
+  const [dateFilter, setDateFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -63,9 +66,15 @@ export default function AdminOpsInbox() {
   }, [orgId]);
 
   const filteredItems = useMemo(() => {
-    if (taskFilter === 'all') return items;
-    return items.filter((item) => item.task_key === taskFilter);
-  }, [items, taskFilter]);
+    const today = new Date().toISOString().slice(0, 10);
+    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    return items.filter((item) => {
+      if (taskFilter !== 'all' && item.task_key !== taskFilter) return false;
+      if (dateFilter === 'today' && (item.created_at || '').slice(0, 10) !== today) return false;
+      if (dateFilter === 'week' && (item.created_at || '').slice(0, 10) < weekAgo) return false;
+      return true;
+    });
+  }, [items, taskFilter, dateFilter]);
 
   const taskCounts = useMemo(() => {
     const counts = Object.keys(TASK_LABELS).reduce((acc, key) => ({ ...acc, [key]: 0 }), {});
@@ -111,13 +120,21 @@ export default function AdminOpsInbox() {
       </div>
 
       <div className="card" style={{ padding: 16, marginBottom: 18, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-        <div style={{ fontWeight: 700 }}>กรองประเภท</div>
-        <select value={taskFilter} onChange={(e) => setTaskFilter(e.target.value)} style={{ width: 240 }}>
+        <select value={taskFilter} onChange={(e) => { setTaskFilter(e.target.value); setSearchParams({}); }} style={{ width: 200 }}>
           {TASK_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
-        <div style={{ fontSize: 13, color: 'var(--muted)' }}>แสดง {filteredItems.length} รายการ</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {[{ k: 'all', l: 'ทั้งหมด' }, { k: 'today', l: 'วันนี้' }, { k: 'week', l: '7 วัน' }].map(({ k, l }) => (
+            <button key={k} onClick={() => setDateFilter(k)} className="btn" style={{
+              background: dateFilter === k ? 'var(--accent)' : 'var(--bg)',
+              color: dateFilter === k ? '#fff' : 'var(--muted)',
+              border: '1px solid var(--line)', padding: '7px 14px', fontSize: 13,
+            }}>{l}</button>
+          ))}
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', marginLeft: 'auto' }}>แสดง {filteredItems.length} รายการ</div>
       </div>
 
       {error && (

@@ -14,6 +14,7 @@ export default function AdminDashboard() {
   const [pendingLeaves, setPendingLeaves] = useState([]);
   const [empReplies, setEmpReplies] = useState([]);
   const [opsEntriesCount, setOpsEntriesCount] = useState(0);
+  const [opsTodayCounts, setOpsTodayCounts] = useState({});
   const [opsWarning, setOpsWarning] = useState('');
   const [employees, setEmployees] = useState([]);
   const [allBranches, setAllBranches] = useState([]);
@@ -21,7 +22,9 @@ export default function AdminDashboard() {
   const today = ymd(new Date());
 
   async function load() {
-    const [{ data: att }, { data: leaves }, { data: todayLeaves }, { data: msgs }, { data: emps }, { data: branches }, { data: settings }, opsResult] = await Promise.all([
+    const todayStart = `${today}T00:00:00`;
+    const todayEnd = `${today}T23:59:59`;
+    const [{ data: att }, { data: leaves }, { data: todayLeaves }, { data: msgs }, { data: emps }, { data: branches }, { data: settings }, opsResult, opsTodayResult] = await Promise.all([
       supabase.from('attendance').select('*, employees(name,nickname,color)').eq('org_id', orgId).eq('date', today),
       supabase.from('leaves').select('*, employees(name,nickname)').eq('org_id', orgId).eq('status', 'pending'),
       supabase.from('leaves')
@@ -35,6 +38,7 @@ export default function AdminDashboard() {
       supabase.from('branches').select('*').eq('org_id', orgId),
       supabase.from('org_settings').select('*').eq('org_id', orgId).single(),
       supabase.from('employee_ops_entries').select('id', { count: 'exact', head: true }).eq('org_id', orgId),
+      supabase.from('employee_ops_entries').select('task_key').eq('org_id', orgId).gte('created_at', todayStart).lte('created_at', todayEnd),
     ]);
 
     const existingEmpIds = new Set((att || []).map((a) => a.emp_id));
@@ -60,6 +64,7 @@ export default function AdminDashboard() {
     setEmpReplies(msgs || []);
     if (opsResult?.error) {
       setOpsEntriesCount(0);
+      setOpsTodayCounts({});
       if (String(opsResult.error.message || '').includes('employee_ops_entries')) {
         setOpsWarning('ยังไม่ได้รัน SQL งานร้านพนักงาน');
       } else {
@@ -68,6 +73,11 @@ export default function AdminDashboard() {
     } else {
       setOpsEntriesCount(opsResult?.count || 0);
       setOpsWarning('');
+      const todayCounts = {};
+      (opsTodayResult?.data || []).forEach((row) => {
+        todayCounts[row.task_key] = (todayCounts[row.task_key] || 0) + 1;
+      });
+      setOpsTodayCounts(todayCounts);
     }
 
     const working = todayRows.filter((a) => a.clock_in && !a.clock_out).length;
@@ -257,26 +267,49 @@ export default function AdminDashboard() {
       </div>
 
       <div className="card" style={{ padding: '20px', marginTop: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
           <div>
             <div style={{ fontWeight: 700, marginBottom: 4 }}>งานร้านที่พนักงานส่งเข้ามา</div>
             <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-              ใช้ดูบิลซื้อของ การผลิตขนม สต๊อก ของใช้ และใบสั่งซื้อจากแอปพนักงาน
+              บิลซื้อของ ผลิตขนม สต๊อก ของใช้ ใบสั่งซื้อ — รวม {opsEntriesCount} รายการ
             </div>
           </div>
           <button className="btn btn-primary" onClick={() => nav('/admin/ops-inbox')}>
             เปิดกล่องงานร้าน
           </button>
         </div>
-        <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <div className="num" style={{ fontSize: 28, fontWeight: 800 }}>{opsEntriesCount}</div>
-          <div style={{ color: 'var(--muted)', fontSize: 13 }}>รายการทั้งหมดในระบบ</div>
-          {opsWarning && (
-            <div style={{ marginLeft: 'auto', fontSize: 13, color: '#7a5b2b', background: '#fff8e8', border: '1px solid #f4dfab', borderRadius: 999, padding: '6px 10px' }}>
-              {opsWarning}
-            </div>
-          )}
-        </div>
+        {opsWarning ? (
+          <div style={{ fontSize: 13, color: '#7a5b2b', background: '#fff8e8', border: '1px solid #f4dfab', borderRadius: 10, padding: '10px 14px' }}>
+            {opsWarning}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+            {[
+              { key: 'bills',          icon: '📷', label: 'ถ่ายบิล' },
+              { key: 'production',     icon: '🏭', label: 'ผลิตขนม' },
+              { key: 'inventory',      icon: '📦', label: 'วัตถุดิบ' },
+              { key: 'cake-stock',     icon: '🍰', label: 'สต๊อกเค้ก' },
+              { key: 'supplies-count', icon: '🧴', label: 'ของใช้' },
+              { key: 'purchase-list',  icon: '🛒', label: 'ใบซื้อ' },
+            ].map(({ key, icon, label }) => (
+              <button
+                key={key}
+                onClick={() => nav(`/admin/ops-inbox?task=${key}`)}
+                style={{
+                  padding: '12px 10px', borderRadius: 14, background: opsTodayCounts[key] ? 'var(--accent-soft)' : 'var(--bg)',
+                  border: `1px solid ${opsTodayCounts[key] ? 'var(--accent)' : 'var(--line)'}`,
+                  cursor: 'pointer', textAlign: 'center',
+                }}
+              >
+                <div style={{ fontSize: 20 }}>{icon}</div>
+                <div className="num" style={{ fontWeight: 800, fontSize: 22, color: opsTodayCounts[key] ? 'var(--accent)' : 'var(--muted)' }}>
+                  {opsTodayCounts[key] || 0}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{label}</div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
