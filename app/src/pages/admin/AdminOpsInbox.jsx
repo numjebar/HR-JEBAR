@@ -6,8 +6,9 @@ const TASK_LABELS = {
   bills: 'ถ่ายบิลซื้อของ',
   production: 'บันทึกการผลิตขนม',
   inventory: 'วัตถุดิบและสต๊อก',
+  'cake-stock': 'สต๊อกขนม',
   'supplies-count': 'นับสต๊อกของใช้',
-  'purchase-list': 'ใบสั่งซื้อก่อนไปซื้อ',
+  'purchase-list': 'ใบสั่งซื้อ',
 };
 
 const TASK_OPTIONS = [
@@ -100,7 +101,7 @@ export default function AdminOpsInbox() {
         <button className="btn" onClick={load}>รีโหลด</button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
         {Object.entries(TASK_LABELS).map(([key, label]) => (
           <div key={key} className="card" style={{ padding: '16px 14px' }}>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>{label}</div>
@@ -180,10 +181,23 @@ export default function AdminOpsInbox() {
 }
 
 function PayloadPreview({ payload, imageName }) {
-  const rows = Object.entries(payload).filter(([, value]) => String(value ?? '').trim() !== '');
+  if (Array.isArray(payload.items)) {
+    return <PurchaseListPreview payload={payload} />;
+  }
+
+  const SKIP_KEYS = new Set(['date', 'recordedBy']);
+  const rows = Object.entries(payload).filter(
+    ([key, value]) => !SKIP_KEYS.has(key) && String(value ?? '').trim() !== ''
+  );
 
   return (
     <div style={{ background: '#faf7f2', border: '1px solid #eadcc6', borderRadius: 16, padding: 14 }}>
+      {(payload.date || payload.recordedBy) && (
+        <div style={{ display: 'flex', gap: 20, marginBottom: 10, fontSize: 12, color: 'var(--muted)' }}>
+          {payload.date && <span>📅 {payload.date}</span>}
+          {payload.recordedBy && <span>👤 {payload.recordedBy}</span>}
+        </div>
+      )}
       <div style={{ display: 'grid', gap: 8 }}>
         {rows.length === 0 ? (
           <div style={{ fontSize: 13, color: 'var(--muted)' }}>ไม่มีรายละเอียดใน payload</div>
@@ -206,8 +220,53 @@ function PayloadPreview({ payload, imageName }) {
   );
 }
 
+function PurchaseListPreview({ payload }) {
+  const { date, recordedBy, items = [] } = payload;
+  return (
+    <div style={{ background: '#faf7f2', border: '1px solid #eadcc6', borderRadius: 16, padding: 14 }}>
+      <div style={{ display: 'flex', gap: 20, marginBottom: 10, fontSize: 12, color: 'var(--muted)', flexWrap: 'wrap' }}>
+        {date && <span>📅 {date}</span>}
+        {recordedBy && <span>👤 {recordedBy}</span>}
+        <span style={{ fontWeight: 700, color: '#bf6c2a' }}>🛒 {items.length} รายการ</span>
+      </div>
+      {items.length === 0 ? (
+        <div style={{ fontSize: 13, color: 'var(--muted)' }}>ไม่มีรายการสั่งซื้อ</div>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: '#f0e8d8', color: '#6b4c2a' }}>
+                <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 700 }}>#</th>
+                <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 700 }}>รายการ</th>
+                <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 700 }}>หมวด</th>
+                <th style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 700 }}>จำนวน</th>
+                <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 700 }}>หน่วย</th>
+                <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 700 }}>หมายเหตุ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, i) => (
+                <tr key={i} style={{ borderTop: '1px solid #eadcc6' }}>
+                  <td style={{ padding: '6px 10px', color: 'var(--muted)' }}>{i + 1}</td>
+                  <td style={{ padding: '6px 10px', fontWeight: 600 }}>{item.itemName}</td>
+                  <td style={{ padding: '6px 10px', color: 'var(--muted)' }}>{item.category}</td>
+                  <td style={{ padding: '6px 10px', textAlign: 'right' }}>{item.quantity}</td>
+                  <td style={{ padding: '6px 10px' }}>{item.unit}</td>
+                  <td style={{ padding: '6px 10px', color: 'var(--muted)' }}>{item.note || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function humanizeKey(key) {
   const map = {
+    date: 'วันที่',
+    recordedBy: 'ผู้บันทึก',
     vendor: 'ร้าน / ผู้ขาย',
     amount: 'ยอดบิล',
     category: 'ประเภท',

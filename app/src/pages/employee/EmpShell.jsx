@@ -1,5 +1,7 @@
-﻿import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
+﻿import { useEffect, useState } from 'react';
+import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
+import { supabase } from '../../lib/supabase';
 import EmpHome from './EmpHome';
 import EmpHistory from './EmpHistory';
 import EmpPay from './EmpPay';
@@ -17,6 +19,39 @@ const tabs = [
 ];
 
 export default function EmpShell() {
+  const { employeeSessionToken, employee } = useAuthStore();
+  const [unreadCount, setUnreadCount] = useState(0);
+  const location = useLocation();
+
+  async function fetchUnread() {
+    if (!employeeSessionToken) return;
+    try {
+      const { data } = await supabase.rpc('employee_get_messages_v2', { p_session_token: employeeSessionToken });
+      setUnreadCount((data || []).filter((m) => m.from === 'admin' && !m.read_at).length);
+    } catch {}
+  }
+
+  useEffect(() => { fetchUnread(); }, [employeeSessionToken]);
+
+  // Clear badge when user opens messages tab
+  useEffect(() => {
+    if (location.pathname === '/emp/messages') setUnreadCount(0);
+  }, [location.pathname]);
+
+  // Realtime: new messages from admin bump the badge
+  useEffect(() => {
+    if (!employee?.id) return;
+    const ch = supabase.channel('shell-unread')
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'messages',
+        filter: `emp_id=eq.${employee.id}`,
+      }, (payload) => {
+        if (payload.new?.from === 'admin') setUnreadCount((n) => n + 1);
+      })
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [employee?.id]);
+
   return (
     <div style={{ maxWidth: 430, margin: '0 auto', minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)', position: 'relative' }}>
       <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 80 }}>
@@ -42,17 +77,32 @@ export default function EmpShell() {
         borderTop: '1px solid var(--line)', display: 'flex', zIndex: 50,
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}>
-        {tabs.map((t) => (
-          <NavLink key={t.path} to={t.path} end={t.end} style={({ isActive }) => ({
-            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-            padding: '10px 0 8px', textDecoration: 'none', fontSize: 11,
-            color: isActive ? 'var(--accent)' : 'var(--muted)', fontWeight: isActive ? 600 : 400,
-            gap: 3,
-          })}>
-            <t.icon size={22} />
-            {t.label}
-          </NavLink>
-        ))}
+        {tabs.map((t) => {
+          const isMessages = t.path === '/emp/messages';
+          return (
+            <NavLink key={t.path} to={t.path} end={t.end} style={({ isActive }) => ({
+              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+              padding: '10px 0 8px', textDecoration: 'none', fontSize: 11,
+              color: isActive ? 'var(--accent)' : 'var(--muted)', fontWeight: isActive ? 600 : 400,
+              gap: 3,
+            })}>
+              <div style={{ position: 'relative' }}>
+                <t.icon size={22} />
+                {isMessages && unreadCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: -4, right: -7,
+                    background: '#ef4444', color: '#fff',
+                    borderRadius: 999, fontSize: 9, fontWeight: 800,
+                    padding: '1px 4px', lineHeight: 1.4, minWidth: 14, textAlign: 'center',
+                  }}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </div>
+              {t.label}
+            </NavLink>
+          );
+        })}
       </nav>
       <div style={{ position: 'fixed', right: 12, bottom: 74, fontSize: 10, color: 'var(--muted)', background: 'rgba(255,255,255,.92)', border: '1px solid var(--line)', borderRadius: 999, padding: '3px 8px', zIndex: 55 }}>
         {APP_VERSION}

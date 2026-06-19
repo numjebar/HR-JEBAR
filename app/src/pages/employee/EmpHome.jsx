@@ -69,9 +69,9 @@ export default function EmpHome() {
   const actionLabel = canClockOut ? 'ลงเวลาออกงาน' : 'ลงเวลาเข้างาน';
 
   const quickStats = [
-    { value: weekSummary.presentDays, label: 'มาวันนี้' },
-    { value: pendingTasks, label: 'ค้างที่ต้องทำ' },
-    { value: unreadCount, label: 'ของแจ้ง' },
+    { value: weekSummary.presentDays, label: 'มาสัปดาห์นี้' },
+    { value: pendingTasks, label: 'งานค้าง' },
+    { value: unreadCount, label: 'ข้อความใหม่' },
   ];
 
   return (
@@ -128,42 +128,42 @@ export default function EmpHome() {
           ))}
         </div>
 
-        <button
-          className="btn"
-          onClick={() => navigate('/emp/ops')}
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '64px 1fr 22px',
-            alignItems: 'center',
-            gap: 14,
-            padding: 18,
-            width: '100%',
-            borderRadius: 24,
-            border: '1px solid #eadcc6',
-            background: '#fff',
-            textAlign: 'left',
-          }}
-        >
-          <div style={{
-            width: 54,
-            height: 54,
-            borderRadius: 18,
-            background: '#f4e2cf',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 26,
-          }}>
-            📋
+        {/* OPS quick shortcuts */}
+        <div style={{ marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: '#9b7a5a', fontWeight: 700, marginBottom: 8, paddingLeft: 2 }}>งานร้านวันนี้</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            {[
+              { path: '/emp/ops/bills',         icon: '📷', label: 'ถ่ายบิล' },
+              { path: '/emp/ops/purchase-list', icon: '🛒', label: 'ใบสั่งซื้อ' },
+              { path: '/emp/ops/production',    icon: '🏭', label: 'ผลิตขนม' },
+            ].map(item => (
+              <button
+                key={item.path}
+                onClick={() => navigate(item.path)}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  gap: 6, padding: '14px 8px', borderRadius: 18,
+                  border: '1px solid #eadcc6', background: '#fff',
+                  cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#2f241f',
+                }}
+              >
+                <span style={{ fontSize: 26 }}>{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
           </div>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 16, color: '#2f241f' }}>งานร้าน / เมนูปฏิบัติงาน</div>
-            <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>
-              รวมเมนูถ่ายบิล ผลิตขนม วัตถุดิบ เช็กสต๊อกเค้ก ของใช้ และใบสั่งซื้อไว้หน้าเดียว
-            </div>
-          </div>
-          <div style={{ fontSize: 26, color: '#9b7a5a' }}>›</div>
-        </button>
+          <button
+            onClick={() => navigate('/emp/ops')}
+            style={{
+              marginTop: 8, width: '100%', padding: '11px 14px', borderRadius: 16,
+              border: '1px solid #eadcc6', background: 'none',
+              fontSize: 13, color: '#9b7a5a', fontWeight: 600, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}
+          >
+            ดูทุกเมนูงาน ›
+          </button>
+        </div>
       </div>
 
       <div style={{ marginTop: 14, display: 'grid', gap: 12 }}>
