@@ -61,9 +61,9 @@ export default function AdminDashboard() {
     if (opsResult?.error) {
       setOpsEntriesCount(0);
       if (String(opsResult.error.message || '').includes('employee_ops_entries')) {
-        setOpsWarning('เธขเธฑเธเนเธกเนเนเธ”เนเธฃเธฑเธ SQL เธเธฒเธเธฃเนเธฒเธเธเธเธฑเธเธเธฒเธ');
+        setOpsWarning('ยังไม่ได้รัน SQL งานร้านพนักงาน');
       } else {
-        setOpsWarning('เนเธซเธฅเธ”เธเธฒเธเธฃเนเธฒเธเธเธเธฑเธเธเธฒเธเนเธกเนเธชเธณเน€เธฃเนเธ');
+        setOpsWarning('โหลดงานร้านพนักงานไม่สำเร็จ');
       }
     } else {
       setOpsEntriesCount(opsResult?.count || 0);
@@ -176,22 +176,22 @@ export default function AdminDashboard() {
   }
 
   const tiles = [
-    { label: 'เธเธณเธฅเธฑเธเธ—เธณเธเธฒเธ', value: stats.working, color: 'var(--accent)', bg: 'var(--accent-soft)', suffix: 'เธเธ', icon: '๐ข' },
-    { label: 'เธกเธฒเธชเธฒเธขเธงเธฑเธเธเธตเน', value: stats.late, color: 'var(--late-fg)', bg: 'var(--late-bg)', suffix: 'เธเธ', icon: 'โฐ' },
-    { label: 'เธฅเธฒเธงเธฑเธเธเธตเน', value: stats.onLeave, color: 'var(--leave-fg)', bg: 'var(--leave-bg)', suffix: 'เธเธ', icon: '๐“…' },
-    { label: 'เธขเธญเธ”เน€เธเธดเธเน€เธ”เธทเธญเธเธเธตเน', value: THB(stats.monthPayroll), color: 'var(--ink)', bg: 'var(--surface)', suffix: '', icon: '๐’ฐ' },
+    { label: 'กำลังทำงาน', value: stats.working, color: 'var(--accent)', bg: 'var(--accent-soft)', suffix: 'คน', icon: '●' },
+    { label: 'มาสายวันนี้', value: stats.late, color: 'var(--late-fg)', bg: 'var(--late-bg)', suffix: 'คน', icon: '⏱' },
+    { label: 'ลาวันนี้', value: stats.onLeave, color: 'var(--leave-fg)', bg: 'var(--leave-bg)', suffix: 'คน', icon: '□' },
+    { label: 'ยอดเงินเดือนนี้', value: THB(stats.monthPayroll), color: 'var(--ink)', bg: 'var(--surface)', suffix: '', icon: '฿' },
   ];
 
   return (
     <div>
-      <h1 style={{ fontWeight: 700, fontSize: 24, marginBottom: 24 }}>เธ เธฒเธเธฃเธงเธกเธงเธฑเธเธเธตเน</h1>
+      <h1 style={{ fontWeight: 700, fontSize: 24, marginBottom: 24 }}>ภาพรวมวันนี้</h1>
 
       {/* alert: employee replies */}
       {empReplies.length > 0 && (
         <div style={{ background: 'var(--danger-bg)', border: '1px solid #fca5a5', borderRadius: 16, padding: '14px 20px', marginBottom: 20 }}>
-          <div style={{ color: 'var(--danger-fg)', fontWeight: 700 }}>๐“ข เธกเธตเธเธเธฑเธเธเธฒเธเธ•เธญเธเธเธฅเธฑเธ {empReplies.length} เธฃเธฒเธขเธเธฒเธฃ</div>
+          <div style={{ color: 'var(--danger-fg)', fontWeight: 700 }}>มีพนักงานตอบกลับ {empReplies.length} รายการ</div>
           <button className="btn" style={{ marginTop: 8, background: 'none', color: 'var(--danger-fg)', padding: '4px 12px', fontSize: 13, border: '1px solid var(--danger-fg)', borderRadius: 8 }} onClick={() => nav('/admin/messages')}>
-            เธ”เธนเธเนเธญเธเธงเธฒเธก โ’
+            ดูข้อความ →
           </button>
         </div>
       )}
@@ -210,10 +210,10 @@ export default function AdminDashboard() {
       {/* today status */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         <div className="card" style={{ padding: '20px' }}>
-          <div style={{ fontWeight: 700, marginBottom: 14 }}>เธชเธ–เธฒเธเธฐเธงเธฑเธเธเธตเน</div>
-          {todayList.length === 0 && <div style={{ color: 'var(--muted)', fontSize: 14 }}>เธขเธฑเธเนเธกเนเธกเธตเธเนเธญเธกเธนเธฅ</div>}
+          <div style={{ fontWeight: 700, marginBottom: 14 }}>สถานะวันนี้</div>
+          {todayList.length === 0 && <div style={{ color: 'var(--muted)', fontSize: 14 }}>ยังไม่มีข้อมูล</div>}
           {todayList.map((a) => {
-            const nickname = a.employees?.nickname || a.employees?.name || 'เธเธเธฑเธเธเธฒเธ';
+            const nickname = a.employees?.nickname || a.employees?.name || 'พนักงาน';
             return (
             <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--line)', fontSize: 14 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -223,7 +223,7 @@ export default function AdminDashboard() {
                 <div>
                   <div style={{ fontWeight: 500 }}>{a.employees?.nickname || a.employees?.name}</div>
                   <div className="num" style={{ fontSize: 12, color: 'var(--muted)' }}>
-                    {a.status === 'leave' ? a.leave_type || 'เธฅเธฒ' : `${a.clock_in || 'โ€”'} ${a.clock_out ? `โ€“ ${a.clock_out}` : ''}`}
+                    {a.status === 'leave' ? a.leave_type || 'ลา' : `${a.clock_in || '-'} ${a.clock_out ? `- ${a.clock_out}` : ''}`}
                   </div>
                 </div>
               </div>
@@ -231,7 +231,7 @@ export default function AdminDashboard() {
                 background: a.status === 'present' ? 'var(--accent-soft)' : a.status === 'late' ? 'var(--late-bg)' : 'var(--leave-bg)',
                 color: a.status === 'present' ? 'var(--accent)' : a.status === 'late' ? 'var(--late-fg)' : 'var(--leave-fg)',
               }}>
-                {a.status === 'present' ? 'เธ—เธณเธเธฒเธ' : a.status === 'late' ? 'เธชเธฒเธข' : a.leave_status === 'pending' ? 'เธฃเธญเธฅเธฒ' : 'เธฅเธฒ'}
+                {a.status === 'present' ? 'ทำงาน' : a.status === 'late' ? 'สาย' : a.leave_status === 'pending' ? 'รอลา' : 'ลา'}
               </span>
             </div>
             );
@@ -240,16 +240,16 @@ export default function AdminDashboard() {
 
         {/* pending leaves */}
         <div className="card" style={{ padding: '20px' }}>
-          <div style={{ fontWeight: 700, marginBottom: 14 }}>เธเธณเธเธญเธฅเธฒ เธฃเธญเธเธดเธเธฒเธฃเธ“เธฒ ({pendingLeaves.length})</div>
-          {pendingLeaves.length === 0 && <div style={{ color: 'var(--muted)', fontSize: 14 }}>เนเธกเนเธกเธตเธเธณเธเธญ</div>}
+          <div style={{ fontWeight: 700, marginBottom: 14 }}>คำขอลา รอพิจารณา ({pendingLeaves.length})</div>
+          {pendingLeaves.length === 0 && <div style={{ color: 'var(--muted)', fontSize: 14 }}>ไม่มีคำขอ</div>}
           {pendingLeaves.map((l) => (
             <div key={l.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--line)' }}>
               <div style={{ fontWeight: 600, fontSize: 14 }}>{l.employees?.name}</div>
-              <div style={{ fontSize: 13, color: 'var(--muted)' }}>{l.type} ยท {l.date_from} โ€“ {l.date_to}</div>
+              <div style={{ fontSize: 13, color: 'var(--muted)' }}>{l.type} · {l.date_from} - {l.date_to}</div>
               {l.reason && <div style={{ fontSize: 13, marginTop: 2 }}>{l.reason}</div>}
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button className="btn" style={{ background: 'var(--accent)', color: '#fff', padding: '6px 14px', fontSize: 13 }} onClick={() => approveLeave(l.id, 'approved')}>เธญเธเธธเธกเธฑเธ•เธด</button>
-                <button className="btn btn-danger" style={{ padding: '6px 14px', fontSize: 13 }} onClick={() => approveLeave(l.id, 'rejected')}>เธเธเธดเน€เธชเธ</button>
+                <button className="btn" style={{ background: 'var(--accent)', color: '#fff', padding: '6px 14px', fontSize: 13 }} onClick={() => approveLeave(l.id, 'approved')}>อนุมัติ</button>
+                <button className="btn btn-danger" style={{ padding: '6px 14px', fontSize: 13 }} onClick={() => approveLeave(l.id, 'rejected')}>ปฏิเสธ</button>
               </div>
             </div>
           ))}
@@ -259,18 +259,18 @@ export default function AdminDashboard() {
       <div className="card" style={{ padding: '20px', marginTop: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>เธเธฒเธเธฃเนเธฒเธเธ—เธตเนเธเธเธฑเธเธเธฒเธเธชเนเธเน€เธเนเธฒเธกเธฒ</div>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>งานร้านที่พนักงานส่งเข้ามา</div>
             <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-              เนเธเนเธ”เธนเธเธดเธฅเธเธทเนเธญเธเธญเธ เธเธฅเธดเธ•เธเธเธก เธชเธ•เนเธญเธ เธเธญเธเนเธเน เนเธฅเธฐเนเธเธชเธฑเนเธเธเธทเนเธญเธเธฒเธเนเธญเธเธเธเธฑเธเธเธฒเธ
+              ใช้ดูบิลซื้อของ การผลิตขนม สต๊อก ของใช้ และใบสั่งซื้อจากแอปพนักงาน
             </div>
           </div>
           <button className="btn btn-primary" onClick={() => nav('/admin/ops-inbox')}>
-            เน€เธเธดเธ”เธเธฅเนเธญเธเธเธฒเธเธฃเนเธฒเธ
+            เปิดกล่องงานร้าน
           </button>
         </div>
         <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div className="num" style={{ fontSize: 28, fontWeight: 800 }}>{opsEntriesCount}</div>
-          <div style={{ color: 'var(--muted)', fontSize: 13 }}>เธฃเธฒเธขเธเธฒเธฃเธ—เธฑเนเธเธซเธกเธ”เนเธเธฃเธฐเธเธ</div>
+          <div style={{ color: 'var(--muted)', fontSize: 13 }}>รายการทั้งหมดในระบบ</div>
           {opsWarning && (
             <div style={{ marginLeft: 'auto', fontSize: 13, color: '#7a5b2b', background: '#fff8e8', border: '1px solid #f4dfab', borderRadius: 999, padding: '6px 10px' }}>
               {opsWarning}
