@@ -239,12 +239,34 @@ function PayloadPreview({ payload, imageName }) {
 
 function PurchaseListPreview({ payload }) {
   const { date, recordedBy, items = [] } = payload;
+  const [copied, setCopied] = useState(false);
+
+  function copyAsText() {
+    const header = `ใบสั่งซื้อ${date ? ` วันที่ ${date}` : ''}${recordedBy ? ` (${recordedBy})` : ''}`;
+    const lines = items.map((item, i) =>
+      `${i + 1}. ${item.itemName}  ${item.quantity} ${item.unit}${item.note ? `  (${item.note})` : ''}`
+    );
+    navigator.clipboard.writeText([header, ...lines].join('\n')).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
   return (
     <div style={{ background: '#faf7f2', border: '1px solid #eadcc6', borderRadius: 16, padding: 14 }}>
-      <div style={{ display: 'flex', gap: 20, marginBottom: 10, fontSize: 12, color: 'var(--muted)', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 20, marginBottom: 10, fontSize: 12, color: 'var(--muted)', flexWrap: 'wrap', alignItems: 'center' }}>
         {date && <span>📅 {date}</span>}
         {recordedBy && <span>👤 {recordedBy}</span>}
         <span style={{ fontWeight: 700, color: '#bf6c2a' }}>🛒 {items.length} รายการ</span>
+        {items.length > 0 && (
+          <button onClick={copyAsText} style={{
+            marginLeft: 'auto', padding: '4px 12px', borderRadius: 8, fontSize: 12,
+            background: copied ? '#ecfdf3' : '#fff', border: `1px solid ${copied ? '#bbe7cf' : '#eadcc6'}`,
+            color: copied ? '#0d7a46' : '#9b7a5a', cursor: 'pointer', fontWeight: 600,
+          }}>
+            {copied ? '✓ คัดลอกแล้ว' : '📋 คัดลอก'}
+          </button>
+        )}
       </div>
       {items.length === 0 ? (
         <div style={{ fontSize: 13, color: 'var(--muted)' }}>ไม่มีรายการสั่งซื้อ</div>
