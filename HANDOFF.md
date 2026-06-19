@@ -1,5 +1,46 @@
 # HR JEBAR Handoff
 
+## Update 2026-06-19 (employee Operate handoff)
+
+- HR employee home now opens the live Operate app directly:
+  `https://je-bar-operate.pages.dev/`
+- The employee button sends Operate these URL params:
+  - `mode=employee`
+  - `emp_id`
+  - `emp_name`
+  - `branch`
+  - `from_hr=1`
+- This follows the Operate contract from:
+  `https://github.com/numjebar/je-bar-operate/blob/claude/continuation-7d4rf1/INTEGRATE_HR_CONTRACT.md`
+- Employee flow no longer opens the old internal `/emp/ops` page from the main employee button.
+- Admin/owner OPS link remains separate and opens the plain owner URL:
+  `https://je-bar-operate.pages.dev/`
+- Version badge updated to:
+  `Build 2026.06.19-hr-operate-employee1`
+- Build passed locally:
+  `npm.cmd run build`
+- Commit pushed to main:
+  `843ecca Connect employee OPS button to Operate app`
+
+### Deploy status
+
+- GitHub Actions auto deploy for commit `843ecca` failed before build.
+- Failure point:
+  `Check required app env`
+- Required GitHub Actions secrets before auto deploy can pass:
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_ANON_KEY`
+  - `CLOUDFLARE_API_TOKEN`
+  - `CLOUDFLARE_ACCOUNT_ID`
+- Production is still serving the previous bundle until the missing secrets are added and the workflow is rerun, or until a manual Cloudflare Pages deploy is performed from local `app/dist`.
+
+### Branch note
+
+- Remote branch `claude/continuation-7d4rf1` currently contains documentation-only changes:
+  - `CATALOG_CAKE_FIX_NOTES.md`
+  - `INTEGRATE_OPERATE_CONTRACT.md`
+- It is diverged from `main`, so do not merge blindly into production.
+
 ## Update 2026-06-19 (weekly/monthly payroll screen alignment)
 
 - Fixed employee payroll screens so they no longer let a weekly-paid employee drift into a monthly payroll view.
