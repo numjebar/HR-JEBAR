@@ -35,6 +35,7 @@ export default function AdminAttendance() {
       .filter((l) => !existingEmpIds.has(l.emp_id))
       .map((l) => ({
         id: `leave-${l.id}`,
+        leave_id: l.id,
         emp_id: l.emp_id,
         employees: l.employees,
         date,
@@ -79,6 +80,17 @@ export default function AdminAttendance() {
       const fallback = await supabase.from('attendance').delete().eq('id', row.id);
       if (fallback.error) alert(fallback.error.message || error.message || 'ลบรายการไม่สำเร็จ');
     }
+    load();
+  }
+
+  async function approveLeave(leaveId) {
+    await supabase.from('leaves').update({ status: 'approved' }).eq('id', leaveId);
+    load();
+  }
+
+  async function rejectLeave(leaveId) {
+    if (!confirm('ปฏิเสธคำขอลา?')) return;
+    await supabase.from('leaves').update({ status: 'rejected' }).eq('id', leaveId);
     load();
   }
 
@@ -200,7 +212,13 @@ export default function AdminAttendance() {
                 </td>
                 <td style={{ padding: '12px 16px' }}>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {r.is_leave_request && <span style={{ color: 'var(--muted)', fontSize: 12 }}>จากคำขอลา</span>}
+                    {r.is_leave_request && r.leave_status === 'pending' && (
+                      <>
+                        <button className="btn" style={{ padding: '6px 10px', fontSize: 12, background: 'var(--accent)', color: '#fff' }} onClick={() => approveLeave(r.leave_id)}>อนุมัติ</button>
+                        <button className="btn" style={{ padding: '6px 10px', fontSize: 12, background: '#fee2e2', color: '#b91c1c' }} onClick={() => rejectLeave(r.leave_id)}>ปฏิเสธ</button>
+                      </>
+                    )}
+                    {r.is_leave_request && r.leave_status !== 'pending' && <span style={{ color: 'var(--muted)', fontSize: 12 }}>{r.leave_status === 'approved' ? '✓ อนุมัติแล้ว' : 'จากคำขอลา'}</span>}
                     {!r.is_leave_request && (
                       <button className="btn" style={{ padding: '6px 10px', fontSize: 12, background: 'var(--bg)', border: '1px solid var(--line)' }} onClick={() => setClockInModal({ row: r, clockIn: r.clock_in || rulesForRow(r).workStart || '09:00', reason: 'แอดมินแก้เวลาเข้างานย้อนหลัง' })}>
                         แก้เวลาเข้า

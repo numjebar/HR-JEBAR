@@ -406,7 +406,9 @@ function OpsTaskPage({ taskKey, navigate }) {
   const [draft, setDraft, resetDraft] = useTaskDraft(taskKey);
   const [localHistory, saveLocalDraft] = useTaskLocalHistory(taskKey);
   const [catalog, setCatalog] = useState(null);
+  const [branches, setBranches] = useState([]);
   const backend = useTaskBackend(taskKey);
+  const { orgId } = useAuthStore();
 
   // Gemini key: env var first, then localStorage fallback
   const geminiKey = import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('hr_gemini_key') || '';
@@ -414,6 +416,13 @@ function OpsTaskPage({ taskKey, navigate }) {
   useEffect(() => {
     fetchOperateCatalog().then(c => { if (c) setCatalog(c); });
   }, []);
+
+  useEffect(() => {
+    if (!orgId) return;
+    supabase.from('branches').select('id,label').eq('org_id', orgId).then(({ data }) => {
+      if (data?.length) setBranches(data);
+    });
+  }, [orgId]);
 
   const summary = summarizeDraft(taskKey, draft);
 
@@ -439,7 +448,7 @@ function OpsTaskPage({ taskKey, navigate }) {
       <OpsFormCard
         taskKey={taskKey} draft={draft} setDraft={setDraft} resetDraft={resetDraft}
         saveLocalDraft={saveLocalDraft} backend={backend} summary={summary}
-        catalog={catalog} geminiKey={geminiKey}
+        catalog={catalog} geminiKey={geminiKey} branches={branches}
       />
 
       <HistorySection
@@ -464,7 +473,7 @@ function OpsTaskPage({ taskKey, navigate }) {
   );
 }
 
-function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, backend, summary, catalog, geminiKey }) {
+function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, backend, summary, catalog, geminiKey, branches = [] }) {
   const { employeeSessionToken, employee } = useAuthStore();
   const empName = employee?.name || '';
   const [saving, setSaving]    = useState(false);
@@ -524,7 +533,7 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
 
       {taskKey === 'purchase-list'
         ? <PurchaseListForm draft={draft} setDraft={setDraft} catalog={catalog} employeeSessionToken={employeeSessionToken} />
-        : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey)
+        : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches)
       }
 
       <div style={summaryPillStyle}>ร่างล่าสุด: {summary}</div>
@@ -543,7 +552,7 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
 }
 
 // ─── Form fields per task ────────────────────────────────────────────────────
-function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey) {
+function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches = []) {
   switch (taskKey) {
     case 'bills':
       return (
@@ -672,7 +681,10 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey) {
         <div style={fieldGridStyle}>
           <Field label="สาขาที่เช็ก">
             <select value={draft.branchName} onChange={e => setDraft({ ...draft, branchName: e.target.value })}>
-              <option>สาขากาดน้ำทอง</option><option>สาขากาดกองเก่า</option>
+              {branches.length > 0
+                ? branches.map(b => <option key={b.id} value={b.label}>{b.label}</option>)
+                : [<option key="1">สาขากาดน้ำทอง</option>, <option key="2">สาขากาดกองเก่า</option>]
+              }
             </select>
           </Field>
           <Field label="ชื่อเค้ก / เมนู">

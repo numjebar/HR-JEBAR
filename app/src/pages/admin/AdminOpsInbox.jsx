@@ -3,6 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 
+const SOURCE_LABELS = {
+  'hr-app': 'HR App',
+  'hr-web': 'Web',
+  'emp-portal': 'พนักงาน',
+};
+
 const TASK_LABELS = {
   bills: 'ถ่ายบิลซื้อของ',
   production: 'บันทึกการผลิตขนม',
@@ -185,7 +191,7 @@ export default function AdminOpsInbox() {
                     </div>
                   </div>
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>source: {item.source}</div>
+                {item.source && <div style={{ fontSize: 12, color: 'var(--muted)', background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 8, padding: '2px 8px' }}>{SOURCE_LABELS[item.source] || item.source}</div>}
               </div>
 
               <PayloadPreview payload={item.payload || {}} imageName={item.image_name} />
