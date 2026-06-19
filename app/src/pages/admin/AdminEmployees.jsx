@@ -672,6 +672,7 @@ function EmpFormModal({ emp, branches, orgId, onClose }) {
     notes: emp?.notes || '',
     closing_tasks_text: isEdit ? (emp?.closing_tasks || []).join('\n') : DEFAULT_CLOSING_TASKS.join('\n'),
     day_off: Array.isArray(emp?.day_off) ? emp.day_off : [],
+    pin: '',
     currentPin,
   });
   const [busy, setBusy] = useState(false);
