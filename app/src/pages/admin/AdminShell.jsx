@@ -11,6 +11,8 @@ import AdminMessages from './AdminMessages';
 import AdminSettings from './AdminSettings';
 import AdminOpsInbox from './AdminOpsInbox';
 
+const OPS_APP_URL = 'https://je-bar-operate.pages.dev/';
+
 const NAV = [
   { path: '/admin', label: 'ภาพรวม', icon: '📊', end: true },
   { path: '/admin/employees', label: 'พนักงาน', icon: '👥' },
@@ -26,7 +28,7 @@ export default function AdminShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const closeSidebar = () => setSidebarOpen(false);
   const openOps = () => {
-    window.location.href = '/ops/';
+    window.location.href = OPS_APP_URL;
   };
 
   return (
