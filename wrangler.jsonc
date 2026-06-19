@@ -6,9 +6,6 @@
     "enabled": true
   },
   "pages_build_output_dir": "app/dist",
-  "assets": {
-    "directory": "app/dist"
-  },
   "compatibility_flags": [
     "nodejs_compat"
   ]

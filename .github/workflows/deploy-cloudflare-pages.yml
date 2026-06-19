@@ -28,8 +28,16 @@ jobs:
         working-directory: app
         run: npm ci
 
+      - name: Check required app env
+        run: |
+          test -n "${{ secrets.VITE_SUPABASE_URL }}"
+          test -n "${{ secrets.VITE_SUPABASE_ANON_KEY }}"
+
       - name: Build
         working-directory: app
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build
 
       - name: Deploy to Cloudflare Pages

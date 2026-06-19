@@ -333,3 +333,31 @@ Build check:
 
 - Build passed:
   `npm.cmd run build`
+
+## Hotfix 2026-06-19 (production blank page recovery)
+
+- Production `https://hr-jebar.pages.dev` was blank after GitHub auto deploy.
+- Root cause: GitHub Actions built the Vite app without Supabase env values, so the generated JS bundle did not contain `VITE_SUPABASE_URL`.
+- Immediate recovery:
+  - Built locally from `app/.env.local`
+  - Deployed `app/dist` directly to Cloudflare Pages project `hr-jebar`
+  - Verified production JS contains the Supabase project URL again
+- Cloudflare preview created by the recovery deploy:
+  - `https://c061ebaf.hr-jebar.pages.dev`
+- Production URL to use:
+  - `https://hr-jebar.pages.dev`
+
+### Auto deploy guardrail
+
+- Updated `.github/workflows/deploy-cloudflare-pages.yml`
+- Build step now receives:
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_ANON_KEY`
+- The workflow now checks these values before build.
+- Required GitHub Actions secrets before using auto deploy again:
+  - `CLOUDFLARE_API_TOKEN`
+  - `CLOUDFLARE_ACCOUNT_ID`
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_ANON_KEY`
+
+If the two Vite Supabase secrets are missing, GitHub Actions should fail before deploy instead of publishing a blank app.
