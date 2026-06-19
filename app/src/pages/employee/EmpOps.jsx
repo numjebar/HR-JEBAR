@@ -120,7 +120,7 @@ function BillImageSection({ draft, setDraft, geminiKey }) {
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFile} />
       <input ref={albumRef}  type="file" accept="image/*"                        style={{ display: 'none' }} onChange={handleFile} />
       {aiError && <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 4 }}>{aiError}</div>}
-      {!geminiKey && <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4 }}>ตั้งค่า VITE_GEMINI_API_KEY เพื่อใช้ AI อ่านบิล</div>}
+      {!geminiKey && <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4 }}>ตั้งค่า AI Key ในหน้าโปรไฟล์ → ตั้งค่า AI (Gemini) เพื่อใช้ฟีเจอร์นี้</div>}
       {draft.imagePreviewUrl && (
         <div style={{ marginTop: 8 }}>
           <img

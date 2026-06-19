@@ -209,10 +209,11 @@ function PayloadPreview({ payload, imageName }) {
     return <PurchaseListPreview payload={payload} />;
   }
 
-  const SKIP_KEYS = new Set(['date', 'recordedBy']);
+  const SKIP_KEYS = new Set(['date', 'recordedBy', 'aiItems', 'imagePreviewUrl', 'imageBase64', 'imageMimeType']);
   const rows = Object.entries(payload).filter(
-    ([key, value]) => !SKIP_KEYS.has(key) && String(value ?? '').trim() !== ''
+    ([key, value]) => !SKIP_KEYS.has(key) && value != null && !Array.isArray(value) && typeof value !== 'object' && String(value).trim() !== ''
   );
+  const aiItems = Array.isArray(payload.aiItems) ? payload.aiItems : [];
 
   return (
     <div style={{ background: '#faf7f2', border: '1px solid #eadcc6', borderRadius: 16, padding: 14 }}>
@@ -223,7 +224,7 @@ function PayloadPreview({ payload, imageName }) {
         </div>
       )}
       <div style={{ display: 'grid', gap: 8 }}>
-        {rows.length === 0 ? (
+        {rows.length === 0 && aiItems.length === 0 && !imageName ? (
           <div style={{ fontSize: 13, color: 'var(--muted)' }}>ไม่มีรายละเอียดใน payload</div>
         ) : (
           rows.map(([key, value]) => (
@@ -232,6 +233,19 @@ function PayloadPreview({ payload, imageName }) {
               <div style={{ color: 'var(--ink)', wordBreak: 'break-word' }}>{String(value)}</div>
             </div>
           ))
+        )}
+        {aiItems.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10, fontSize: 13 }}>
+            <div style={{ color: 'var(--muted)', fontWeight: 700 }}>รายการจาก AI</div>
+            <div style={{ color: 'var(--ink)' }}>
+              {aiItems.slice(0, 5).map((it, i) => (
+                <span key={i} style={{ display: 'inline-block', background: '#eef2ff', borderRadius: 6, padding: '2px 8px', fontSize: 12, marginRight: 4, marginBottom: 4 }}>
+                  {it.name}{it.qty > 0 ? ` ×${it.qty}` : ''}{it.unit ? ` ${it.unit}` : ''}
+                </span>
+              ))}
+              {aiItems.length > 5 && <span style={{ fontSize: 12, color: 'var(--muted)' }}>+{aiItems.length - 5} รายการ</span>}
+            </div>
+          </div>
         )}
         {imageName && (
           <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10, fontSize: 13 }}>
