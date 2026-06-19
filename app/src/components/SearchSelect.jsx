@@ -1,0 +1,80 @@
+import { useState, useRef, useEffect } from 'react';
+
+export default function SearchSelect({
+  options = [],
+  value = '',
+  onChange,
+  placeholder = 'พิมพ์เพื่อค้นหา...',
+  maxVisible = 5,
+}) {
+  const [q, setQ] = useState(value);
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => { setQ(value); }, [value]);
+
+  useEffect(() => {
+    const handle = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, []);
+
+  const lower = q.trim().toLowerCase();
+  const filtered = lower
+    ? options.filter(o => (o.name || '').toLowerCase().includes(lower))
+    : options;
+  const visible = filtered.slice(0, 60);
+
+  const ITEM_H = 44;
+  const listH = Math.min(visible.length, maxVisible) * ITEM_H;
+
+  function pick(name) {
+    setQ(name);
+    onChange(name);
+    setOpen(false);
+  }
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', flex: 1 }}>
+      <input
+        value={q}
+        onChange={e => { setQ(e.target.value); onChange(e.target.value); if (!open) setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        placeholder={placeholder}
+        style={{ width: '100%' }}
+        autoComplete="off"
+      />
+      {open && visible.length > 0 && (
+        <div style={{
+          position: 'absolute', zIndex: 1000, top: 'calc(100% + 4px)', left: 0, right: 0,
+          background: '#fff', border: '1.5px solid #e0d4c0', borderRadius: 14,
+          boxShadow: '0 8px 28px rgba(0,0,0,.14)',
+          maxHeight: `${listH}px`, overflowY: 'auto',
+        }}>
+          {visible.map((o, i) => (
+            <button
+              key={i}
+              onMouseDown={e => { e.preventDefault(); pick(o.name); }}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                width: '100%', textAlign: 'left', padding: '10px 14px', height: `${ITEM_H}px`,
+                background: 'none', border: 'none',
+                borderBottom: i < visible.length - 1 ? '1px solid #f5ede0' : 'none',
+                cursor: 'pointer', fontSize: 14, color: '#2f241f',
+              }}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.name}</span>
+              {(o.unit || o.type) && (
+                <span style={{ fontSize: 11, color: '#9a8070', flexShrink: 0, marginLeft: 8 }}>
+                  {o.unit ? `${o.unit} · ` : ''}{o.type}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
