@@ -244,6 +244,7 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
   const [period, setPeriod] = useState(naturalPeriod);
   const [att, setAtt] = useState([]);
   const [adj, setAdj] = useState([]);
+  const [leaves, setLeaves] = useState([]);
   const [pay, setPay] = useState(null);
   const [showEdit, setShowEdit] = useState(false);
   const [showAddAdj, setShowAddAdj] = useState(false);
@@ -263,14 +264,16 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
   async function load() {
     const range = rangeForEmployee(effectivePeriod, emp);
     setPayRange(range);
-    const [{ data: st }, { data: a }, { data: s }, { data: d }] = await Promise.all([
+    const [{ data: st }, { data: a }, { data: s }, { data: d }, { data: lv }] = await Promise.all([
       supabase.from('org_settings').select('*').eq('org_id', orgId).single(),
       supabase.from('attendance').select('*').eq('emp_id', emp.id).gte('date', range.from).lte('date', range.to).order('date', { ascending: false }),
       supabase.from('sales').select('*').eq('emp_id', emp.id).gte('date', range.from).lte('date', range.to),
       supabase.from('adjustments').select('*').eq('emp_id', emp.id).gte('date', range.from).lte('date', range.to).order('created_at', { ascending: false }),
+      supabase.from('leaves').select('*').eq('emp_id', emp.id).gte('date_from', range.from).lte('date_from', range.to).order('created_at', { ascending: false }),
     ]);
     setAtt(a || []);
     setAdj(d || []);
+    setLeaves(lv || []);
     const rules = rulesFor(st?.rules, br, emp);
     const syntheticAttendance = toSyntheticAttendance(buildAttendanceTimeline(range, a || [], emp.day_off));
     setPay(computePay(emp, syntheticAttendance, s || [], d || [], rules, range));
@@ -295,6 +298,17 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
   async function deleteAdj(id) {
     if (!confirm('ลบรายการนี้?')) return;
     await supabase.from('adjustments').delete().eq('id', id).eq('emp_id', emp.id);
+    load();
+  }
+
+  async function approveLeave(leaveId) {
+    await supabase.from('leaves').update({ status: 'approved' }).eq('id', leaveId);
+    load();
+  }
+
+  async function rejectLeave(leaveId) {
+    if (!confirm('ปฏิเสธคำขอลา?')) return;
+    await supabase.from('leaves').update({ status: 'rejected' }).eq('id', leaveId);
     load();
   }
 
@@ -480,6 +494,49 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* leaves */}
+      <div className="card" style={{ padding: '20px', marginBottom: 20 }}>
+        <div style={{ fontWeight: 600, marginBottom: 12 }}>คำขอลา / ประวัติการลา</div>
+        {leaves.length === 0 ? (
+          <div style={{ color: 'var(--muted)', fontSize: 14 }}>ไม่มีคำขอลาในรอบนี้</div>
+        ) : (
+          leaves.map((lv) => {
+            const isPending = lv.status === 'pending';
+            const statusMeta = lv.status === 'approved'
+              ? { label: 'อนุมัติแล้ว', color: '#0f766e', bg: '#ccfbf1' }
+              : lv.status === 'rejected'
+              ? { label: 'ปฏิเสธแล้ว', color: '#b91c1c', bg: '#fee2e2' }
+              : { label: 'รออนุมัติ', color: '#92400e', bg: '#fef3c7' };
+            const days = Math.round((new Date(lv.date_to) - new Date(lv.date_from)) / 86400000) + 1;
+            return (
+              <div key={lv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--line)' }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 500 }}>
+                    {lv.type}
+                    {lv.urgent && <span style={{ marginLeft: 6, fontSize: 11, background: '#fee2e2', color: '#b91c1c', borderRadius: 6, padding: '1px 6px' }}>ด่วน</span>}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                    {lv.date_from === lv.date_to ? lv.date_from : `${lv.date_from} – ${lv.date_to}`}
+                    {' · '}{days} วัน
+                    {lv.reason && ` · ${lv.reason}`}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {isPending ? (
+                    <>
+                      <button className="btn" style={{ padding: '6px 10px', fontSize: 12, background: 'var(--accent)', color: '#fff' }} onClick={() => approveLeave(lv.id)}>อนุมัติ</button>
+                      <button className="btn" style={{ padding: '6px 10px', fontSize: 12, background: '#fee2e2', color: '#b91c1c' }} onClick={() => rejectLeave(lv.id)}>ปฏิเสธ</button>
+                    </>
+                  ) : (
+                    <span className="badge" style={{ background: statusMeta.bg, color: statusMeta.color }}>{statusMeta.label}</span>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* attendance */}
