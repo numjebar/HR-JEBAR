@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 
 const SOURCE_LABELS = {
+  'hr_employee_app': 'HR App',
   'hr-app': 'HR App',
   'hr-web': 'Web',
   'emp-portal': 'พนักงาน',
