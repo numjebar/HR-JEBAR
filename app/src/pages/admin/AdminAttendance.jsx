@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
-import { ymd, addDays, rulesFor, parseHM } from '../../lib/payroll';
+import { ymd, addDays, dayRate, rulesFor, parseHM } from '../../lib/payroll';
+
+const URGENT_LEAVE_NOTE_PREFIX = 'ลาด่วนเช้าวันงานโดยไม่มีเหตุผล';
 
 export default function AdminAttendance() {
   const { orgId } = useAuthStore();
@@ -84,13 +86,58 @@ export default function AdminAttendance() {
   }
 
   async function approveLeave(leaveId) {
+    const { data: leave } = await supabase.from('leaves').select('*').eq('id', leaveId).single();
     await supabase.from('leaves').update({ status: 'approved' }).eq('id', leaveId);
+    if (leave) {
+      const days = [];
+      let cursor = new Date(`${leave.date_from}T00:00:00`);
+      const end = new Date(`${leave.date_to}T00:00:00`);
+      while (cursor <= end) {
+        days.push({
+          org_id: leave.org_id, emp_id: leave.emp_id, date: ymd(cursor),
+          clock_in: null, clock_out: null, status: 'leave', ot_min: 0,
+          leave_type: leave.type, paid: true,
+        });
+        cursor = addDays(cursor, 1);
+      }
+      await supabase.from('attendance').upsert(days, { onConflict: 'emp_id,date' });
+      if (Boolean(leave.urgent)) {
+        const { data: emp } = await supabase.from('employees').select('*').eq('id', leave.emp_id).single();
+        if (emp) {
+          const br = branches.find((b) => b.id === emp.branch_id);
+          const rules = rulesFor(settings?.rules, br, emp);
+          const deductDays = Number(rules?.urgentLeaveDeductDays || 0);
+          if (deductDays > 0) {
+            const note = `${URGENT_LEAVE_NOTE_PREFIX} (หัก ${deductDays} แรง)`;
+            const deductAmount = Math.round(dayRate(emp) * deductDays);
+            const { data: existingAdjust } = await supabase.from('adjustments').select('id')
+              .eq('emp_id', leave.emp_id).eq('date', leave.date_from).eq('auto', true)
+              .like('note', `${URGENT_LEAVE_NOTE_PREFIX}%`).maybeSingle();
+            if (!existingAdjust && deductAmount > 0) {
+              await supabase.from('adjustments').insert({
+                emp_id: leave.emp_id, org_id: leave.org_id, date: leave.date_from,
+                type: 'other', amount: deductAmount, note, auto: true,
+              });
+            }
+          }
+        }
+      }
+    }
     load();
   }
 
   async function rejectLeave(leaveId) {
     if (!confirm('ปฏิเสธคำขอลา?')) return;
+    const { data: leave } = await supabase.from('leaves').select('*').eq('id', leaveId).single();
     await supabase.from('leaves').update({ status: 'rejected' }).eq('id', leaveId);
+    if (leave) {
+      await supabase.from('attendance').delete()
+        .eq('emp_id', leave.emp_id).gte('date', leave.date_from).lte('date', leave.date_to)
+        .eq('status', 'leave').eq('leave_type', leave.type);
+      await supabase.from('adjustments').delete()
+        .eq('emp_id', leave.emp_id).eq('date', leave.date_from).eq('auto', true)
+        .like('note', `${URGENT_LEAVE_NOTE_PREFIX}%`);
+    }
     load();
   }
 
