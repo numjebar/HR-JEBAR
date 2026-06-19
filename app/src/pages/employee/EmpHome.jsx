@@ -1,31 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
 import { fmtDateFull, fmtHM, rulesFor, shopRulesFor } from '../../lib/payroll';
 import CheckInFlow from './CheckInFlow';
 
-const OPERATE_EMPLOYEE_URL = 'https://je-bar-operate.pages.dev/';
-
 function nowClock() {
   return new Date().toLocaleTimeString('th-TH', { hour12: false });
 }
 
-function openOperateForEmployee(employee, branch) {
-  const url = new URL(OPERATE_EMPLOYEE_URL);
-  const employeeId = employee?.id || employee?.employee_id || employee?.emp_id || employee?.code || 'unknown';
-  const employeeName = employee?.name || employee?.nickname || employeeId;
-  const branchName = branch?.label || branch?.name || employee?.branch || employee?.branch_id || '';
-
-  url.searchParams.set('mode', 'employee');
-  url.searchParams.set('emp_id', String(employeeId));
-  url.searchParams.set('emp_name', String(employeeName));
-  if (branchName) url.searchParams.set('branch', String(branchName));
-  url.searchParams.set('from_hr', '1');
-
-  window.location.href = url.toString();
-}
-
 export default function EmpHome() {
+  const navigate = useNavigate();
   const { employee, employeeSessionToken } = useAuthStore();
   const [currentEmployee, setCurrentEmployee] = useState(employee);
   const [branch, setBranch] = useState(null);
@@ -145,7 +130,7 @@ export default function EmpHome() {
 
         <button
           className="btn"
-          onClick={() => openOperateForEmployee(currentEmployee, branch)}
+          onClick={() => navigate('/emp/ops')}
           style={{
             display: 'grid',
             gridTemplateColumns: '64px 1fr 22px',
