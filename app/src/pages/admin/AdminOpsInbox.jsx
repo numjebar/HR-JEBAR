@@ -114,7 +114,10 @@ export default function AdminOpsInbox() {
             รวมรายการบิล ผลิตขนม วัตถุดิบ ของใช้ และใบสั่งซื้อที่พนักงานบันทึกเข้ามาจากแอป HR
           </div>
         </div>
-        <button className="btn" onClick={load}>รีโหลด</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn" onClick={load}>รีโหลด</button>
+          <button className="btn" onClick={() => exportCSV(filteredItems, employees, branches)} title="ส่งออก CSV">📥 CSV</button>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
@@ -212,7 +215,7 @@ function PayloadPreview({ payload, imageName }) {
   const SKIP_KEYS = new Set([
     'date', 'recordedBy', 'aiItems',
     'imagePreviewUrl', 'imageBase64', 'imageMimeType',
-    'photoNames', 'photoCount',
+    'photoNames', 'photoCount', 'photoUrls', 'billImageUrl',
   ]);
   const rows = Object.entries(payload).filter(
     ([key, value]) => !SKIP_KEYS.has(key) && value != null && !Array.isArray(value) && typeof value !== 'object' && String(value).trim() !== ''
@@ -220,6 +223,7 @@ function PayloadPreview({ payload, imageName }) {
   const aiItems = Array.isArray(payload.aiItems) ? payload.aiItems : [];
   const photoNames = Array.isArray(payload.photoNames) ? payload.photoNames : [];
   const photoCount = payload.photoCount || photoNames.length;
+  const billImageUrl = payload.billImageUrl || '';
 
   return (
     <div style={{ background: '#faf7f2', border: '1px solid #eadcc6', borderRadius: 16, padding: 14 }}>
@@ -230,7 +234,7 @@ function PayloadPreview({ payload, imageName }) {
         </div>
       )}
       <div style={{ display: 'grid', gap: 8 }}>
-        {rows.length === 0 && aiItems.length === 0 && !imageName && photoCount === 0 ? (
+        {rows.length === 0 && aiItems.length === 0 && !imageName && !billImageUrl && photoCount === 0 ? (
           <div style={{ fontSize: 13, color: 'var(--muted)' }}>ไม่มีรายละเอียดใน payload</div>
         ) : (
           rows.map(([key, value]) => (
@@ -253,11 +257,14 @@ function PayloadPreview({ payload, imageName }) {
             </div>
           </div>
         )}
-        {imageName && (
-          <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10, fontSize: 13 }}>
-            <div style={{ color: 'var(--muted)', fontWeight: 700 }}>รูปบิล</div>
-            <div>{imageName}</div>
-          </div>
+        {/* รูปบิล — ถ้ามี URL ให้แสดง thumbnail; ถ้ามีแค่ชื่อไฟล์แสดงข้อความ */}
+        {(billImageUrl || imageName) && (
+          <PhotosRow
+            photoUrls={billImageUrl ? [billImageUrl] : []}
+            photoNames={[imageName || 'รูปบิล']}
+            photoCount={1}
+            label="รูปบิล"
+          />
         )}
         {(photoCount > 0 || payload.photoUrls?.length > 0) && (
           <PhotosRow photoUrls={payload.photoUrls || []} photoNames={photoNames} photoCount={photoCount} />
@@ -343,14 +350,14 @@ function PurchaseListPreview({ payload }) {
   );
 }
 
-function PhotosRow({ photoUrls = [], photoNames = [], photoCount = 0 }) {
+function PhotosRow({ photoUrls = [], photoNames = [], photoCount = 0, label = 'รูปแนบ' }) {
   const [lightbox, setLightbox] = useState(null);
   const count = photoUrls.length || photoCount;
   if (count === 0) return null;
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10, fontSize: 13 }}>
-      <div style={{ color: 'var(--muted)', fontWeight: 700 }}>รูปแนบ</div>
+      <div style={{ color: 'var(--muted)', fontWeight: 700 }}>{label}</div>
       <div>
         {photoUrls.length > 0 ? (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
@@ -436,4 +443,48 @@ function formatDateTime(value) {
   } catch {
     return value;
   }
+}
+
+function exportCSV(items, employees, branches) {
+  function empName(empId) {
+    const e = employees.find(r => r.id === empId);
+    return e?.nickname || e?.name || '';
+  }
+  function branchName(branchId) {
+    return branches.find(r => r.id === branchId)?.label || '';
+  }
+  function payloadSummary(item) {
+    const p = item.payload || {};
+    switch (item.task_key) {
+      case 'bills':         return `${p.vendor||''} / ${p.amount||''} บาท / ${p.category||''}`;
+      case 'production':    return `${p.product||''} / ${p.quantity||''} ${p.unit||''} / ${p.batch||''}`;
+      case 'inventory':     return `${p.itemName||''} / ${p.stockLeft||''} ${p.unit||''} / ${p.status||''}`;
+      case 'cake-stock':    return `${p.branchName||''} / ${p.cakeName||''} / พร้อมขาย ${p.available||0} จอง ${p.reserved||0} เสีย ${p.damaged||0}`;
+      case 'supplies-count':return `${p.area||''} / ${p.itemName||''} / ${p.count||''} ${p.unit||''}`;
+      case 'purchase-list': return (p.items||[]).map(i=>`${i.itemName} ${i.quantity}${i.unit}`).join(' | ');
+      default:              return JSON.stringify(p);
+    }
+  }
+
+  const headers = ['วันที่บันทึก', 'ประเภทงาน', 'พนักงาน', 'สาขา', 'รายละเอียด', 'รูปแนบ'];
+  const rows = items.map(item => [
+    formatDateTime(item.created_at),
+    TASK_LABELS[item.task_key] || item.task_key,
+    empName(item.emp_id),
+    branchName(item.branch_id),
+    payloadSummary(item),
+    item.payload?.photoCount || (item.payload?.photoUrls?.length) || (item.image_name ? 1 : 0),
+  ]);
+
+  const csv = [headers, ...rows]
+    .map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `jebar-ops-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }

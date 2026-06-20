@@ -7,7 +7,7 @@ import SearchSelect from '../../components/SearchSelect';
 import VoiceBtn from '../../components/VoiceBtn';
 import PhotoSection from '../../components/PhotoSection';
 import { fetchOperateCatalog } from '../../lib/operateCatalog';
-import { uploadOpsPhotos } from '../../lib/opsStorage';
+import { uploadOpsPhotos, uploadSingleBase64 } from '../../lib/opsStorage';
 
 const STORAGE_PREFIX = 'hr_emp_ops_';
 const HISTORY_LIMIT = 8;
@@ -546,8 +546,16 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
     try {
       const payload = sanitizePayload(taskKey, draft);
 
-      // อัปโหลดรูปไปยัง Supabase Storage (ถ้ามี)
-      const photos = draft.photos || (taskKey === 'bills' ? [] : []);
+      // อัปโหลดรูปบิลไปยัง Supabase Storage (bills form)
+      if (taskKey === 'bills' && draft.imageBase64 && draft.imageMimeType && orgId) {
+        setUploadMsg('⏳ กำลังอัปโหลดรูปบิล...');
+        const result = await uploadSingleBase64(draft.imageBase64, draft.imageMimeType, draft.imageName, orgId, 'bills');
+        if (result?.url) payload.billImageUrl = result.url;
+        setUploadMsg('');
+      }
+
+      // อัปโหลดรูปแนบ (forms อื่น)
+      const photos = taskKey !== 'bills' ? (draft.photos || []) : [];
       if (photos.length > 0 && orgId) {
         setUploadMsg(`⏳ กำลังอัปโหลด ${photos.length} รูป...`);
         const uploaded = await uploadOpsPhotos(photos, orgId, taskKey);
@@ -567,7 +575,8 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
       if (error) throw error;
       saveLocalDraft(payload);
       await backend.reload();
-      setSuccess(`บันทึกเข้า backend แล้ว${payload.photoUrls?.length ? ` (รูป ${payload.photoUrls.length} รูปอัปโหลดสำเร็จ)` : ''}`);
+      const uploadedCount = (payload.photoUrls?.length || 0) + (payload.billImageUrl ? 1 : 0);
+      setSuccess(`บันทึกเข้า backend แล้ว${uploadedCount > 0 ? ` (อัปโหลด ${uploadedCount} รูปสำเร็จ)` : ''}`);
     } catch (error) {
       setUploadMsg('');
       const msg = String(error?.message || '');
