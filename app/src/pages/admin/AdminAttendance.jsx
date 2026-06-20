@@ -13,6 +13,7 @@ export default function AdminAttendance() {
   const [settings, setSettings] = useState(null);
   const [clockOutModal, setClockOutModal] = useState(null);
   const [clockInModal, setClockInModal] = useState(null);
+  const [tab, setTab] = useState('day');
 
   async function load() {
     const [{ data: attendanceRows }, { data: leaveRows }, { data: brs }, { data: st }, { data: allEmps }] = await Promise.all([
@@ -275,14 +276,22 @@ export default function AdminAttendance() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
         <h1 style={{ fontWeight: 700, fontSize: 24 }}>การลงเวลา</h1>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {['day', 'month'].map((t) => (
+            <button key={t} className="btn" onClick={() => setTab(t)} style={{ background: tab === t ? 'var(--accent)' : 'var(--surface)', color: tab === t ? '#fff' : 'var(--muted)', border: '1px solid var(--line)', padding: '7px 14px', fontSize: 13 }}>
+              {t === 'day' ? 'รายวัน' : 'สรุปรายเดือน'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tab === 'day' && (<>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16, justifyContent: 'flex-end' }}>
           <button className="btn" onClick={exportAttendanceCSV} disabled={rows.length === 0} title="ส่งออก CSV">📥 CSV</button>
           <button className="btn btn-ghost" onClick={() => setDate(ymd(addDays(new Date(date + 'T00:00'), -1)))}>←</button>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ width: 160 }} />
           <button className="btn btn-ghost" onClick={() => setDate(ymd(addDays(new Date(date + 'T00:00'), 1)))}>→</button>
         </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
         {[
           { label: 'มาทำงาน', value: summary.present, color: 'var(--accent)', bg: 'var(--accent-soft)' },
           { label: 'มาสาย',   value: summary.late,    color: 'var(--late-fg)', bg: 'var(--late-bg)' },
@@ -394,6 +403,8 @@ export default function AdminAttendance() {
           onClose={() => setClockInModal(null)}
         />
       )}
+      </>)}
+      {tab === 'month' && <MonthlyReportView orgId={orgId} />}
     </div>
   );
 }
@@ -476,6 +487,147 @@ function SelfieCell({ row }) {
   return (
     <div title="ยังไม่มีรูปเซลฟี่ของรายการนี้" style={{ width: 36, height: 36, borderRadius: '50%', background: emp.color || '#0E7C66', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, overflow: 'hidden' }}>
       {label.slice(0, 2)}
+    </div>
+  );
+}
+
+function MonthlyReportView({ orgId }) {
+  const today = new Date();
+  const defaultMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  const [month, setMonth] = useState(defaultMonth);
+  const [stats, setStats] = useState([]);
+  const [busy, setBusy] = useState(true);
+
+  async function load() {
+    setBusy(true);
+    const [y, m] = month.split('-').map(Number);
+    const firstDay = `${month}-01`;
+    const lastDay = new Date(y, m, 0).toISOString().slice(0, 10);
+    const [{ data: empData }, { data: attData }, { data: brData }] = await Promise.all([
+      supabase.from('employees').select('id,name,nickname,color,branch_id').eq('org_id', orgId).eq('active', true).order('name'),
+      supabase.from('attendance').select('emp_id,status,ot_min').eq('org_id', orgId).gte('date', firstDay).lte('date', lastDay),
+      supabase.from('branches').select('*').eq('org_id', orgId),
+    ]);
+    const empList = empData || [];
+    const attList = attData || [];
+    const brList = brData || [];
+    const result = empList.map((emp) => {
+      const empAtt = attList.filter((a) => a.emp_id === emp.id);
+      const present = empAtt.filter((a) => a.status === 'present').length;
+      const late = empAtt.filter((a) => a.status === 'late').length;
+      const leave = empAtt.filter((a) => a.status === 'leave').length;
+      const absent = empAtt.filter((a) => a.status === 'absent').length;
+      const otMin = empAtt.reduce((s, a) => s + Number(a.ot_min || 0), 0);
+      const worked = present + late;
+      const br = brList.find((b) => b.id === emp.branch_id);
+      return { emp, br, present, late, leave, absent, otMin, worked };
+    });
+    setStats(result);
+    setBusy(false);
+  }
+
+  useEffect(() => { load(); }, [orgId, month]);
+
+  function exportCsv() {
+    const headers = ['ชื่อ', 'ชื่อเล่น', 'สาขา', 'วันทำงาน', 'มาสาย (ครั้ง)', 'วันลา', 'วันขาด', 'OT รวม (น.)'];
+    const csvRows = stats.map((s) => [
+      s.emp.name, s.emp.nickname || '', s.br?.label || '',
+      s.worked, s.late, s.leave, s.absent, s.otMin,
+    ]);
+    const csv = [headers, ...csvRows]
+      .map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\r\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hr-attendance-${month}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  const totals = stats.reduce(
+    (acc, s) => { acc.worked += s.worked; acc.late += s.late; acc.leave += s.leave; acc.absent += s.absent; acc.otMin += s.otMin; return acc; },
+    { worked: 0, late: 0, leave: 0, absent: 0, otMin: 0 }
+  );
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end', marginBottom: 16, flexWrap: 'wrap' }}>
+        <button className="btn" onClick={exportCsv} disabled={stats.length === 0} title="ส่งออก CSV">📥 CSV</button>
+        <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={{ width: 160 }} />
+      </div>
+
+      {busy ? (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>กำลังโหลด...</div>
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
+            {[
+              { label: 'วันทำงานรวม', value: totals.worked, color: 'var(--accent)', bg: 'var(--accent-soft)' },
+              { label: 'ครั้งสาย', value: totals.late, color: 'var(--late-fg)', bg: 'var(--late-bg)' },
+              { label: 'วันลา', value: totals.leave, color: 'var(--leave-fg)', bg: 'var(--leave-bg)' },
+              { label: 'วันขาด', value: totals.absent, color: 'var(--danger-fg)', bg: 'var(--danger-bg)' },
+              { label: 'OT รวม (น.)', value: totals.otMin, color: '#6941c6', bg: '#f9f5ff' },
+            ].map((item) => (
+              <div key={item.label} className="card" style={{ padding: '12px 10px', textAlign: 'center', background: item.bg, border: `1px solid ${item.color}22` }}>
+                <div className="num" style={{ fontSize: 24, fontWeight: 800, color: item.color }}>{item.value}</div>
+                <div style={{ fontSize: 11, color: item.color, marginTop: 2, fontWeight: 600 }}>{item.label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="card" style={{ overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+              <thead>
+                <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--line)' }}>
+                  {['พนักงาน', 'สาขา', 'ทำงาน', 'สาย', 'ลา', 'ขาด', 'OT (น.)'].map((h) => (
+                    <th key={h} style={{ padding: '12px 16px', textAlign: h === 'พนักงาน' || h === 'สาขา' ? 'left' : 'center', color: 'var(--muted)', fontWeight: 600 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {stats.map(({ emp, br, worked, late, leave, absent, otMin }) => (
+                  <tr key={emp.id} style={{ borderBottom: '1px solid var(--line)' }}>
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: emp.color || '#0E7C66', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                          {(emp.nickname || emp.name || '').slice(0, 2)}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 500 }}>{emp.name}</div>
+                          {emp.nickname && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{emp.nickname}</div>}
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '12px 16px', color: 'var(--muted)', fontSize: 13 }}>{br?.label || '—'}</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{worked}</span>
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <span style={{ color: late > 0 ? 'var(--late-fg)' : 'var(--muted)', fontWeight: late > 0 ? 700 : 400 }}>{late || '—'}</span>
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <span style={{ color: leave > 0 ? 'var(--leave-fg)' : 'var(--muted)', fontWeight: leave > 0 ? 700 : 400 }}>{leave || '—'}</span>
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <span style={{ color: absent > 0 ? 'var(--danger-fg)' : 'var(--muted)', fontWeight: absent > 0 ? 700 : 400 }}>{absent || '—'}</span>
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <span className="num" style={{ color: otMin > 0 ? '#6941c6' : 'var(--muted)', fontWeight: otMin > 0 ? 700 : 400 }}>{otMin > 0 ? otMin : '—'}</span>
+                    </td>
+                  </tr>
+                ))}
+                {stats.length === 0 && (
+                  <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>ไม่มีข้อมูลพนักงาน</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }
