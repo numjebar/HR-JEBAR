@@ -266,6 +266,54 @@ export default function AdminOpsInbox() {
     return branches.find((row) => row.id === branchId)?.label || '-';
   }
 
+  const [lineCopied, setLineCopied] = useState(false);
+
+  function copySummaryForLine() {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayLabel = new Date(todayStr + 'T00:00:00').toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    const lines = [`📊 สรุปงานร้านประจำวัน ${todayLabel}`, ''];
+
+    if (productionSummary && productionSummary.length > 0) {
+      lines.push('🏭 ผลิตขนม:');
+      productionSummary.forEach(([product, data]) => {
+        lines.push(`  • ${product}: ${data.total % 1 === 0 ? data.total : data.total.toFixed(1)} ${data.unit} (${data.batches} รอบ)`);
+      });
+      lines.push('');
+    }
+
+    if (billsSummary) {
+      lines.push(`📷 บิลซื้อของ: ${billsSummary.count} ใบ รวม ฿${billsSummary.total.toLocaleString('th-TH', { maximumFractionDigits: 0 })}`);
+      lines.push('');
+    }
+
+    if (cakeStockSummary && cakeStockSummary.length > 0) {
+      lines.push('🍰 สต๊อกเค้ก:');
+      cakeStockSummary.forEach(({ branch, cakes }) => {
+        lines.push(`  ${branch}:`);
+        cakes.forEach(({ name, available, status }) => {
+          lines.push(`    - ${name}: ${available} (${status || 'พร้อมขาย'})`);
+        });
+      });
+      lines.push('');
+    }
+
+    if (inventoryAlertSummary && inventoryAlertSummary.length > 0) {
+      lines.push('⚠️ สต๊อกต้องติดตาม:');
+      inventoryAlertSummary.forEach(({ itemName, stockLeft, unit, status }) => {
+        lines.push(`  • ${itemName}: ${stockLeft || '?'} ${unit} — ${status}`);
+      });
+      lines.push('');
+    }
+
+    const todayCount = filteredItems.filter(i => (i.created_at || '').slice(0, 10) === todayStr).length;
+    lines.push(`รวมทั้งหมด ${todayCount} รายการ`);
+
+    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+      setLineCopied(true);
+      setTimeout(() => setLineCopied(false), 2500);
+    });
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 24 }}>
@@ -277,6 +325,9 @@ export default function AdminOpsInbox() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn" onClick={load}>รีโหลด</button>
+          <button className="btn" onClick={copySummaryForLine} style={{ background: lineCopied ? '#ecfdf3' : undefined, color: lineCopied ? '#0d7a46' : undefined, border: lineCopied ? '1px solid #bbe7cf' : undefined }} title="คัดลอกสรุปวันนี้">
+            {lineCopied ? '✓ คัดลอกแล้ว' : '📋 สรุปวันนี้'}
+          </button>
           <button className="btn" onClick={() => exportCSV(filteredItems, employees, branches)} title="ส่งออก CSV">📥 CSV</button>
         </div>
       </div>
