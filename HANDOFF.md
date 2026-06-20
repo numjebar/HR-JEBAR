@@ -1,5 +1,47 @@
 # HR JEBAR Handoff
 
+## Update 2026-06-20 (admin edit attendance per day — v59)
+
+### สิ่งที่เพิ่มใน v59
+
+**AdminPayroll DayBreakdown — แอดมินแก้ไขการลงเวลารายวันได้**
+
+- ต่อยอดจาก v56 (ตารางรายวัน) — เดิมเป็น read-only ตอนนี้แก้ไขได้
+- ทุกแถวในตารางรายวันมีปุ่ม **"แก้ไข"** (คอลัมน์ "จัดการ")
+- กดแล้วเปิด `DayEditModal` ให้แอดมินตั้งค่าวันนั้น:
+  - **สถานะ**: ทำงาน / ลา / ขาด
+  - ถ้า "ทำงาน" → กรอกเวลาเข้า / ออก (สาย+OT คำนวณอัตโนมัติ)
+  - ถ้า "ลา" → toggle "ลาแบบได้รับค่าจ้าง"
+  - ปุ่ม **"ลบรายการวันนี้"** ถ้ามีข้อมูลอยู่แล้ว
+- บันทึกผ่าน `attendance` upsert (`onConflict: emp_id,date`) — ใช้ admin RLS เดิม
+- หลังบันทึก หน้า payroll reload → ยอดเงินคำนวณใหม่ทันที
+
+### ปิด Open Concern ครบ
+
+จาก AGENT_WORKFLOW.md "Current Open Concern" — payroll per-day:
+- ✅ Show each date in the cycle (v56)
+- ✅ work / late / leave / absent / off day (v56)
+- ✅ advances & deductions per date (v56)
+- ✅ **Allow admin to edit a day by date (v59 — ใหม่)**
+- ✅ persistent "paid already" marker (v57/v58)
+
+→ Open Concern ปิดครบทุกข้อแล้ว
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/pages/admin/AdminPayroll.jsx` — `DayEditModal` + `dayEditModal` state + คอลัมน์ "จัดการ" + ปุ่มแก้ไข
+- `app/src/lib/version.js` — bump เป็น `Build 2026.06.20-payroll-editday-v59`
+
+### ไม่มี SQL ใหม่
+
+ใช้ตาราง `attendance` + RLS `admin full attendance` ที่มีอยู่แล้ว — ไม่ต้องรัน migration
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+---
+
 ## Update 2026-06-20 (employee sees "paid" status — v58)
 
 ### สิ่งที่เพิ่มใน v58

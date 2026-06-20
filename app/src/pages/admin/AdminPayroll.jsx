@@ -31,6 +31,7 @@ export default function AdminPayroll() {
   const [ssModal, setSsModal] = useState(null);
   const [advanceModal, setAdvanceModal] = useState(null);
   const [netModal, setNetModal] = useState(null);
+  const [dayEditModal, setDayEditModal] = useState(null);
   const [payRange, setPayRange] = useState(rangeFor('month'));
 
   async function load() {
@@ -446,7 +447,14 @@ export default function AdminPayroll() {
             )}
             {dayView[emp.id] && (
               <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
-                <DayBreakdown emp={emp} range={range} att={empAtt} adj={empAdj} rules={rules} />
+                <DayBreakdown
+                  emp={emp}
+                  range={range}
+                  att={empAtt}
+                  adj={empAdj}
+                  rules={rules}
+                  onEditDay={(dateStr, rec) => setDayEditModal({ emp, orgId, date: dateStr, rec, rules })}
+                />
               </div>
             )}
           </div>
@@ -467,11 +475,12 @@ export default function AdminPayroll() {
         setNetModal(null);
         load();
       }} />}
+      {dayEditModal && <DayEditModal data={dayEditModal} onClose={() => setDayEditModal(null)} onSaved={() => { setDayEditModal(null); load(); }} />}
     </div>
   );
 }
 
-function DayBreakdown({ emp, range, att, adj, rules }) {
+function DayBreakdown({ emp, range, att, adj, rules, onEditDay }) {
   const start = parseYmd(range.from);
   const end = parseYmd(range.to);
   if (!start || !end) return null;
@@ -514,6 +523,7 @@ function DayBreakdown({ emp, range, att, adj, rules }) {
               <th style={{ textAlign: 'center', padding: '6px 8px', fontWeight: 600 }}>สาย</th>
               <th style={{ textAlign: 'center', padding: '6px 8px', fontWeight: 600 }}>OT</th>
               <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 600 }}>ปรับ / หัก</th>
+              <th style={{ textAlign: 'center', padding: '6px 8px', fontWeight: 600 }}>จัดการ</th>
             </tr>
           </thead>
           <tbody>
@@ -573,11 +583,131 @@ function DayBreakdown({ emp, range, att, adj, rules }) {
                       </div>
                     ) : <span style={{ color: 'var(--muted)' }}>—</span>}
                   </td>
+                  <td style={{ textAlign: 'center', padding: '8px 8px' }}>
+                    <button
+                      className="btn"
+                      style={{ padding: '4px 10px', fontSize: 11, background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)', whiteSpace: 'nowrap' }}
+                      onClick={() => onEditDay && onEditDay(dateStr, rec || null)}
+                    >
+                      แก้ไข
+                    </button>
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+function DayEditModal({ data, onClose, onSaved }) {
+  const { emp, orgId, date, rec, rules } = data;
+  const initialStatus = rec?.status === 'leave' ? 'leave' : rec?.status === 'absent' ? 'absent' : rec ? 'present' : 'present';
+  const [status, setStatus] = useState(initialStatus);
+  const [clockIn, setClockIn] = useState(rec?.clock_in || '');
+  const [clockOut, setClockOut] = useState(rec?.clock_out || '');
+  const [paid, setPaid] = useState(rec?.paid ?? true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  async function save() {
+    setBusy(true);
+    setErr('');
+    const row = {
+      org_id: orgId,
+      emp_id: emp.id,
+      date,
+      status,
+      clock_in: status === 'present' ? (clockIn || null) : null,
+      clock_out: status === 'present' ? (clockOut || null) : null,
+      paid: status === 'leave' ? paid : true,
+      leave_type: status === 'leave' ? (rec?.leave_type || 'ลา') : null,
+    };
+    if (status === 'present' && clockOut) {
+      row.ot_min = overtimeMinutesOf({ clock_out: clockOut }, rules);
+    } else {
+      row.ot_min = 0;
+    }
+    const { error } = await supabase.from('attendance').upsert(row, { onConflict: 'emp_id,date' });
+    setBusy(false);
+    if (error) { setErr(error.message || 'บันทึกไม่สำเร็จ'); return; }
+    onSaved();
+  }
+
+  async function removeDay() {
+    if (!confirm('ลบรายการลงเวลาของวันนี้?')) return;
+    setBusy(true);
+    setErr('');
+    const { error } = await supabase.from('attendance').delete().eq('emp_id', emp.id).eq('date', date);
+    setBusy(false);
+    if (error) { setErr(error.message || 'ลบไม่สำเร็จ'); return; }
+    onSaved();
+  }
+
+  const STATUS_OPTS = [
+    ['present', 'ทำงาน'],
+    ['leave', 'ลา'],
+    ['absent', 'ขาด'],
+  ];
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal" style={{ padding: 28 }}>
+        <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 6 }}>แก้ไขการลงเวลา</div>
+        <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 16 }}>
+          {emp.name} · {fmtDateFull(date)}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
+          {STATUS_OPTS.map(([value, label]) => (
+            <button
+              key={value}
+              className="btn"
+              onClick={() => setStatus(value)}
+              style={{ background: status === value ? 'var(--accent)' : 'var(--bg)', color: status === value ? '#fff' : 'var(--ink)', border: '1px solid var(--line)', padding: '8px 0' }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {status === 'present' && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 4 }}>
+            <div>
+              <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 5 }}>เวลาเข้า</label>
+              <input type="time" value={clockIn} onChange={(e) => setClockIn(e.target.value)} />
+            </div>
+            <div>
+              <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 5 }}>เวลาออก</label>
+              <input type="time" value={clockOut} onChange={(e) => setClockOut(e.target.value)} />
+            </div>
+          </div>
+        )}
+
+        {status === 'leave' && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, marginBottom: 4, cursor: 'pointer' }}>
+            <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} />
+            ลาแบบได้รับค่าจ้าง (นับเป็นวันจ่าย)
+          </label>
+        )}
+
+        {status === 'absent' && (
+          <div style={{ color: 'var(--muted)', fontSize: 13 }}>วันขาดงานจะไม่ถูกนับเป็นวันจ่าย</div>
+        )}
+
+        {err && <div style={{ color: 'var(--danger-fg)', fontSize: 13, marginTop: 10 }}>{err}</div>}
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+          <button className="btn btn-primary" style={{ flex: 1 }} onClick={save} disabled={busy}>{busy ? 'กำลังบันทึก...' : 'บันทึก'}</button>
+          <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>ยกเลิก</button>
+        </div>
+        {rec && (
+          <button className="btn" style={{ width: '100%', marginTop: 10, background: 'var(--bg)', border: '1px solid var(--line)', color: '#dc2626' }} onClick={removeDay} disabled={busy}>
+            ลบรายการวันนี้
+          </button>
+        )}
       </div>
     </div>
   );
