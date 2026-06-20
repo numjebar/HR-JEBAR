@@ -35,6 +35,7 @@ export default function AdminOpsInbox() {
   const [searchText, setSearchText] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [replyEntry, setReplyEntry] = useState(null);
 
   async function load() {
     setLoading(true);
@@ -219,12 +220,98 @@ export default function AdminOpsInbox() {
                     </div>
                   </div>
                 </div>
-                {item.source && <div style={{ fontSize: 12, color: 'var(--muted)', background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 8, padding: '2px 8px' }}>{SOURCE_LABELS[item.source] || item.source}</div>}
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                  {item.source && <div style={{ fontSize: 12, color: 'var(--muted)', background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 8, padding: '2px 8px' }}>{SOURCE_LABELS[item.source] || item.source}</div>}
+                  <button onClick={() => setReplyEntry(item)} style={{ fontSize: 12, color: 'var(--accent)', background: 'var(--accent-soft)', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 9px', cursor: 'pointer', fontWeight: 600 }}>
+                    ↩ ตอบ
+                  </button>
+                </div>
               </div>
 
               <PayloadPreview payload={item.payload || {}} imageName={item.image_name} />
             </div>
           ))
+        )}
+      </div>
+
+      {replyEntry && (
+        <ReplyModal
+          entry={replyEntry}
+          employees={employees}
+          orgId={orgId}
+          onClose={() => setReplyEntry(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ReplyModal({ entry, employees, orgId, onClose }) {
+  const [text, setText] = useState('');
+  const [kind, setKind] = useState('message');
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const emp = employees.find(e => e.id === entry.emp_id);
+  const empName = emp?.nickname || emp?.name || 'พนักงาน';
+
+  async function send() {
+    if (!text.trim() || !entry.emp_id) return;
+    setBusy(true);
+    try {
+      await supabase.from('messages').insert({
+        emp_id: entry.emp_id,
+        org_id: orgId,
+        from: 'admin',
+        kind,
+        text: text.trim(),
+        status: 'unread',
+        created_at: new Date().toISOString(),
+      });
+      setSent(true);
+      setTimeout(onClose, 1200);
+    } catch { /* ignore */ } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: '24px 24px 0 0', padding: 24, width: '100%', maxWidth: 520, display: 'grid', gap: 14, paddingBottom: 32 }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 4 }}>ตอบกลับ {empName}</div>
+          <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+            {TASK_LABELS[entry.task_key] || entry.task_key} · {formatDateTime(entry.created_at)}
+          </div>
+        </div>
+        {sent ? (
+          <div style={{ background: '#ecfdf3', border: '1px solid #bbe7cf', borderRadius: 14, padding: 16, textAlign: 'center', color: '#0d7a46', fontWeight: 700 }}>
+            ✓ ส่งข้อความแล้ว
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {['message', 'task'].map(k => (
+                <button key={k} onClick={() => setKind(k)} className="btn" style={{ background: kind === k ? 'var(--accent)' : 'var(--bg)', color: kind === k ? '#fff' : 'var(--muted)', border: '1px solid var(--line)', padding: '6px 14px', fontSize: 13 }}>
+                  {k === 'message' ? '💬 ข้อความ' : '📋 มอบงาน'}
+                </button>
+              ))}
+            </div>
+            <textarea
+              rows={3}
+              value={text}
+              onChange={e => setText(e.target.value)}
+              placeholder={`พิมพ์ข้อความถึง ${empName}...`}
+              style={{ resize: 'vertical', fontSize: 14 }}
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="btn btn-primary" onClick={send} disabled={busy || !text.trim()} style={{ flex: 1 }}>
+                {busy ? 'กำลังส่ง...' : 'ส่ง'}
+              </button>
+              <button className="btn" onClick={onClose} style={{ flex: 1 }}>ยกเลิก</button>
+            </div>
+          </>
         )}
       </div>
     </div>

@@ -1,5 +1,32 @@
 # HR JEBAR Handoff
 
+## Update 2026-06-20 (admin quick-reply from OPS entry — v7)
+
+### สิ่งที่เพิ่มใน v7
+
+**AdminOpsInbox — "↩ ตอบ" button per entry**
+- ทุก OPS entry มีปุ่ม "↩ ตอบ" ที่มุมขวาบน
+- คลิกแล้วได้ bottom sheet สำหรับส่งข้อความหรือมอบงานให้พนักงานคนนั้นทันที
+- ใช้ตาราง `messages` เดิม (ไม่เพิ่ม schema ใหม่)
+- พนักงานรับข้อความใน tab ข้อความ (EmpMessages) เหมือนเดิม
+- หลังส่งแล้ว sheet ปิดอัตโนมัติใน 1.2 วินาที
+
+**Flow:**
+1. แอดมินเปิด AdminOpsInbox → เห็นรายการที่พนักงานส่งมา
+2. กด "↩ ตอบ" → เลือก 💬 ข้อความ หรือ 📋 มอบงาน → พิมพ์ → ส่ง
+3. พนักงานรับข้อความใน EmpMessages พร้อม badge แจ้งเตือน
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/pages/admin/AdminOpsInbox.jsx` — `replyEntry` state + reply button + `ReplyModal` component
+- `app/src/lib/version.js` — bump เป็น `Build 2026.06.20-hr-ops-v7`
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+---
+
 ## Update 2026-06-20 (OPS home badges + admin search — v6)
 
 ### สิ่งที่เพิ่มใน v6
