@@ -664,18 +664,20 @@ function OpsTaskPage({ taskKey, navigate }) {
 
   useEffect(() => {
     let alive = true;
-    fetchOperateCatalog().then(c => {
-      if (!alive) return;
-      if (c) setCatalog(c);
-      setCatalogReady(true);
-      // Auto-retry once after 5s if null — covers race where EmpHome hasn't cached ops_config yet
-      if (!c) {
-        setTimeout(() => {
-          if (!alive) return;
-          fetchOperateCatalog().then(c2 => { if (alive && c2) setCatalog(c2); });
-        }, 5000);
-      }
-    });
+    // Retry up to 4 times (at 3s, 7s, 13s, 21s) while EmpHome is still loading ops_config
+    const RETRY_DELAYS = [3000, 4000, 6000, 8000];
+    let retryIdx = 0;
+    function tryFetch() {
+      fetchOperateCatalog().then(c => {
+        if (!alive) return;
+        if (c) { setCatalog(c); setCatalogReady(true); return; }
+        if (retryIdx === 0) setCatalogReady(true); // show UI after first attempt
+        if (retryIdx < RETRY_DELAYS.length) {
+          setTimeout(() => { if (alive) { retryIdx++; tryFetch(); } }, RETRY_DELAYS[retryIdx]);
+        }
+      });
+    }
+    tryFetch();
     return () => { alive = false; };
   }, []);
 

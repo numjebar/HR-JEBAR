@@ -9,6 +9,7 @@ import EmpMessages from './EmpMessages';
 import EmpProfile from './EmpProfile';
 import EmpOps from './EmpOps';
 import { APP_VERSION } from '../../lib/version';
+import { OPS_CONFIG_KEY, clearCatalogCache } from '../../lib/operateCatalog';
 
 const tabs = [
   { path: '/emp', label: 'หน้าหลัก', icon: HomeIcon, end: true },
@@ -32,6 +33,23 @@ export default function EmpShell() {
   }
 
   useEffect(() => { fetchUnread(); }, [employeeSessionToken]);
+
+  // Load ops_config from DB into sessionStorage early so OPS catalog is ready
+  // regardless of whether EmpHome has mounted yet
+  useEffect(() => {
+    if (!employeeSessionToken) return;
+    supabase.rpc('employee_home_data_v2', { p_session_token: employeeSessionToken })
+      .then(({ data }) => {
+        const cfg = data?.settings?.rules?.ops_config;
+        if (cfg?.url && cfg?.key) {
+          const prev = sessionStorage.getItem(OPS_CONFIG_KEY);
+          const prevCfg = prev ? JSON.parse(prev) : {};
+          const changed = prevCfg.url !== cfg.url || prevCfg.key !== cfg.key;
+          try { sessionStorage.setItem(OPS_CONFIG_KEY, JSON.stringify({ url: cfg.url, key: cfg.key })); } catch { /* ignore */ }
+          if (changed) clearCatalogCache(); // bust cache so new config is used
+        }
+      }).catch(() => { /* ignore */ });
+  }, [employeeSessionToken]);
 
   // Clear badge when user opens messages tab
   useEffect(() => {
