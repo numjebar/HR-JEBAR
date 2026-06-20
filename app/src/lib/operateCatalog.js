@@ -2,6 +2,10 @@ const CACHE_KEY = 'hr_jebar_catalog';
 const CACHE_TTL = 30 * 60 * 1000; // 30 min
 export const OPS_CONFIG_KEY = 'hr_ops_config'; // set by EmpHome after login
 
+export function clearCatalogCache() {
+  try { sessionStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
+}
+
 export async function fetchOperateCatalog() {
   try {
     const raw = sessionStorage.getItem(CACHE_KEY);

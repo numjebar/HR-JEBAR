@@ -6,7 +6,7 @@ import { APP_VERSION } from '../../lib/version';
 import SearchSelect from '../../components/SearchSelect';
 import VoiceBtn from '../../components/VoiceBtn';
 import PhotoSection from '../../components/PhotoSection';
-import { fetchOperateCatalog } from '../../lib/operateCatalog';
+import { fetchOperateCatalog, clearCatalogCache } from '../../lib/operateCatalog';
 import { uploadOpsPhotos, uploadSingleBase64 } from '../../lib/opsStorage';
 
 const STORAGE_PREFIX = 'hr_emp_ops_';
@@ -227,7 +227,7 @@ function AiItemsTable({ items, catalog, onChange }) {
 }
 
 // ─── Purchase List Form (multi-item + category + stock check) ────────────────
-function PurchaseListForm({ draft, setDraft, catalog, catalogReady, employeeSessionToken }) {
+function PurchaseListForm({ draft, setDraft, catalog, catalogReady, reloadCatalog, employeeSessionToken }) {
   const [newItem, setNewItem] = useState({ category: 'วัตถุดิบ', itemName: '', quantity: '', unit: 'กก.', priority: 'วันนี้', note: '' });
   const [stockInfo, setStockInfo] = useState(null); // null | 'checking' | {stockLeft, unit, status} | {notFound}
   const [stockBlocked, setStockBlocked] = useState(false);
@@ -404,8 +404,9 @@ function PurchaseListForm({ draft, setDraft, catalog, catalogReady, employeeSess
             <VoiceBtn onResult={pickItem} />
           </div>
           {catalogReady && !catalog && (
-            <div style={{ fontSize: 12, color: '#9a8070', marginTop: 6, lineHeight: 1.5 }}>
-              💡 ยังไม่ได้เชื่อมฐานข้อมูล OPS — พิมพ์ชื่อรายการได้เลยไม่ต้องเลือกจากรายการ
+            <div style={{ fontSize: 12, color: '#9a8070', marginTop: 6, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span>💡 ยังไม่ได้เชื่อมฐานข้อมูล OPS — พิมพ์ชื่อรายการได้เลย</span>
+              {reloadCatalog && <button type="button" onClick={reloadCatalog} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 8px', cursor: 'pointer', flexShrink: 0 }}>🔄 ลองใหม่</button>}
             </div>
           )}
         </Field>
@@ -645,8 +646,27 @@ function OpsTaskPage({ taskKey, navigate }) {
   // Gemini key: env var first, then localStorage fallback
   const geminiKey = import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('hr_gemini_key') || '';
 
-  useEffect(() => {
+  function reloadCatalog() {
+    clearCatalogCache();
+    setCatalogReady(false);
     fetchOperateCatalog().then(c => { if (c) setCatalog(c); setCatalogReady(true); });
+  }
+
+  useEffect(() => {
+    let alive = true;
+    fetchOperateCatalog().then(c => {
+      if (!alive) return;
+      if (c) setCatalog(c);
+      setCatalogReady(true);
+      // Auto-retry once after 5s if null — covers race where EmpHome hasn't cached ops_config yet
+      if (!c) {
+        setTimeout(() => {
+          if (!alive) return;
+          fetchOperateCatalog().then(c2 => { if (alive && c2) setCatalog(c2); });
+        }, 5000);
+      }
+    });
+    return () => { alive = false; };
   }, []);
 
   useEffect(() => {
@@ -688,7 +708,7 @@ function OpsTaskPage({ taskKey, navigate }) {
       <OpsFormCard
         taskKey={taskKey} draft={draft} setDraft={setDraft} resetDraft={resetDraft}
         saveLocalDraft={saveLocalDraft} backend={backend} summary={summary}
-        catalog={catalog} catalogReady={catalogReady} geminiKey={geminiKey} branches={branches}
+        catalog={catalog} catalogReady={catalogReady} reloadCatalog={reloadCatalog} geminiKey={geminiKey} branches={branches}
       />
 
       <HistorySection
@@ -713,7 +733,7 @@ function OpsTaskPage({ taskKey, navigate }) {
   );
 }
 
-function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, backend, summary, catalog, catalogReady, geminiKey, branches = [] }) {
+function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, backend, summary, catalog, catalogReady, reloadCatalog, geminiKey, branches = [] }) {
   const { employeeSessionToken, employee, orgId } = useAuthStore();
   const empName = employee?.name || '';
   const navigate = useNavigate();
@@ -919,8 +939,8 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
       </TwoColRow>
 
       {taskKey === 'purchase-list'
-        ? <PurchaseListForm draft={draft} setDraft={setDraft} catalog={catalog} catalogReady={catalogReady} employeeSessionToken={employeeSessionToken} />
-        : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches, lastRecord, todayProductionTotal, lastCakeRecord, todayProductionBatches, todayCakeLog, catalogReady)
+        ? <PurchaseListForm draft={draft} setDraft={setDraft} catalog={catalog} catalogReady={catalogReady} reloadCatalog={reloadCatalog} employeeSessionToken={employeeSessionToken} />
+        : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches, lastRecord, todayProductionTotal, lastCakeRecord, todayProductionBatches, todayCakeLog, catalogReady, reloadCatalog)
       }
 
       <div style={summaryPillStyle}>ร่างล่าสุด: {summary}</div>
@@ -967,7 +987,7 @@ function LastRecordHint({ record, taskKey }) {
   );
 }
 
-function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches = [], lastRecord = null, todayProductionTotal = null, lastCakeRecord = null, todayProductionBatches = [], todayCakeLog = [], catalogReady = false) {
+function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches = [], lastRecord = null, todayProductionTotal = null, lastCakeRecord = null, todayProductionBatches = [], todayCakeLog = [], catalogReady = false, reloadCatalog = null) {
   switch (taskKey) {
     case 'bills':
       return (
@@ -1026,8 +1046,9 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               <VoiceBtn onResult={v => setDraft({ ...draft, product: v })} />
             </div>
             {catalogReady && (!catalog || (catalog.menus || []).length === 0) && (
-              <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4, lineHeight: 1.5 }}>
-                💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีเมนูในระบบ Operate —'} พิมพ์ชื่อเมนูได้เลย
+              <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span>💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีเมนูในระบบ Operate —'} พิมพ์ชื่อเมนูได้เลย</span>
+                {!catalog && reloadCatalog && <button type="button" onClick={reloadCatalog} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 8px', cursor: 'pointer', flexShrink: 0 }}>🔄 ลองใหม่</button>}
               </div>
             )}
           </Field>
@@ -1110,8 +1131,9 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               <VoiceBtn onResult={v => setDraft({ ...draft, itemName: v })} />
             </div>
             {catalogReady && (!catalog || (catalog.ingredients || []).length === 0) && (
-              <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4, lineHeight: 1.5 }}>
-                💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีวัตถุดิบในระบบ Operate —'} พิมพ์ชื่อวัตถุดิบได้เลย
+              <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span>💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีวัตถุดิบในระบบ Operate —'} พิมพ์ชื่อวัตถุดิบได้เลย</span>
+                {!catalog && reloadCatalog && <button type="button" onClick={reloadCatalog} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 8px', cursor: 'pointer', flexShrink: 0 }}>🔄 ลองใหม่</button>}
               </div>
             )}
           </Field>
@@ -1172,8 +1194,9 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               <VoiceBtn onResult={v => setDraft({ ...draft, cakeName: v })} />
             </div>
             {catalogReady && (!catalog || (catalog.menus || []).length === 0) && (
-              <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4, lineHeight: 1.5 }}>
-                💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีเมนูในระบบ Operate —'} พิมพ์ชื่อเค้กได้เลย
+              <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span>💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีเมนูในระบบ Operate —'} พิมพ์ชื่อเค้กได้เลย</span>
+                {!catalog && reloadCatalog && <button type="button" onClick={reloadCatalog} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 8px', cursor: 'pointer', flexShrink: 0 }}>🔄 ลองใหม่</button>}
               </div>
             )}
           </Field>
@@ -1265,8 +1288,9 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               <VoiceBtn onResult={v => setDraft({ ...draft, itemName: v })} />
             </div>
             {catalogReady && (!catalog || (catalog.materials || []).length === 0) && (
-              <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4, lineHeight: 1.5 }}>
-                💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีรายการของใช้ในระบบ Operate —'} พิมพ์ชื่อของใช้ได้เลย
+              <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span>💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีรายการของใช้ในระบบ Operate —'} พิมพ์ชื่อของใช้ได้เลย</span>
+                {!catalog && reloadCatalog && <button type="button" onClick={reloadCatalog} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 8px', cursor: 'pointer', flexShrink: 0 }}>🔄 ลองใหม่</button>}
               </div>
             )}
           </Field>
