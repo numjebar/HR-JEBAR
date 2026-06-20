@@ -186,6 +186,29 @@ export default function AdminOpsInbox() {
     return { total, count: billItems.length };
   }, [filteredItems]);
 
+  const cakeStockSummary = useMemo(() => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const cakeItems = filteredItems.filter(item =>
+      item.task_key === 'cake-stock' && (item.created_at || '').slice(0, 10) === todayStr
+    );
+    if (cakeItems.length === 0) return null;
+    const byBranch = new Map();
+    cakeItems.forEach(item => {
+      const p = item.payload || {};
+      const branch = p.branchName || 'ไม่ระบุสาขา';
+      if (!byBranch.has(branch)) byBranch.set(branch, new Map());
+      const branchMap = byBranch.get(branch);
+      const cakeName = p.cakeName || 'ไม่ระบุ';
+      if (!branchMap.has(cakeName)) {
+        branchMap.set(cakeName, { available: p.available ?? '-', reserved: p.reserved, status: p.status || '' });
+      }
+    });
+    return [...byBranch.entries()].map(([branch, cakes]) => ({
+      branch,
+      cakes: [...cakes.entries()].map(([name, data]) => ({ name, ...data })),
+    }));
+  }, [filteredItems]);
+
   const groupedItems = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
@@ -302,6 +325,31 @@ export default function AdminOpsInbox() {
             </div>
             <div style={{ fontSize: 13, color: '#6366f1' }}>{billsSummary.count} ใบ</div>
           </div>
+        </div>
+      )}
+
+      {cakeStockSummary && cakeStockSummary.length > 0 && (
+        <div className="card" style={{ padding: '16px 18px', marginBottom: 16, border: '1px solid #fde68a', background: '#fffbeb' }}>
+          <div style={{ fontWeight: 700, marginBottom: 12, color: '#92400e', fontSize: 14 }}>🍰 สต๊อกเค้กวันนี้</div>
+          {cakeStockSummary.map(({ branch, cakes }) => (
+            <div key={branch} style={{ marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#78350f', marginBottom: 8 }}>{branch}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 8 }}>
+                {cakes.map(({ name, available, reserved, status }) => {
+                  const isLow = status === 'ใกล้หมด' || status === 'หมด' || status === 'ต้องเติมจากครัว' || status === 'มีปัญหา';
+                  return (
+                    <div key={name} style={{ background: '#fff', border: `1px solid ${isLow ? '#fca5a5' : '#fde68a'}`, borderRadius: 12, padding: '10px 12px' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#2f241f', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                      <div style={{ fontSize: 20, fontWeight: 800, color: isLow ? '#b42318' : '#92400e' }}>{available}</div>
+                      <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+                        {status || 'พร้อมขาย'}{reserved && reserved !== '0' ? ` · จอง ${reserved}` : ''}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

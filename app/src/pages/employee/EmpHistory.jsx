@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
 import { fmtDateFull, fmtDate, ymd, dayRate, rulesFor } from '../../lib/payroll';
@@ -31,10 +31,21 @@ export default function EmpHistory() {
   const [leaves, setLeaves] = useState([]);
   const [opsEntries, setOpsEntries] = useState([]);
   const [opsLoading, setOpsLoading] = useState(false);
+  const [opsFilter, setOpsFilter] = useState('all');
   const [tab, setTab] = useState('att');
   const [showLeaveForm, setShowLeaveForm] = useState(false);
   const [branch, setBranch] = useState(null);
   const [settings, setSettings] = useState(null);
+
+  const opsCounts = useMemo(() => {
+    const c = { all: opsEntries.length };
+    opsEntries.forEach(e => { c[e.task_key] = (c[e.task_key] || 0) + 1; });
+    return c;
+  }, [opsEntries]);
+
+  const filteredOps = useMemo(() =>
+    opsFilter === 'all' ? opsEntries : opsEntries.filter(e => e.task_key === opsFilter),
+  [opsEntries, opsFilter]);
 
   async function load() {
     const { data } = await supabase.rpc('employee_history_data_v2', { p_session_token: employeeSessionToken });
@@ -119,29 +130,52 @@ export default function EmpHistory() {
       )}
 
       {tab === 'ops' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {opsLoading ? (
-            <div style={{ color: 'var(--muted)', textAlign: 'center', marginTop: 40 }}>กำลังโหลด...</div>
-          ) : opsEntries.length === 0 ? (
-            <div style={{ color: 'var(--muted)', textAlign: 'center', marginTop: 40 }}>ยังไม่มีบันทึกงานร้าน</div>
-          ) : (
-            opsEntries.map((entry) => {
-              const p = entry.payload || {};
-              const summary = opsPayloadSummary(entry.task_key, p);
-              return (
-                <div key={entry.id} className="card" style={{ padding: '12px 16px', display: 'grid', gap: 4 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 18 }}>{OPS_ICONS[entry.task_key] || '📋'}</span>
-                      <span style={{ fontWeight: 700, fontSize: 14 }}>{OPS_LABELS[entry.task_key] || entry.task_key}</span>
-                    </div>
-                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>{fmtDateFull(entry.created_at?.slice(0, 10))}</div>
-                  </div>
-                  {summary && <div style={{ fontSize: 13, color: 'var(--muted)', paddingLeft: 28 }}>{summary}</div>}
-                </div>
-              );
-            })
+        <div>
+          {!opsLoading && opsEntries.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+              {[['all', 'ทั้งหมด'], ...Object.entries(OPS_LABELS)].map(([key, label]) => {
+                const count = opsCounts[key] || 0;
+                if (key !== 'all' && count === 0) return null;
+                return (
+                  <button key={key} onClick={() => setOpsFilter(key)} className="btn" style={{
+                    background: opsFilter === key ? 'var(--accent)' : 'var(--surface)',
+                    color: opsFilter === key ? '#fff' : 'var(--muted)',
+                    border: '1px solid var(--line)', padding: '5px 12px', fontSize: 12,
+                  }}>
+                    {label}{count > 0 && key !== 'all' ? ` (${count})` : key === 'all' ? ` (${count})` : ''}
+                  </button>
+                );
+              })}
+            </div>
           )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {opsLoading ? (
+              <div style={{ color: 'var(--muted)', textAlign: 'center', marginTop: 40 }}>กำลังโหลด...</div>
+            ) : filteredOps.length === 0 ? (
+              <div style={{ color: 'var(--muted)', textAlign: 'center', marginTop: 40 }}>ยังไม่มีบันทึกงานร้าน</div>
+            ) : (
+              filteredOps.map((entry) => {
+                const p = entry.payload || {};
+                const summary = opsPayloadSummary(entry.task_key, p);
+                const timeStr = entry.created_at?.slice(11, 16) || '';
+                return (
+                  <div key={entry.id} className="card" style={{ padding: '12px 16px', display: 'grid', gap: 4 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 18 }}>{OPS_ICONS[entry.task_key] || '📋'}</span>
+                        <span style={{ fontWeight: 700, fontSize: 14 }}>{OPS_LABELS[entry.task_key] || entry.task_key}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'right' }}>
+                        <div>{fmtDateFull(entry.created_at?.slice(0, 10))}</div>
+                        {timeStr && <div style={{ fontWeight: 700 }}>{timeStr}</div>}
+                      </div>
+                    </div>
+                    {summary && <div style={{ fontSize: 13, color: 'var(--muted)', paddingLeft: 28 }}>{summary}</div>}
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
       )}
 
