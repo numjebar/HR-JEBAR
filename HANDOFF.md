@@ -1,5 +1,34 @@
 # HR JEBAR Handoff
 
+## Update 2026-06-20 (inventory → purchase-list quick-add CTA — v10)
+
+### สิ่งที่เพิ่มใน v10
+
+**EmpOps — Quick-add shortcut after inventory submit**
+- หลังส่ง inventory ที่มี status != ปกติ สำเร็จ จะมี banner เหลือง:
+  `"⚡ [ชื่อวัตถุดิบ] [status] — เพิ่มในใบสั่งซื้อ?" [+ ใบสั่งซื้อ]`
+- กดปุ่ม → navigate ไป `/emp/ops/purchase-list?suggest=ไข่ไก่&unit=ฟอง&urgent=1`
+- URL params ถูกอ่านทันทีที่เปิดฟอร์ม purchase-list → pre-fill itemName, unit, priority
+- ล้าง URL params ออกหลังอ่าน (ไม่ให้ re-trigger)
+
+**Flow ปิดวงจรสมบูรณ์:**
+1. เช็กสต๊อก → "ไข่ไก่ เหลือ 3 ฟอง ใกล้หมด" → บันทึก
+2. Banner: "เพิ่มในใบสั่งซื้อ?" → กด "+ ใบสั่งซื้อ"
+3. เปิดฟอร์มใบสั่งซื้อ → ไข่ไก่ ถูกเลือกแล้ว priority = พรุ่งนี้
+4. ใส่จำนวน → "+ เพิ่มรายการ" → ส่ง
+5. แอดมินเห็น + ตอบกลับ + เห็น low-stock alert บน Dashboard
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/pages/employee/EmpOps.jsx` — quick-add banner + `useNavigate` in OpsFormCard + URL param reader in PurchaseListForm
+- `app/src/lib/version.js` — bump เป็น `Build 2026.06.20-hr-ops-v10`
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+---
+
 ## Update 2026-06-20 (purchase-list smart suggestions from inventory — v9)
 
 ### สิ่งที่เพิ่มใน v9

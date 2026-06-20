@@ -245,6 +245,21 @@ function PurchaseListForm({ draft, setDraft, catalog, employeeSessionToken }) {
     }).catch(() => {});
   }, [employeeSessionToken]);
 
+  // Pre-fill from URL params (e.g. coming from inventory quick-add shortcut)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const suggestName = params.get('suggest');
+    if (!suggestName) return;
+    setNewItem(ni => ({
+      ...ni,
+      category: 'วัตถุดิบ',
+      itemName: suggestName,
+      unit: params.get('unit') || ni.unit,
+      priority: params.get('urgent') === '1' ? 'วันนี้' : 'พรุ่งนี้',
+    }));
+    window.history.replaceState(null, '', window.location.pathname);
+  }, []);
+
   const categoryOptions = {
     'วัตถุดิบ':          catalog?.ingredients || [],
     'ข้อมูลหลัก':       catalog?.menus || [],
@@ -649,6 +664,7 @@ function OpsTaskPage({ taskKey, navigate }) {
 function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, backend, summary, catalog, geminiKey, branches = [] }) {
   const { employeeSessionToken, employee, orgId } = useAuthStore();
   const empName = employee?.name || '';
+  const navigate = useNavigate();
   const [saving, setSaving]    = useState(false);
   const [uploadMsg, setUploadMsg] = useState('');
 
@@ -737,6 +753,18 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
       <div style={summaryPillStyle}>ร่างล่าสุด: {summary}</div>
       {uploadMsg && <Notice tone="warning">{uploadMsg}</Notice>}
       {success && <Notice tone="success">{success}</Notice>}
+      {success && taskKey === 'inventory' && draft.itemName && draft.status && draft.status !== 'ปกติ' && (
+        <div style={{ background: '#fff8e8', border: '1px solid #f4dfab', borderRadius: 16, padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, fontSize: 13 }}>
+          <span style={{ color: '#7a5b2b' }}>⚡ {draft.itemName} {draft.status} — เพิ่มในใบสั่งซื้อ?</span>
+          <button
+            type="button"
+            onClick={() => navigate(`/emp/ops/purchase-list?suggest=${encodeURIComponent(draft.itemName)}&unit=${encodeURIComponent(draft.unit || '')}&urgent=${draft.status === 'ต้องสั่งเพิ่ม' || draft.status === 'มีปัญหา' ? '1' : '0'}`)}
+            style={{ padding: '6px 12px', borderRadius: 10, border: '1.5px solid var(--accent)', background: 'var(--accent-soft)', color: 'var(--accent)', fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+          >
+            + ใบสั่งซื้อ
+          </button>
+        </div>
+      )}
       {errMsg  && <Notice tone="danger">{errMsg}</Notice>}
 
       <div style={actionRowStyle}>
