@@ -7,6 +7,7 @@ import SearchSelect from '../../components/SearchSelect';
 import VoiceBtn from '../../components/VoiceBtn';
 import PhotoSection from '../../components/PhotoSection';
 import { fetchOperateCatalog } from '../../lib/operateCatalog';
+import { uploadOpsPhotos } from '../../lib/opsStorage';
 
 const STORAGE_PREFIX = 'hr_emp_ops_';
 const HISTORY_LIMIT = 8;
@@ -524,9 +525,10 @@ function OpsTaskPage({ taskKey, navigate }) {
 }
 
 function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, backend, summary, catalog, geminiKey, branches = [] }) {
-  const { employeeSessionToken, employee } = useAuthStore();
+  const { employeeSessionToken, employee, orgId } = useAuthStore();
   const empName = employee?.name || '';
   const [saving, setSaving]    = useState(false);
+  const [uploadMsg, setUploadMsg] = useState('');
 
   useEffect(() => {
     setDraft(prev => ({
@@ -540,9 +542,23 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
 
   async function submitBackend() {
     if (!hasAnyInput(taskKey, draft) || saving) return;
-    setSaving(true); setSuccess(''); setErrMsg('');
+    setSaving(true); setSuccess(''); setErrMsg(''); setUploadMsg('');
     try {
       const payload = sanitizePayload(taskKey, draft);
+
+      // อัปโหลดรูปไปยัง Supabase Storage (ถ้ามี)
+      const photos = draft.photos || (taskKey === 'bills' ? [] : []);
+      if (photos.length > 0 && orgId) {
+        setUploadMsg(`⏳ กำลังอัปโหลด ${photos.length} รูป...`);
+        const uploaded = await uploadOpsPhotos(photos, orgId, taskKey);
+        if (uploaded.length > 0) {
+          payload.photoUrls = uploaded.map(u => u.url);
+          payload.photoNames = uploaded.map(u => u.name);
+          payload.photoCount = uploaded.length;
+        }
+        setUploadMsg('');
+      }
+
       const { error } = await supabase.rpc('employee_submit_ops_entry_v2', {
         p_session_token: employeeSessionToken,
         p_task_key: taskKey,
@@ -551,8 +567,9 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
       if (error) throw error;
       saveLocalDraft(payload);
       await backend.reload();
-      setSuccess('บันทึกเข้า backend แล้ว');
+      setSuccess(`บันทึกเข้า backend แล้ว${payload.photoUrls?.length ? ` (รูป ${payload.photoUrls.length} รูปอัปโหลดสำเร็จ)` : ''}`);
     } catch (error) {
+      setUploadMsg('');
       const msg = String(error?.message || '');
       if (msg.includes('employee_submit_ops_entry_v2') || msg.includes('employee_ops_entries')) {
         setErrMsg('ยังไม่ได้รันไฟล์ 25_employee_ops_entries.sql ใน Supabase SQL Editor');
@@ -587,6 +604,7 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
       }
 
       <div style={summaryPillStyle}>ร่างล่าสุด: {summary}</div>
+      {uploadMsg && <Notice tone="warning">{uploadMsg}</Notice>}
       {success && <Notice tone="success">{success}</Notice>}
       {errMsg  && <Notice tone="danger">{errMsg}</Notice>}
 

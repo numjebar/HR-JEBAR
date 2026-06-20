@@ -206,7 +206,7 @@ export default function AdminOpsInbox() {
 
 function PayloadPreview({ payload, imageName }) {
   if (Array.isArray(payload.items)) {
-    return <PurchaseListPreview payload={payload} />;
+    return <PurchaseListPreview payload={payload} />;  // payload passed in full
   }
 
   const SKIP_KEYS = new Set([
@@ -259,20 +259,8 @@ function PayloadPreview({ payload, imageName }) {
             <div>{imageName}</div>
           </div>
         )}
-        {photoCount > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10, fontSize: 13 }}>
-            <div style={{ color: 'var(--muted)', fontWeight: 700 }}>รูปแนบ</div>
-            <div style={{ color: 'var(--ink)' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#eef2ff', borderRadius: 8, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>
-                📷 {photoCount} รูป
-              </span>
-              {photoNames.length > 0 && (
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                  {photoNames.join(', ')}
-                </div>
-              )}
-            </div>
-          </div>
+        {(photoCount > 0 || payload.photoUrls?.length > 0) && (
+          <PhotosRow photoUrls={payload.photoUrls || []} photoNames={photoNames} photoCount={photoCount} />
         )}
       </div>
     </div>
@@ -280,7 +268,7 @@ function PayloadPreview({ payload, imageName }) {
 }
 
 function PurchaseListPreview({ payload }) {
-  const { date, recordedBy, items = [], photoCount, photoNames = [] } = payload;
+  const { date, recordedBy, items = [], photoCount, photoNames = [], photoUrls = [] } = payload;
   const [copied, setCopied] = useState(false);
 
   function copyAsText() {
@@ -300,8 +288,8 @@ function PurchaseListPreview({ payload }) {
         {date && <span>📅 {date}</span>}
         {recordedBy && <span>👤 {recordedBy}</span>}
         <span style={{ fontWeight: 700, color: '#bf6c2a' }}>🛒 {items.length} รายการ</span>
-        {(photoCount > 0 || photoNames.length > 0) && (
-          <span style={{ fontWeight: 700, color: '#4338ca' }}>📷 {photoCount || photoNames.length} รูป</span>
+        {(payload.photoUrls?.length > 0 || photoCount > 0 || photoNames.length > 0) && (
+          <span style={{ fontWeight: 700, color: '#4338ca' }}>📷 {payload.photoUrls?.length || photoCount || photoNames.length} รูป</span>
         )}
         {items.length > 0 && (
           <button onClick={copyAsText} style={{
@@ -344,6 +332,70 @@ function PurchaseListPreview({ payload }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {(photoUrls.length > 0 || photoCount > 0) && (
+        <div style={{ marginTop: 12 }}>
+          <PhotosRow photoUrls={photoUrls} photoNames={photoNames} photoCount={photoCount} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PhotosRow({ photoUrls = [], photoNames = [], photoCount = 0 }) {
+  const [lightbox, setLightbox] = useState(null);
+  const count = photoUrls.length || photoCount;
+  if (count === 0) return null;
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10, fontSize: 13 }}>
+      <div style={{ color: 'var(--muted)', fontWeight: 700 }}>รูปแนบ</div>
+      <div>
+        {photoUrls.length > 0 ? (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
+            {photoUrls.map((url, i) => (
+              <img
+                key={i}
+                src={url}
+                alt={photoNames[i] || `รูป ${i + 1}`}
+                onClick={() => setLightbox({ url, name: photoNames[i] || `รูป ${i + 1}` })}
+                style={{
+                  width: 64, height: 64, objectFit: 'cover',
+                  borderRadius: 10, border: '1.5px solid #eadcc6',
+                  cursor: 'zoom-in',
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#eef2ff', borderRadius: 8, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>
+            📷 {count} รูป {photoNames.length > 0 ? `(${photoNames.join(', ')})` : ''}
+          </span>
+        )}
+      </div>
+
+      {lightbox && (
+        <div
+          onClick={() => setLightbox(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.92)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+        >
+          <img
+            src={lightbox.url}
+            alt={lightbox.name}
+            onClick={e => e.stopPropagation()}
+            style={{ maxWidth: '100%', maxHeight: '88vh', borderRadius: 18, objectFit: 'contain' }}
+          />
+          <div style={{ position: 'absolute', top: 14, right: 14 }}>
+            <button onClick={() => setLightbox(null)} style={{ background: 'rgba(255,255,255,.22)', border: 'none', color: '#fff', borderRadius: 12, padding: '8px 16px', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+              ✕ ปิด
+            </button>
+          </div>
+          {lightbox.name && (
+            <div style={{ position: 'absolute', bottom: 14, left: 0, right: 0, textAlign: 'center', color: 'rgba(255,255,255,.6)', fontSize: 12, pointerEvents: 'none' }}>
+              {lightbox.name}
+            </div>
+          )}
         </div>
       )}
     </div>
