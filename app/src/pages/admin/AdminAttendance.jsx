@@ -15,7 +15,7 @@ export default function AdminAttendance() {
   const [clockInModal, setClockInModal] = useState(null);
 
   async function load() {
-    const [{ data: attendanceRows }, { data: leaveRows }, { data: brs }, { data: st }] = await Promise.all([
+    const [{ data: attendanceRows }, { data: leaveRows }, { data: brs }, { data: st }, { data: allEmps }] = await Promise.all([
       supabase.from('attendance')
         .select('*, employees(name,nickname,color,branch_id)')
         .eq('org_id', orgId).eq('date', date).order('employees(name)'),
@@ -28,6 +28,7 @@ export default function AdminAttendance() {
         .order('created_at', { ascending: false }),
       supabase.from('branches').select('*').eq('org_id', orgId),
       supabase.from('org_settings').select('*').eq('org_id', orgId).single(),
+      supabase.from('employees').select('id,name,nickname,color,branch_id,active').eq('org_id', orgId).eq('active', true),
     ]);
     setBranches(brs || []);
     setSettings(st || null);
@@ -52,7 +53,24 @@ export default function AdminAttendance() {
         is_leave_request: true,
       }));
 
-    setRows([...(attendanceRows || []), ...visibleLeaves].sort((a, b) => {
+    const leaveEmpIds = new Set(visibleLeaves.map(l => l.emp_id));
+    const absentRows = (allEmps || [])
+      .filter(emp => !existingEmpIds.has(emp.id) && !leaveEmpIds.has(emp.id))
+      .map(emp => ({
+        id: `absent-${emp.id}`,
+        emp_id: emp.id,
+        employees: emp,
+        date,
+        clock_in: null,
+        clock_out: null,
+        status: 'absent',
+        ot_min: 0,
+        checkin_dist: null,
+        checkin_selfie_url: null,
+        is_absent_inferred: true,
+      }));
+
+    setRows([...(attendanceRows || []), ...visibleLeaves, ...absentRows].sort((a, b) => {
       const an = a.employees?.nickname || a.employees?.name || '';
       const bn = b.employees?.nickname || b.employees?.name || '';
       return an.localeCompare(bn, 'th');
@@ -315,22 +333,25 @@ export default function AdminAttendance() {
                       </>
                     )}
                     {r.is_leave_request && r.leave_status !== 'pending' && <span style={{ color: 'var(--muted)', fontSize: 12 }}>{r.leave_status === 'approved' ? '✓ อนุมัติแล้ว' : 'จากคำขอลา'}</span>}
-                    {!r.is_leave_request && (
+                    {r.is_absent_inferred && (
+                      <span style={{ color: 'var(--muted)', fontSize: 12, fontStyle: 'italic' }}>ยังไม่มีข้อมูล</span>
+                    )}
+                    {!r.is_leave_request && !r.is_absent_inferred && (
                       <button className="btn" style={{ padding: '6px 10px', fontSize: 12, background: 'var(--bg)', border: '1px solid var(--line)' }} onClick={() => setClockInModal({ row: r, clockIn: r.clock_in || rulesForRow(r).workStart || '09:00', reason: 'แอดมินแก้เวลาเข้างานย้อนหลัง' })}>
                         แก้เวลาเข้า
                       </button>
                     )}
-                    {!r.is_leave_request && r.clock_out && (
+                    {!r.is_leave_request && !r.is_absent_inferred && r.clock_out && (
                       <button className="btn" style={{ padding: '6px 10px', fontSize: 12, background: 'var(--accent-soft)', color: 'var(--accent)' }} onClick={() => clearClockOut(r)}>
                         ล้างเวลาออก
                       </button>
                     )}
-                    {!r.is_leave_request && r.clock_in && !r.clock_out && (
+                    {!r.is_leave_request && !r.is_absent_inferred && r.clock_in && !r.clock_out && (
                       <button className="btn" style={{ padding: '6px 10px', fontSize: 12, background: 'var(--accent-soft)', color: 'var(--accent)' }} onClick={() => setClockOutModal({ row: r, clockOut: defaultClockOutFor(r), reason: 'พนักงานลืมเช็คเอาท์' })}>
                         ใส่เวลาออก
                       </button>
                     )}
-                    {!r.is_leave_request && (
+                    {!r.is_leave_request && !r.is_absent_inferred && (
                       <button className="btn" style={{ padding: '6px 10px', fontSize: 12, background: 'var(--danger-bg)', color: 'var(--danger-fg)' }} onClick={() => deleteAttendance(r)}>
                         ลบรายการ
                       </button>

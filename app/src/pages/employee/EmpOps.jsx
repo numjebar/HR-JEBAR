@@ -608,7 +608,15 @@ function OpsTaskPage({ taskKey, navigate }) {
   useEffect(() => {
     if (!orgId) return;
     supabase.from('branches').select('id,label').eq('org_id', orgId).then(({ data }) => {
-      if (data?.length) setBranches(data);
+      if (data?.length) {
+        setBranches(data);
+        if (taskKey === 'cake-stock') {
+          setDraft(prev => {
+            const hasMatch = data.some(b => b.label === prev.branchName);
+            return hasMatch ? prev : { ...prev, branchName: data[0].label };
+          });
+        }
+      }
     });
   }, [orgId]);
 
