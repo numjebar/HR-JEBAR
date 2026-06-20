@@ -729,6 +729,21 @@ function OpsTaskPage({ taskKey, navigate }) {
         ))}
       </div>
 
+      {catalogReady && catalog && (
+        <div style={{ textAlign: 'center', marginBottom: 8 }}>
+          <span style={{ fontSize: 12, color: '#0d7a46', background: '#ecfdf3', border: '1px solid #bbe7cf', borderRadius: 99, padding: '4px 14px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            ✓ OPS: {catalog.menus?.length || 0} เมนู · {catalog.ingredients?.length || 0} วัตถุดิบ · {catalog.materials?.length || 0} วัสดุ
+          </span>
+        </div>
+      )}
+      {catalogRetrying && !catalog && (
+        <div style={{ textAlign: 'center', marginBottom: 8 }}>
+          <span style={{ fontSize: 12, color: '#0369a1', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 99, padding: '4px 14px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            ⏳ กำลังเชื่อมต่อ OPS...
+          </span>
+        </div>
+      )}
+
       <OpsFormCard
         taskKey={taskKey} draft={draft} setDraft={setDraft} resetDraft={resetDraft}
         saveLocalDraft={saveLocalDraft} backend={backend} summary={summary}

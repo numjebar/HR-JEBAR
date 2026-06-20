@@ -165,7 +165,10 @@ function AISettingsCard() {
         </div>
         {!saved && (
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-            ขอ Key ได้ที่ Google AI Studio → aistudio.google.com
+            ขอ Key ได้ที่{' '}
+            <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', fontWeight: 600 }}>
+              Google AI Studio
+            </a>
           </div>
         )}
       </div>
