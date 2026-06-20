@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
 import { ymd } from '../../lib/payroll';
 
 export default function AdminMessages() {
   const { orgId } = useAuthStore();
+  const location = useLocation();
   const [employees, setEmployees] = useState([]);
   const [selected, setSelected] = useState(null);
   const [thread, setThread] = useState([]);
@@ -45,6 +47,13 @@ export default function AdminMessages() {
   }
 
   useEffect(() => { loadEmployees(); }, []);
+
+  useEffect(() => {
+    const empId = location.state?.empId;
+    if (!empId || employees.length === 0 || selected) return;
+    const emp = employees.find(e => e.id === empId);
+    if (emp) loadThread(emp);
+  }, [employees, location.state?.empId]);
 
   useEffect(() => {
     if (!selected) return;

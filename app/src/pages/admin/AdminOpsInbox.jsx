@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 
@@ -35,12 +35,15 @@ const TASK_OPTIONS = [
 
 export default function AdminOpsInbox() {
   const { orgId } = useAuthStore();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [branches, setBranches] = useState([]);
   const [taskFilter, setTaskFilter] = useState(searchParams.get('task') || 'all');
   const [dateFilter, setDateFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [empFilter, setEmpFilter] = useState('all');
   const [searchText, setSearchText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -130,6 +133,11 @@ export default function AdminOpsInbox() {
       if (taskFilter !== 'all' && item.task_key !== taskFilter) return false;
       if (dateFilter === 'today' && (item.created_at || '').slice(0, 10) !== today) return false;
       if (dateFilter === 'week' && (item.created_at || '').slice(0, 10) < weekAgo) return false;
+      if (dateFilter === 'custom') {
+        const d = (item.created_at || '').slice(0, 10);
+        if (dateFrom && d < dateFrom) return false;
+        if (dateTo && d > dateTo) return false;
+      }
       if (empFilter !== 'all' && item.emp_id !== empFilter) return false;
       if (q) {
         const emp = employees.find(r => r.id === item.emp_id);
@@ -148,7 +156,7 @@ export default function AdminOpsInbox() {
       }
       return true;
     });
-  }, [items, taskFilter, dateFilter, empFilter, searchText, employees, reviewed, hideReviewed]);
+  }, [items, taskFilter, dateFilter, dateFrom, dateTo, empFilter, searchText, employees, reviewed, hideReviewed]);
 
   const taskCounts = useMemo(() => {
     const counts = Object.keys(TASK_LABELS).reduce((acc, key) => ({ ...acc, [key]: 0 }), {});
@@ -360,14 +368,21 @@ export default function AdminOpsInbox() {
             <option key={emp.id} value={emp.id}>{emp.nickname || emp.name}</option>
           ))}
         </select>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {[{ k: 'all', l: 'ทั้งหมด' }, { k: 'today', l: 'วันนี้' }, { k: 'week', l: '7 วัน' }].map(({ k, l }) => (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          {[{ k: 'all', l: 'ทั้งหมด' }, { k: 'today', l: 'วันนี้' }, { k: 'week', l: '7 วัน' }, { k: 'custom', l: 'กำหนดเอง' }].map(({ k, l }) => (
             <button key={k} onClick={() => setDateFilter(k)} className="btn" style={{
               background: dateFilter === k ? 'var(--accent)' : 'var(--bg)',
               color: dateFilter === k ? '#fff' : 'var(--muted)',
               border: '1px solid var(--line)', padding: '7px 14px', fontSize: 13,
             }}>{l}</button>
           ))}
+          {dateFilter === 'custom' && (
+            <>
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ width: 150, fontSize: 13 }} placeholder="จาก" />
+              <span style={{ fontSize: 13, color: 'var(--muted)' }}>–</span>
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ width: 150, fontSize: 13 }} placeholder="ถึง" />
+            </>
+          )}
         </div>
         <button onClick={() => setHideReviewed(h => !h)} className="btn" style={{
           background: hideReviewed ? 'var(--accent)' : 'var(--bg)',
@@ -576,13 +591,14 @@ export default function AdminOpsInbox() {
           employees={employees}
           orgId={orgId}
           onClose={() => setReplyEntry(null)}
+          navigateToMessages={(empId) => navigate('/admin/messages', { state: { empId } })}
         />
       )}
     </div>
   );
 }
 
-function ReplyModal({ entry, employees, orgId, onClose }) {
+function ReplyModal({ entry, employees, orgId, onClose, navigateToMessages }) {
   const [text, setText] = useState(() => {
     const p = entry.payload || {};
     if (entry.task_key === 'purchase-list') {
@@ -630,11 +646,16 @@ function ReplyModal({ entry, employees, orgId, onClose }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: '24px 24px 0 0', padding: 24, width: '100%', maxWidth: 520, display: 'grid', gap: 14, paddingBottom: 32 }}>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 4 }}>ตอบกลับ {empName}</div>
-          <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-            {TASK_LABELS[entry.task_key] || entry.task_key} · {formatDateTime(entry.created_at)}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 4 }}>ตอบกลับ {empName}</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+              {TASK_LABELS[entry.task_key] || entry.task_key} · {formatDateTime(entry.created_at)}
+            </div>
           </div>
+          <button onClick={() => { navigateToMessages(entry.emp_id); onClose(); }} style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--bg)', fontSize: 12, color: 'var(--accent)', cursor: 'pointer', flexShrink: 0 }}>
+            💬 ประวัติ
+          </button>
         </div>
         {sent ? (
           <div style={{ background: '#ecfdf3', border: '1px solid #bbe7cf', borderRadius: 14, padding: 16, textAlign: 'center', color: '#0d7a46', fontWeight: 700 }}>
