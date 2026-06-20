@@ -6,7 +6,7 @@ import { APP_VERSION } from '../../lib/version';
 import SearchSelect from '../../components/SearchSelect';
 import VoiceBtn from '../../components/VoiceBtn';
 import PhotoSection from '../../components/PhotoSection';
-import { fetchOperateCatalog, clearCatalogCache } from '../../lib/operateCatalog';
+import { fetchOperateCatalog, clearCatalogCache, OPS_CONFIG_KEY } from '../../lib/operateCatalog';
 import { uploadOpsPhotos, uploadSingleBase64 } from '../../lib/opsStorage';
 
 const STORAGE_PREFIX = 'hr_emp_ops_';
@@ -641,15 +641,25 @@ function OpsTaskPage({ taskKey, navigate }) {
   const [catalogReady, setCatalogReady] = useState(false); // true once fetch attempt completes
   const [branches, setBranches] = useState([]);
   const backend = useTaskBackend(taskKey);
-  const { orgId } = useAuthStore();
+  const { orgId, employeeSessionToken: taskPageToken } = useAuthStore();
 
   // Gemini key: env var first, then localStorage fallback
   const geminiKey = import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('hr_gemini_key') || '';
 
-  function reloadCatalog() {
+  async function reloadCatalog() {
     clearCatalogCache();
     setCatalogReady(false);
-    fetchOperateCatalog().then(c => { if (c) setCatalog(c); setCatalogReady(true); });
+    // Re-fetch org settings so admin's just-saved ops_config reaches sessionStorage
+    try {
+      const { data } = await supabase.rpc('employee_home_data_v2', { p_session_token: taskPageToken });
+      const cfg = data?.settings?.rules?.ops_config;
+      if (cfg?.url && cfg?.key) {
+        try { sessionStorage.setItem(OPS_CONFIG_KEY, JSON.stringify({ url: cfg.url, key: cfg.key })); } catch { /* ignore */ }
+      }
+    } catch { /* ignore */ }
+    const c = await fetchOperateCatalog();
+    if (c) setCatalog(c);
+    setCatalogReady(true);
   }
 
   useEffect(() => {
