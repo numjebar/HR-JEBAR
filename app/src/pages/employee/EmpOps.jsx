@@ -746,6 +746,9 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
   const [todayProductionBatches, setTodayProductionBatches] = useState([]);
   const [prodRefreshTick, setProdRefreshTick] = useState(0);
 
+  const [todayCakeLog, setTodayCakeLog] = useState([]);
+  const [cakeRefreshTick, setCakeRefreshTick] = useState(0);
+
   useEffect(() => {
     if (taskKey !== 'production' || !draft.product || !orgId) {
       setTodayProductionTotal(null);
@@ -774,6 +777,34 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
       });
     return () => { cancelled = true; };
   }, [draft.product, taskKey, orgId, prodRefreshTick]);
+
+  useEffect(() => {
+    if (taskKey !== 'cake-stock' || !orgId) { setTodayCakeLog([]); return; }
+    let cancelled = false;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    supabase
+      .from('employee_ops_entries')
+      .select('payload,created_at')
+      .eq('org_id', orgId)
+      .eq('task_key', 'cake-stock')
+      .gte('created_at', `${todayStr}T00:00:00`)
+      .lte('created_at', `${todayStr}T23:59:59`)
+      .order('created_at', { ascending: true })
+      .then(({ data }) => {
+        if (cancelled) return;
+        const qBranch = (draft.branchName || '').trim().toLowerCase();
+        const entries = (data || []).filter(e => (e.payload?.branchName || '').trim().toLowerCase() === qBranch);
+        setTodayCakeLog(entries.map(e => ({
+          cakeName: e.payload?.cakeName || '',
+          available: e.payload?.available || '0',
+          reserved: e.payload?.reserved || '0',
+          damaged: e.payload?.damaged || '0',
+          status: e.payload?.status || '',
+          time: (e.created_at || '').slice(11, 16),
+        })));
+      });
+    return () => { cancelled = true; };
+  }, [draft.branchName, taskKey, orgId, cakeRefreshTick]);
 
   useEffect(() => {
     setDraft(prev => ({
@@ -821,6 +852,7 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
       saveLocalDraft(payload);
       await backend.reload();
       if (taskKey === 'production') setProdRefreshTick(t => t + 1);
+      if (taskKey === 'cake-stock') setCakeRefreshTick(t => t + 1);
       const uploadedCount = (payload.photoUrls?.length || 0) + (payload.billImageUrl ? 1 : 0);
       setSuccess(`บันทึกเข้า backend แล้ว${uploadedCount > 0 ? ` (อัปโหลด ${uploadedCount} รูปสำเร็จ)` : ''}`);
     } catch (error) {
@@ -855,7 +887,7 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
 
       {taskKey === 'purchase-list'
         ? <PurchaseListForm draft={draft} setDraft={setDraft} catalog={catalog} employeeSessionToken={employeeSessionToken} />
-        : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches, lastRecord, todayProductionTotal, lastCakeRecord, todayProductionBatches)
+        : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches, lastRecord, todayProductionTotal, lastCakeRecord, todayProductionBatches, todayCakeLog)
       }
 
       <div style={summaryPillStyle}>ร่างล่าสุด: {summary}</div>
@@ -902,7 +934,7 @@ function LastRecordHint({ record, taskKey }) {
   );
 }
 
-function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches = [], lastRecord = null, todayProductionTotal = null, lastCakeRecord = null, todayProductionBatches = []) {
+function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches = [], lastRecord = null, todayProductionTotal = null, lastCakeRecord = null, todayProductionBatches = [], todayCakeLog = []) {
   switch (taskKey) {
     case 'bills':
       return (
@@ -1149,6 +1181,20 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
             onChange={photos => setDraft({ ...draft, photos })}
             label="รูปสต๊อกเค้ก (ไม่บังคับ)"
           />
+          {todayCakeLog.length > 0 && (
+            <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 12, padding: '10px 12px' }}>
+              <div style={{ fontSize: 12, color: '#92400e', fontWeight: 700, marginBottom: 6 }}>
+                🍰 วันนี้เช็กแล้ว {todayCakeLog.length} รายการ ({draft.branchName})
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {todayCakeLog.map((c, i) => (
+                  <span key={i} style={{ background: '#fff', border: '1px solid #fde68a', borderRadius: 8, padding: '2px 8px', fontSize: 11, color: '#78350f' }}>
+                    {c.cakeName} · {c.available}{c.reserved && c.reserved !== '0' ? ` จอง${c.reserved}` : ''}{c.status && c.status !== 'พร้อมขาย' ? ` · ${c.status}` : ''} @{c.time}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       );
 
