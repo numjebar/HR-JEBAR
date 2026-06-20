@@ -12,6 +12,7 @@ export default function AdminMessages() {
   const [kind, setKind] = useState('message');
   const [due, setDue] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showBroadcast, setShowBroadcast] = useState(false);
   const bottomRef = useRef(null);
 
   async function loadEmployees() {
@@ -72,7 +73,12 @@ export default function AdminMessages() {
     <div style={{ display: 'flex', gap: 0, height: 'calc(100vh - 56px)', overflow: 'hidden' }}>
       {/* employee list */}
       <div style={{ width: 260, flexShrink: 0, borderRight: '1px solid var(--line)', overflowY: 'auto', background: 'var(--surface)' }}>
-        <div style={{ padding: '16px 16px 12px', fontWeight: 700, fontSize: 16, borderBottom: '1px solid var(--line)' }}>ข้อความ & สั่งงาน</div>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+          <div style={{ fontWeight: 700, fontSize: 16 }}>ข้อความ & สั่งงาน</div>
+          <button onClick={() => setShowBroadcast(true)} title="ส่งให้ทุกคน" style={{ background: 'var(--accent-soft)', border: '1px solid var(--accent)', color: 'var(--accent)', borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+            📣
+          </button>
+        </div>
         {employees.map((emp) => (
           <button key={emp.id} onClick={() => loadThread(emp)} style={{
             display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px 16px',
@@ -164,6 +170,79 @@ export default function AdminMessages() {
           เลือกพนักงานเพื่อดูข้อความ
         </div>
       )}
+
+      {showBroadcast && (
+        <BroadcastModal
+          employees={employees}
+          orgId={orgId}
+          onClose={() => setShowBroadcast(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function BroadcastModal({ employees, orgId, onClose }) {
+  const [text, setText] = useState('');
+  const [kind, setKind] = useState('message');
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [targetIds, setTargetIds] = useState(null);
+
+  const activeEmps = employees.filter(e => e.id);
+
+  async function send() {
+    if (!text.trim() || activeEmps.length === 0) return;
+    setBusy(true);
+    const targets = targetIds || activeEmps.map(e => e.id);
+    const rows = targets.map(empId => ({
+      emp_id: empId, org_id: orgId,
+      from: 'admin', kind, text: text.trim(),
+      status: 'unread', created_at: new Date().toISOString(),
+    }));
+    await supabase.from('messages').insert(rows);
+    setSent(true);
+    setBusy(false);
+    setTimeout(onClose, 1400);
+  }
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: '24px 24px 0 0', padding: 24, width: '100%', maxWidth: 520, display: 'grid', gap: 14, paddingBottom: 32 }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 4 }}>📣 ส่งให้ทุกคน</div>
+          <div style={{ fontSize: 13, color: 'var(--muted)' }}>พนักงาน {activeEmps.length} คนจะได้รับข้อความนี้</div>
+        </div>
+        {sent ? (
+          <div style={{ background: '#ecfdf3', border: '1px solid #bbe7cf', borderRadius: 14, padding: 16, textAlign: 'center', color: '#0d7a46', fontWeight: 700 }}>
+            ✓ ส่งให้พนักงานทุกคนแล้ว
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {['message', 'task'].map(k => (
+                <button key={k} onClick={() => setKind(k)} className="btn" style={{ background: kind === k ? 'var(--accent)' : 'var(--bg)', color: kind === k ? '#fff' : 'var(--muted)', border: '1px solid var(--line)', padding: '6px 14px', fontSize: 13 }}>
+                  {k === 'message' ? '💬 ข้อความ' : '📋 มอบงาน'}
+                </button>
+              ))}
+            </div>
+            <textarea
+              rows={4}
+              value={text}
+              onChange={e => setText(e.target.value)}
+              placeholder="พิมพ์ข้อความถึงพนักงานทุกคน..."
+              style={{ resize: 'vertical', fontSize: 14 }}
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="btn btn-primary" onClick={send} disabled={busy || !text.trim()} style={{ flex: 1 }}>
+                {busy ? 'กำลังส่ง...' : `ส่งให้ ${activeEmps.length} คน`}
+              </button>
+              <button className="btn" onClick={onClose} style={{ flex: 1 }}>ยกเลิก</button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
