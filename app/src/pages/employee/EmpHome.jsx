@@ -151,7 +151,7 @@ export default function EmpHome() {
         </div>
 
         <div style={{ textAlign: 'center', margin: '18px 0 12px', fontSize: 64, letterSpacing: 6, fontWeight: 500, color: '#3f332e' }}>
-          JEBAR
+          LUCID
         </div>
 
         <div style={{

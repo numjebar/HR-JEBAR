@@ -606,7 +606,7 @@ function OpsHome({ navigate }) {
     <div style={pageStyle}>
       <section style={heroCardStyle}>
         <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>งานร้านของพนักงาน</div>
-        <div style={{ fontWeight: 800, fontSize: 28, color: '#2f241f' }}>JEBAR OPS</div>
+        <div style={{ fontWeight: 800, fontSize: 28, color: '#2f241f' }}>LUCID OPS</div>
         <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 8, lineHeight: 1.6 }}>
           ใช้ส่งบิล บันทึกการผลิต เช็กวัตถุดิบ เช็กสต๊อกเค้ก สต๊อกของใช้ และเตรียมรายการซื้อ
         </div>

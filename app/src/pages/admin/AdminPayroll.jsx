@@ -2,7 +2,7 @@
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
 import { computePay, rulesFor, rangeFor, rangeForEmployee, THB, ymd, addDays, parseYmd, fmtDateFull, lateMinutesOf, overtimeMinutesOf } from '../../lib/payroll';
-import slipLogo from '../../assets/jebar-logo-slip.png';
+import slipLogo from '../../assets/lucid-logo.svg';
 
 const PERIOD_LABEL = {
   day: 'รายวัน',
@@ -123,7 +123,7 @@ export default function AdminPayroll() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `hr-jebar-payroll-${period}-${branchFilter}.csv`;
+    a.download = `lucid-payroll-${period}-${branchFilter}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -237,7 +237,7 @@ export default function AdminPayroll() {
     } else {
       ctx.fillStyle = '#2f302e';
       ctx.font = '700 38px sans-serif';
-      ctx.fillText('JEBAR', 132, 148);
+      ctx.fillText('LUCID', 132, 148);
     }
 
     ctx.fillStyle = '#ffffff';
@@ -294,7 +294,7 @@ export default function AdminPayroll() {
     ctx.font = '400 18px sans-serif';
     ctx.fillText(`สร้างเมื่อ ${new Date().toLocaleString('th-TH')}`, 100, 1060);
     ctx.textAlign = 'right';
-    ctx.fillText('HR JEBAR', 800, 1060);
+    ctx.fillText('LUCID HR', 800, 1060);
     ctx.textAlign = 'left';
 
     const a = document.createElement('a');

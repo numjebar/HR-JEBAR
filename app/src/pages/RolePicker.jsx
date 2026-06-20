@@ -1,14 +1,14 @@
 ﻿import { useNavigate } from 'react-router-dom';
-import logo from '../assets/jebar-logo.png';
+import logo from '../assets/lucid-logo.svg';
 
 export default function RolePicker() {
   const nav = useNavigate();
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 32, padding: 24 }}>
-      <img src={logo} alt="JEBAR" style={{ height: 64 }} />
+      <img src={logo} alt="LUCID" style={{ height: 64 }} />
       <div style={{ textAlign: 'center' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginBottom: 8 }}>JEBAR OPERATIONS SYSTEM</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginBottom: 8 }}>LUCID OPERATIONS SYSTEM</h1>
         <p style={{ color: 'var(--muted)', textAlign: 'center', maxWidth: 520 }}>
           ระบบกลางสำหรับพนักงาน เจ้าของร้าน และการจัดการหน้าร้านในแอปเดียว
         </p>

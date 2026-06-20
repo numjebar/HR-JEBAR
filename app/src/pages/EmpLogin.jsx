@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabase';
-import logo from '../assets/jebar-logo.png';
+import logo from '../assets/lucid-logo.svg';
 
 function Avatar({ emp }) {
   const displayName = emp.nickname || emp.name || 'พนักงาน';
@@ -120,7 +120,7 @@ export default function EmpLogin() {
     return (
       <div style={{ minHeight: '100vh', padding: 24, maxWidth: 480, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 24, marginBottom: 28 }}>
-          <img src={logo} alt="JEBAR" style={{ height: 36 }} />
+          <img src={logo} alt="LUCID" style={{ height: 36 }} />
           <span style={{ fontWeight: 700, fontSize: 16 }}>เลือกบัญชีของคุณ</span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

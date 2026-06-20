@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 32" width="130" height="32" fill="none">
+  <!-- Diamond icon -->
+  <polygon points="16,1.5 30.5,16 16,30.5 1.5,16" stroke="#1B5EA8" stroke-width="2.5" stroke-linejoin="round"/>
+  <line x1="1.5" y1="16" x2="30.5" y2="16" stroke="#1B5EA8" stroke-width="0.9" opacity="0.28"/>
+  <line x1="16" y1="1.5" x2="16" y2="30.5" stroke="#1B5EA8" stroke-width="0.9" opacity="0.28"/>
+  <!-- LUCID text -->
+  <text x="38" y="23.5" font-family="-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif" font-weight="800" font-size="20" fill="#0f172a" letter-spacing="0.5">LUCID</text>
+</svg>
