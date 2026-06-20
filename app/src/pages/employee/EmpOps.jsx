@@ -95,10 +95,20 @@ function BillImageSection({ draft, setDraft, geminiKey }) {
     setAiError('');
     try {
       const result = await callGeminiVision(draft.imageBase64, draft.imageMimeType, geminiKey);
+      let billDate = draft.date;
+      if (result.date) {
+        try {
+          const d = new Date(result.date);
+          if (!isNaN(d.getTime()) && Math.abs(d.getFullYear() - new Date().getFullYear()) <= 1) {
+            billDate = d.toISOString().slice(0, 10);
+          }
+        } catch {}
+      }
       setDraft({
         ...draft,
         vendor: result.vendor || draft.vendor,
         amount: result.total ? String(result.total) : draft.amount,
+        date: billDate,
         aiItems: (result.items || []).map(it => ({
           name: it.name || '', qty: it.qty || 1, unit: it.unit || '', unitPrice: it.unitPrice || 0,
         })),

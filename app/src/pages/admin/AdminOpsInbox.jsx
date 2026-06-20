@@ -156,6 +156,36 @@ export default function AdminOpsInbox() {
     return counts;
   }, [items]);
 
+  const productionSummary = useMemo(() => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const prodItems = filteredItems.filter(item =>
+      item.task_key === 'production' && (item.created_at || '').slice(0, 10) === todayStr
+    );
+    if (prodItems.length === 0) return null;
+    const byProduct = new Map();
+    prodItems.forEach(item => {
+      const p = item.payload || {};
+      const product = p.product || 'ไม่ระบุ';
+      const qty = parseFloat(p.quantity || 0) || 0;
+      const unit = p.unit || 'ชิ้น';
+      if (!byProduct.has(product)) byProduct.set(product, { total: 0, unit, batches: 0 });
+      const entry = byProduct.get(product);
+      entry.total += qty;
+      entry.batches += 1;
+    });
+    return [...byProduct.entries()];
+  }, [filteredItems]);
+
+  const billsSummary = useMemo(() => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const billItems = filteredItems.filter(item =>
+      item.task_key === 'bills' && (item.created_at || '').slice(0, 10) === todayStr
+    );
+    if (billItems.length < 2) return null;
+    const total = billItems.reduce((sum, item) => sum + (parseFloat(item.payload?.amount) || 0), 0);
+    return { total, count: billItems.length };
+  }, [filteredItems]);
+
   const groupedItems = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
@@ -245,6 +275,35 @@ export default function AdminOpsInbox() {
         </button>
         <div style={{ fontSize: 13, color: 'var(--muted)', marginLeft: 'auto' }}>แสดง {filteredItems.length} รายการ</div>
       </div>
+
+      {productionSummary && productionSummary.length > 0 && (
+        <div className="card" style={{ padding: '16px 18px', marginBottom: 16, border: '1px solid #bbe7cf', background: '#ecfdf3' }}>
+          <div style={{ fontWeight: 700, marginBottom: 12, color: '#0d7a46', fontSize: 14 }}>🏭 สรุปการผลิตวันนี้</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+            {productionSummary.map(([product, data]) => (
+              <div key={product} style={{ background: '#fff', border: '1px solid #bbe7cf', borderRadius: 14, padding: '12px 14px' }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: '#1a5e3a', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{product}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: '#0d7a46' }}>
+                  {data.total % 1 === 0 ? data.total : data.total.toFixed(1)} <span style={{ fontSize: 12, fontWeight: 500 }}>{data.unit}</span>
+                </div>
+                <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{data.batches} รอบ</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {billsSummary && (
+        <div className="card" style={{ padding: '14px 18px', marginBottom: 16, border: '1px solid #c7d2fe', background: '#eef2ff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+          <div style={{ fontWeight: 700, color: '#3730a3', fontSize: 14 }}>📷 บิลวันนี้</div>
+          <div style={{ display: 'flex', gap: 20, alignItems: 'baseline' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#3730a3' }}>
+              ฿{billsSummary.total.toLocaleString('th-TH', { maximumFractionDigits: 0 })}
+            </div>
+            <div style={{ fontSize: 13, color: '#6366f1' }}>{billsSummary.count} ใบ</div>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="card" style={{ padding: 16, marginBottom: 18, background: '#fff8e8', border: '1px solid #f4dfab', color: '#7a5b2b' }}>
@@ -357,7 +416,13 @@ export default function AdminOpsInbox() {
 }
 
 function ReplyModal({ entry, employees, orgId, onClose }) {
-  const [text, setText] = useState('');
+  const [text, setText] = useState(() => {
+    if (entry.task_key === 'purchase-list') {
+      const n = (entry.payload?.items || []).length;
+      return `อนุมัติใบสั่งซื้อแล้ว ✓ กรุณาดำเนินการตามรายการ${n > 0 ? ` (${n} รายการ)` : ''}`;
+    }
+    return '';
+  });
   const [kind, setKind] = useState('message');
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
