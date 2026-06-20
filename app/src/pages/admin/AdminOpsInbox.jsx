@@ -721,12 +721,27 @@ function PayloadPreview({ payload, imageName }) {
         {rows.length === 0 && aiItems.length === 0 && !imageName && !billImageUrl && photoCount === 0 ? (
           <div style={{ fontSize: 13, color: 'var(--muted)' }}>ไม่มีรายละเอียดใน payload</div>
         ) : (
-          rows.map(([key, value]) => (
-            <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10, fontSize: 13 }}>
-              <div style={{ color: 'var(--muted)', fontWeight: 700 }}>{humanizeKey(key)}</div>
-              <div style={{ color: 'var(--ink)', wordBreak: 'break-word' }}>{String(value)}</div>
-            </div>
-          ))
+          rows.map(([key, value]) => {
+            const valStr = String(value);
+            const isAlertStatus = key === 'status' && valStr !== 'ปกติ' && valStr !== 'พร้อมขาย' && valStr !== 'done' && valStr !== 'read' && valStr !== 'unread';
+            const isUrgent = isAlertStatus && (valStr === 'ต้องสั่งเพิ่ม' || valStr === 'มีปัญหา' || valStr === 'หมดแล้ว' || valStr === 'หมด');
+            return (
+              <div key={key} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10, fontSize: 13 }}>
+                <div style={{ color: 'var(--muted)', fontWeight: 700 }}>{humanizeKey(key)}</div>
+                <div style={{
+                  color: isUrgent ? '#b42318' : isAlertStatus ? '#92400e' : 'var(--ink)',
+                  fontWeight: isAlertStatus ? 700 : 400,
+                  wordBreak: 'break-word',
+                  background: isUrgent ? '#fff1f1' : isAlertStatus ? '#fffbeb' : undefined,
+                  borderRadius: isAlertStatus ? 6 : undefined,
+                  padding: isAlertStatus ? '1px 6px' : undefined,
+                  display: 'inline-block',
+                }}>
+                  {isAlertStatus && (isUrgent ? '🔴 ' : '🟡 ')}{valStr}
+                </div>
+              </div>
+            );
+          })
         )}
         {aiItems.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10, fontSize: 13 }}>
