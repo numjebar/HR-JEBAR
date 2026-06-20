@@ -91,7 +91,7 @@ export default function AdminSettings() {
     setConnStatus('testing');
     try {
       const res = await fetch(
-        `${url.replace(/\/+$/, '')}/rest/v1/jebar_app_state?select=db&limit=1`,
+        `${url.replace(/\/+$/, '')}/rest/v1/jebar_app_state?select=db,updated_at&limit=1`,
         { headers: { apikey: key, Authorization: `Bearer ${key}` } }
       );
       if (!res.ok) {
@@ -108,10 +108,12 @@ export default function AdminSettings() {
         setConnStatus({ ok: true, menus: 0, ingredients: 0, materials: 0, noRow: true }); return;
       }
       const db = rows[0]?.db || {};
+      const updatedAt = rows[0]?.updated_at;
       const menus = (db.menus || []).filter(x => x.name).length;
       const ingredients = (db.ingredients || []).filter(x => x.name).length;
       const materials = (db.materials || db.ingredients || []).filter(x => x.name).length;
-      setConnStatus({ ok: true, menus, ingredients, materials });
+      const syncAge = updatedAt ? Math.round((Date.now() - new Date(updatedAt)) / 60000) : null;
+      setConnStatus({ ok: true, menus, ingredients, materials, syncAge });
     } catch (err) {
       setConnStatus({ ok: false, error: err.message || 'ไม่สามารถเชื่อมต่อได้' });
     }
@@ -325,6 +327,11 @@ export default function AdminSettings() {
                 <span>🍽️ เมนู {connStatus.menus} รายการ</span>
                 <span>📦 วัตถุดิบ {connStatus.ingredients} รายการ</span>
                 <span>🧴 วัสดุ {connStatus.materials} รายการ</span>
+                {connStatus.syncAge !== null && (
+                  <span style={{ color: connStatus.syncAge > 60 ? '#b45309' : '#0d7a46' }}>
+                    🔄 ซิงก์ล่าสุด {connStatus.syncAge < 2 ? 'เมื่อกี้' : connStatus.syncAge < 60 ? `${connStatus.syncAge} นาทีที่แล้ว` : `${Math.floor(connStatus.syncAge / 60)} ชม.ที่แล้ว`}
+                  </span>
+                )}
                 {(connStatus.menus === 0 && connStatus.ingredients === 0) && (
                   <div style={{ width: '100%', marginTop: 6, padding: '8px 10px', background: '#fff8e8', border: '1px solid #f4dfab', borderRadius: 10, color: '#7a5b2b', fontSize: 12, lineHeight: 1.6 }}>
                     {connStatus.noRow
