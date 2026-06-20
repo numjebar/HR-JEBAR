@@ -32,8 +32,7 @@ export default function AdminShell() {
   const location = useLocation();
   const closeSidebar = () => setSidebarOpen(false);
 
-  useEffect(() => {
-    if (!orgId) return;
+  function refreshBadgeCounts() {
     const today = new Date().toISOString().slice(0, 10);
     const seenKey = `hr_ops_today_seen_${today}`;
     const seen = parseInt(localStorage.getItem(seenKey) || '0', 10);
@@ -55,6 +54,21 @@ export default function AdminShell() {
       .eq('from', 'emp')
       .eq('status', 'unread')
       .then(({ count }) => setUnreadMsgCount(count || 0));
+  }
+
+  useEffect(() => {
+    if (!orgId) return;
+    refreshBadgeCounts();
+  }, [orgId]);
+
+  useEffect(() => {
+    if (!orgId) return;
+    const ch = supabase.channel('shell-badge-live')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'employee_ops_entries', filter: `org_id=eq.${orgId}` }, refreshBadgeCounts)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `org_id=eq.${orgId}` }, refreshBadgeCounts)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `org_id=eq.${orgId}` }, refreshBadgeCounts)
+      .subscribe();
+    return () => supabase.removeChannel(ch);
   }, [orgId]);
 
   useEffect(() => {

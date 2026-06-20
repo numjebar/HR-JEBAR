@@ -44,6 +44,16 @@ export default function EmpHome() {
 
   useEffect(() => {
     if (!employee?.id || !orgId) return;
+    const ch = supabase.channel(`emp-home-${employee.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attendance', filter: `emp_id=eq.${employee.id}` }, load)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'attendance', filter: `emp_id=eq.${employee.id}` }, load)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `org_id=eq.${orgId}` }, load)
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [employee?.id, orgId]);
+
+  function loadOpsCounts() {
+    if (!employee?.id || !orgId) return;
     const today = new Date().toISOString().slice(0, 10);
     supabase
       .from('employee_ops_entries')
@@ -57,6 +67,18 @@ export default function EmpHome() {
         (data || []).forEach(e => { counts[e.task_key] = (counts[e.task_key] || 0) + 1; });
         setTodayOpsCounts(counts);
       }).catch(() => {});
+  }
+
+  useEffect(() => {
+    loadOpsCounts();
+  }, [employee?.id, orgId]);
+
+  useEffect(() => {
+    if (!employee?.id || !orgId) return;
+    const ch = supabase.channel(`emp-ops-counts-${employee.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'employee_ops_entries', filter: `emp_id=eq.${employee.id}` }, loadOpsCounts)
+      .subscribe();
+    return () => supabase.removeChannel(ch);
   }, [employee?.id, orgId]);
 
   useEffect(() => {
