@@ -1,5 +1,61 @@
 # HR JEBAR Handoff
 
+## Update 2026-06-20 (OPS home badges + admin search — v6)
+
+### สิ่งที่เพิ่มใน v6
+
+**Employee OpsHome — today's submission badges**
+- โหลดจำนวนรายการที่ส่งวันนี้จาก backend (6 task พร้อมกัน)
+- แสดง badge สีเขียว "✓ N" บน task card ที่ส่งแล้ววันนี้
+- แสดง badge สีเหลือง "• ร่างค้าง" บน task card ที่มี draft ค้างอยู่ใน localStorage
+- พนักงานเห็นได้ทันทีว่าทำงานไหนไปแล้วในวันนี้
+
+**AdminOpsInbox — search bar**
+- เพิ่มช่องค้นหาใน filter bar
+- ค้นหาได้จาก: ชื่อพนักงาน, ร้านค้า (vendor), เมนู (product), ชื่อวัตถุดิบ, ชื่อเค้ก, หมายเหตุ, รายการในใบสั่งซื้อ
+- ค้นหา realtime ไม่ต้องกดปุ่ม
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/pages/employee/EmpOps.jsx` — `OpsHome` + `hasDraftData()` ใหม่
+- `app/src/pages/admin/AdminOpsInbox.jsx` — `searchText` state + filter + input UI
+- `app/src/lib/version.js` — bump เป็น `Build 2026.06.20-hr-ops-v6`
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+---
+
+## Update 2026-06-20 (bills image upload to Storage + admin CSV export — v5)
+
+### สิ่งที่เพิ่มใน v5
+
+**Bills form — อัปโหลดรูปบิลไป Supabase Storage**
+- `uploadSingleBase64()` จาก `opsStorage.js` ส่ง `imageBase64` ไป bucket `ops-photos`
+- ได้ public URL กลับมา เก็บเป็น `payload.billImageUrl`
+- แอดมินเห็นรูปบิลเป็น thumbnail และ lightbox เหมือน OPS form อื่น
+
+**AdminOpsInbox — CSV export**
+- ปุ่ม 📥 CSV ใน header
+- `exportCSV(items, employees, branches)` ส่งออกเป็น UTF-8 CSV พร้อม BOM (Excel อ่านได้)
+- คอลัมน์: วันที่บันทึก, ประเภทงาน, พนักงาน, สาขา, รายละเอียด, รูปแนบ
+
+**AdminOpsInbox — `PhotosRow` label prop**
+- รูปบิลแสดงหัวข้อ "รูปบิล" แทน "รูปแนบ"
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/pages/employee/EmpOps.jsx` — bills upload via `uploadSingleBase64`
+- `app/src/pages/admin/AdminOpsInbox.jsx` — CSV export + `PhotosRow` label + bill image display
+- `app/src/lib/version.js` — bump เป็น `Build 2026.06.20-hr-ops-v5`
+
+### Commit
+
+- `3025969` feat: bill image upload to Storage + admin CSV export (v5)
+
+---
+
 ## Update 2026-06-20 (OPS photo upload to Supabase Storage — v4)
 
 ### สิ่งที่เพิ่มใน v4

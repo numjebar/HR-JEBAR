@@ -423,7 +423,48 @@ export default function EmpOps() {
   return <OpsTaskPage taskKey={taskKey} navigate={navigate} />;
 }
 
+function hasDraftData(taskKey) {
+  try {
+    const raw = localStorage.getItem(`${STORAGE_PREFIX}${taskKey}`);
+    if (!raw) return false;
+    const s = JSON.parse(raw);
+    switch (taskKey) {
+      case 'bills':          return !!(s.vendor || s.amount || s.imageName);
+      case 'purchase-list':  return (s.items?.length || 0) > 0;
+      case 'production':     return !!(s.product || s.quantity || s.batch || s.note);
+      case 'inventory':      return !!(s.itemName || s.stockLeft || s.note);
+      case 'cake-stock':     return !!(s.cakeName || s.available || s.reserved || s.damaged || s.note);
+      case 'supplies-count': return !!(s.itemName || s.count || s.note);
+      default:               return false;
+    }
+  } catch { return false; }
+}
+
 function OpsHome({ navigate }) {
+  const { employeeSessionToken } = useAuthStore();
+  const [todayCounts, setTodayCounts] = useState({});
+
+  useEffect(() => {
+    if (!employeeSessionToken) return;
+    const today = new Date().toISOString().slice(0, 10);
+    Promise.all(
+      TASKS.map(task =>
+        supabase.rpc('employee_get_ops_entries_v2', {
+          p_session_token: employeeSessionToken,
+          p_task_key: task.key,
+          p_limit: 10,
+        }).then(({ data }) => ({
+          key: task.key,
+          count: (data || []).filter(e => (e.created_at || '').startsWith(today)).length,
+        }))
+      )
+    ).then(results => {
+      const counts = {};
+      results.forEach(r => { counts[r.key] = r.count; });
+      setTodayCounts(counts);
+    }).catch(() => {});
+  }, [employeeSessionToken]);
+
   return (
     <div style={pageStyle}>
       <section style={heroCardStyle}>
@@ -435,16 +476,32 @@ function OpsHome({ navigate }) {
       </section>
 
       <div style={{ display: 'grid', gap: 14 }}>
-        {TASKS.map((task) => (
-          <button key={task.key} onClick={() => navigate(task.path)} style={taskCardButtonStyle}>
-            <div style={taskIconStyle}>{task.icon}</div>
-            <div style={{ flex: 1, textAlign: 'left' }}>
-              <div style={{ fontWeight: 800, fontSize: 18, color: '#2f241f' }}>{task.title}</div>
-              <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 6, lineHeight: 1.55 }}>{task.subtitle}</div>
-            </div>
-            <div style={{ fontSize: 24, color: '#9b7a5a' }}>›</div>
-          </button>
-        ))}
+        {TASKS.map((task) => {
+          const todayCount = todayCounts[task.key] || 0;
+          const hasDraft = hasDraftData(task.key);
+          return (
+            <button key={task.key} onClick={() => navigate(task.path)} style={taskCardButtonStyle}>
+              <div style={taskIconStyle}>{task.icon}</div>
+              <div style={{ flex: 1, textAlign: 'left' }}>
+                <div style={{ fontWeight: 800, fontSize: 18, color: '#2f241f', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  {task.title}
+                  {todayCount > 0 && (
+                    <span style={{ background: '#ecfdf3', color: '#0d7a46', borderRadius: 999, padding: '2px 8px', fontSize: 12, fontWeight: 700 }}>
+                      ✓ {todayCount}
+                    </span>
+                  )}
+                  {hasDraft && (
+                    <span style={{ background: '#fff8e8', color: '#7a5b2b', borderRadius: 999, padding: '2px 8px', fontSize: 12, fontWeight: 700 }}>
+                      • ร่างค้าง
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 6, lineHeight: 1.55 }}>{task.subtitle}</div>
+              </div>
+              <div style={{ fontSize: 24, color: '#9b7a5a' }}>›</div>
+            </button>
+          );
+        })}
       </div>
 
       <div style={versionStyle}>{APP_VERSION}</div>

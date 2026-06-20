@@ -32,6 +32,7 @@ export default function AdminOpsInbox() {
   const [branches, setBranches] = useState([]);
   const [taskFilter, setTaskFilter] = useState(searchParams.get('task') || 'all');
   const [dateFilter, setDateFilter] = useState('all');
+  const [searchText, setSearchText] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -75,13 +76,29 @@ export default function AdminOpsInbox() {
   const filteredItems = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    const q = searchText.trim().toLowerCase();
     return items.filter((item) => {
       if (taskFilter !== 'all' && item.task_key !== taskFilter) return false;
       if (dateFilter === 'today' && (item.created_at || '').slice(0, 10) !== today) return false;
       if (dateFilter === 'week' && (item.created_at || '').slice(0, 10) < weekAgo) return false;
+      if (q) {
+        const emp = employees.find(r => r.id === item.emp_id);
+        const empName = (emp?.nickname || emp?.name || '').toLowerCase();
+        const p = item.payload || {};
+        const haystack = [
+          empName,
+          p.vendor || '',
+          p.product || '',
+          p.itemName || '',
+          p.cakeName || '',
+          p.note || '',
+          (p.items || []).map(i => i.itemName).join(' '),
+        ].join(' ').toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
       return true;
     });
-  }, [items, taskFilter, dateFilter]);
+  }, [items, taskFilter, dateFilter, searchText, employees]);
 
   const taskCounts = useMemo(() => {
     const counts = Object.keys(TASK_LABELS).reduce((acc, key) => ({ ...acc, [key]: 0 }), {});
@@ -130,6 +147,13 @@ export default function AdminOpsInbox() {
       </div>
 
       <div className="card" style={{ padding: 16, marginBottom: 18, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input
+          type="search"
+          value={searchText}
+          onChange={e => setSearchText(e.target.value)}
+          placeholder="ค้นหา พนักงาน / สินค้า / รายการ..."
+          style={{ flex: 1, minWidth: 180 }}
+        />
         <select value={taskFilter} onChange={(e) => { setTaskFilter(e.target.value); setSearchParams({}); }} style={{ width: 200 }}>
           {TASK_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
