@@ -17,6 +17,7 @@ export default function AdminDashboard() {
   const [opsTodayCounts, setOpsTodayCounts] = useState({});
   const [opsWarning, setOpsWarning] = useState('');
   const [lowStockItems, setLowStockItems] = useState([]);
+  const [pendingTasksCount, setPendingTasksCount] = useState(0);
   const [employees, setEmployees] = useState([]);
   const [allBranches, setAllBranches] = useState([]);
   const [orgSettings, setOrgSettings] = useState(null);
@@ -25,7 +26,7 @@ export default function AdminDashboard() {
   async function load() {
     const todayStart = `${today}T00:00:00`;
     const todayEnd = `${today}T23:59:59`;
-    const [{ data: att }, { data: leaves }, { data: todayLeaves }, { data: msgs }, { data: emps }, { data: branches }, { data: settings }, opsResult, opsTodayResult, lowStockResult] = await Promise.all([
+    const [{ data: att }, { data: leaves }, { data: todayLeaves }, { data: msgs }, { data: emps }, { data: branches }, { data: settings }, opsResult, opsTodayResult, lowStockResult, pendingTasksResult] = await Promise.all([
       supabase.from('attendance').select('*, employees(name,nickname,color)').eq('org_id', orgId).eq('date', today),
       supabase.from('leaves').select('*, employees(name,nickname)').eq('org_id', orgId).eq('status', 'pending'),
       supabase.from('leaves')
@@ -41,6 +42,7 @@ export default function AdminDashboard() {
       supabase.from('employee_ops_entries').select('id', { count: 'exact', head: true }).eq('org_id', orgId),
       supabase.from('employee_ops_entries').select('task_key').eq('org_id', orgId).gte('created_at', todayStart).lte('created_at', todayEnd),
       supabase.from('employee_ops_entries').select('id,emp_id,created_at,payload').eq('org_id', orgId).eq('task_key', 'inventory').order('created_at', { ascending: false }).limit(40),
+      supabase.from('messages').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('from', 'admin').eq('kind', 'task').neq('status', 'done'),
     ]);
 
     const existingEmpIds = new Set((att || []).map((a) => a.emp_id));
@@ -64,6 +66,7 @@ export default function AdminDashboard() {
     setTodayList(todayRows);
     setPendingLeaves(leaves || []);
     setEmpReplies(msgs || []);
+    setPendingTasksCount(pendingTasksResult?.count || 0);
     if (opsResult?.error) {
       setOpsEntriesCount(0);
       setOpsTodayCounts({});
@@ -218,6 +221,19 @@ export default function AdminDashboard() {
         <div style={{ background: 'var(--danger-bg)', border: '1px solid #fca5a5', borderRadius: 16, padding: '14px 20px', marginBottom: 20 }}>
           <div style={{ color: 'var(--danger-fg)', fontWeight: 700 }}>มีพนักงานตอบกลับ {empReplies.length} รายการ</div>
           <button className="btn" style={{ marginTop: 8, background: 'none', color: 'var(--danger-fg)', padding: '4px 12px', fontSize: 13, border: '1px solid var(--danger-fg)', borderRadius: 8 }} onClick={() => nav('/admin/messages')}>
+            ดูข้อความ →
+          </button>
+        </div>
+      )}
+
+      {/* alert: pending tasks */}
+      {pendingTasksCount > 0 && (
+        <div style={{ background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: 16, padding: '14px 20px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+          <div>
+            <div style={{ color: '#3730a3', fontWeight: 700 }}>📋 งานที่มอบหมายค้างอยู่ {pendingTasksCount} รายการ</div>
+            <div style={{ fontSize: 13, color: '#6366f1', marginTop: 2 }}>พนักงานยังไม่ได้กด "ทำงานเสร็จ"</div>
+          </div>
+          <button className="btn" onClick={() => nav('/admin/messages')} style={{ background: 'none', color: '#3730a3', border: '1px solid #a5b4fc', borderRadius: 8, padding: '4px 12px', fontSize: 13, cursor: 'pointer', flexShrink: 0 }}>
             ดูข้อความ →
           </button>
         </div>

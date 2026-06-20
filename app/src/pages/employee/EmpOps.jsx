@@ -697,6 +697,32 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
     return () => { cancelled = true; };
   }, [draft.itemName, taskKey, orgId]);
 
+  const [todayProductionTotal, setTodayProductionTotal] = useState(null);
+  const [prodRefreshTick, setProdRefreshTick] = useState(0);
+
+  useEffect(() => {
+    if (taskKey !== 'production' || !draft.product || !orgId) { setTodayProductionTotal(null); return; }
+    let cancelled = false;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    supabase
+      .from('employee_ops_entries')
+      .select('payload')
+      .eq('org_id', orgId)
+      .eq('task_key', 'production')
+      .gte('created_at', `${todayStr}T00:00:00`)
+      .lte('created_at', `${todayStr}T23:59:59`)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const q = draft.product.trim().toLowerCase();
+        const matching = (data || []).filter(e => (e.payload?.product || '').trim().toLowerCase() === q);
+        if (matching.length === 0) { setTodayProductionTotal(null); return; }
+        let total = 0;
+        matching.forEach(e => { total += parseFloat(e.payload?.quantity || 0) || 0; });
+        setTodayProductionTotal({ total, unit: matching[0]?.payload?.unit || '', count: matching.length });
+      });
+    return () => { cancelled = true; };
+  }, [draft.product, taskKey, orgId, prodRefreshTick]);
+
   useEffect(() => {
     setDraft(prev => ({
       ...prev,
@@ -742,6 +768,7 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
       if (error) throw error;
       saveLocalDraft(payload);
       await backend.reload();
+      if (taskKey === 'production') setProdRefreshTick(t => t + 1);
       const uploadedCount = (payload.photoUrls?.length || 0) + (payload.billImageUrl ? 1 : 0);
       setSuccess(`บันทึกเข้า backend แล้ว${uploadedCount > 0 ? ` (อัปโหลด ${uploadedCount} รูปสำเร็จ)` : ''}`);
     } catch (error) {
@@ -776,7 +803,7 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
 
       {taskKey === 'purchase-list'
         ? <PurchaseListForm draft={draft} setDraft={setDraft} catalog={catalog} employeeSessionToken={employeeSessionToken} />
-        : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches, lastRecord)
+        : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches, lastRecord, todayProductionTotal)
       }
 
       <div style={summaryPillStyle}>ร่างล่าสุด: {summary}</div>
@@ -823,7 +850,7 @@ function LastRecordHint({ record, taskKey }) {
   );
 }
 
-function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches = [], lastRecord = null) {
+function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches = [], lastRecord = null, todayProductionTotal = null) {
   switch (taskKey) {
     case 'bills':
       return (
@@ -882,6 +909,11 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               <VoiceBtn onResult={v => setDraft({ ...draft, product: v })} />
             </div>
           </Field>
+          {todayProductionTotal && (
+            <div style={{ fontSize: 12, color: '#0d7a46', background: '#ecfdf3', border: '1px solid #bbe7cf', borderRadius: 10, padding: '6px 10px', marginTop: -8 }}>
+              🏭 วันนี้ผลิตแล้ว: {todayProductionTotal.total} {todayProductionTotal.unit} ({todayProductionTotal.count} รอบ)
+            </div>
+          )}
           <TwoColRow>
             <Field label="จำนวน">
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
