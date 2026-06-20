@@ -211,6 +211,27 @@ export default function AdminOpsInbox() {
     }));
   }, [filteredItems]);
 
+  const inventoryAlertSummary = useMemo(() => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const alertItems = filteredItems.filter(item =>
+      (item.task_key === 'inventory' || item.task_key === 'supplies-count') &&
+      (item.created_at || '').slice(0, 10) === todayStr &&
+      item.payload?.status && item.payload.status !== 'ปกติ'
+    );
+    if (alertItems.length === 0) return null;
+    const seen = new Set();
+    return alertItems.filter(item => {
+      const name = item.payload?.itemName;
+      if (!name || seen.has(name)) return false;
+      seen.add(name);
+      return true;
+    }).map(item => {
+      const p = item.payload || {};
+      const emp = employees.find(e => e.id === item.emp_id);
+      return { itemName: p.itemName || '?', stockLeft: p.stockLeft, unit: p.unit || '', status: p.status || '', empName: emp?.nickname || emp?.name || 'พนักงาน' };
+    });
+  }, [filteredItems, employees]);
+
   const groupedItems = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
@@ -376,6 +397,27 @@ export default function AdminOpsInbox() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {inventoryAlertSummary && inventoryAlertSummary.length > 0 && (
+        <div className="card" style={{ padding: '16px 18px', marginBottom: 16, border: '1px solid #fca5a5', background: '#fff1f1' }}>
+          <div style={{ fontWeight: 700, marginBottom: 12, color: '#b42318', fontSize: 14 }}>⚠️ สต๊อกต้องติดตามวันนี้ ({inventoryAlertSummary.length} รายการ)</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
+            {inventoryAlertSummary.map(({ itemName, stockLeft, unit, status, empName }) => {
+              const isUrgent = status === 'ต้องสั่งเพิ่ม' || status === 'มีปัญหา';
+              return (
+                <div key={itemName} style={{ background: '#fff', border: `1px solid ${isUrgent ? '#fca5a5' : '#fed7aa'}`, borderRadius: 12, padding: '10px 12px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#2f241f', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{itemName}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: isUrgent ? '#b42318' : '#c2410c' }}>
+                    {stockLeft || '?'} <span style={{ fontSize: 11, fontWeight: 500 }}>{unit}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: isUrgent ? '#b42318' : '#9a3412', marginTop: 2, fontWeight: isUrgent ? 700 : 400 }}>{status}</div>
+                  <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>{empName}</div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

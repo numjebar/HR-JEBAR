@@ -34,7 +34,7 @@ const DEFAULT_DRAFTS = {
   production:       { product: '', quantity: '', unit: 'ชิ้น', batch: '', note: '', date: '', recordedBy: '', photos: [] },
   inventory:        { itemName: '', stockLeft: '', unit: 'กก.', status: 'ปกติ', note: '', date: '', recordedBy: '', photos: [] },
   'cake-stock':     { branchName: 'สาขากาดน้ำทอง', cakeName: '', available: '', reserved: '', damaged: '', status: 'พร้อมขาย', note: '', date: '', recordedBy: '', photos: [] },
-  'supplies-count': { area: 'หน้าร้าน', itemName: '', count: '', unit: 'ชิ้น', note: '', date: '', recordedBy: '', photos: [] },
+  'supplies-count': { area: 'หน้าร้าน', itemName: '', count: '', unit: 'ชิ้น', status: 'ปกติ', note: '', date: '', recordedBy: '', photos: [] },
   'purchase-list':  { date: '', recordedBy: '', items: [], photos: [] },
 };
 
@@ -546,7 +546,7 @@ function OpsHome({ navigate }) {
           p_limit: 10,
         }).then(({ data }) => {
           const todayEntries = (data || []).filter(e => (e.created_at || '').startsWith(today));
-          const hasAlert = task.key === 'inventory' && todayEntries.some(e => e.payload?.status && e.payload.status !== 'ปกติ');
+          const hasAlert = (task.key === 'inventory' || task.key === 'supplies-count') && todayEntries.some(e => e.payload?.status && e.payload.status !== 'ปกติ');
           return { key: task.key, count: todayEntries.length, hasAlert };
         })
       )
@@ -854,12 +854,12 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
       <div style={summaryPillStyle}>ร่างล่าสุด: {summary}</div>
       {uploadMsg && <Notice tone="warning">{uploadMsg}</Notice>}
       {success && <Notice tone="success">{success}</Notice>}
-      {success && taskKey === 'inventory' && draft.itemName && draft.status && draft.status !== 'ปกติ' && (
+      {success && (taskKey === 'inventory' || taskKey === 'supplies-count') && draft.itemName && draft.status && draft.status !== 'ปกติ' && (
         <div style={{ background: '#fff8e8', border: '1px solid #f4dfab', borderRadius: 16, padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, fontSize: 13 }}>
           <span style={{ color: '#7a5b2b' }}>⚡ {draft.itemName} {draft.status} — เพิ่มในใบสั่งซื้อ?</span>
           <button
             type="button"
-            onClick={() => navigate(`/emp/ops/purchase-list?suggest=${encodeURIComponent(draft.itemName)}&unit=${encodeURIComponent(draft.unit || '')}&urgent=${draft.status === 'ต้องสั่งเพิ่ม' || draft.status === 'มีปัญหา' ? '1' : '0'}`)}
+            onClick={() => navigate(`/emp/ops/purchase-list?suggest=${encodeURIComponent(draft.itemName)}&unit=${encodeURIComponent(draft.unit || '')}&urgent=${draft.status === 'ต้องสั่งเพิ่ม' || draft.status === 'มีปัญหา' || draft.status === 'หมดแล้ว' ? '1' : '0'}`)}
             style={{ padding: '6px 12px', borderRadius: 10, border: '1.5px solid var(--accent)', background: 'var(--accent-soft)', color: 'var(--accent)', fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
           >
             + ใบสั่งซื้อ
@@ -886,7 +886,7 @@ function LastRecordHint({ record, taskKey }) {
   const dateStr = record.created_at ? new Date(record.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) : '';
   let text = '';
   if (taskKey === 'inventory') text = `ครั้งล่าสุด (${dateStr}): ${p.stockLeft || '?'} ${p.unit || ''} — ${p.status || ''}`;
-  if (taskKey === 'supplies-count') text = `ครั้งล่าสุด (${dateStr}): ${p.count || '?'} ${p.unit || ''}`;
+  if (taskKey === 'supplies-count') text = `ครั้งล่าสุด (${dateStr}): ${p.count || '?'} ${p.unit || ''}${p.status && p.status !== 'ปกติ' ? ' — ' + p.status : ''}`;
   if (!text) return null;
   return (
     <div style={{ fontSize: 12, color: '#7a5b2b', background: '#fff8e8', border: '1px solid #f4dfab', borderRadius: 10, padding: '6px 10px', marginTop: -8 }}>
@@ -1168,6 +1168,16 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               </select>
             </Field>
           </TwoColRow>
+          <Field label="สถานะ">
+            <select value={draft.status || 'ปกติ'} onChange={e => setDraft({ ...draft, status: e.target.value })}
+              style={{ background: draft.status && draft.status !== 'ปกติ' ? '#fff8e8' : undefined }}>
+              <option>ปกติ</option>
+              <option>ใกล้หมด</option>
+              <option>ต้องสั่งเพิ่ม</option>
+              <option>หมดแล้ว</option>
+              <option>มีปัญหา</option>
+            </select>
+          </Field>
           <Field label="หมายเหตุ">
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
               <textarea rows={3} style={{ flex: 1 }} value={draft.note}
@@ -1370,7 +1380,7 @@ function summarizeDraft(taskKey, draft) {
     case 'production':    return `${draft.product||'-'} / ${draft.quantity||'0'} ${draft.unit||''} / ${draft.batch||'-'}`;
     case 'inventory':     return `${draft.itemName||'-'} / ${draft.stockLeft||'0'} ${draft.unit||''} / ${draft.status||'-'}`;
     case 'cake-stock':    return `${draft.branchName||'-'} / ${draft.cakeName||'-'} / พร้อมขาย ${draft.available||'0'} จอง ${draft.reserved||'0'} เสีย ${draft.damaged||'0'}`;
-    case 'supplies-count':return `${draft.area||'-'} / ${draft.itemName||'-'} / ${draft.count||'0'} ${draft.unit||''}`;
+    case 'supplies-count':return `${draft.area||'-'} / ${draft.itemName||'-'} / ${draft.count||'0'} ${draft.unit||''} / ${draft.status||'ปกติ'}`;
     case 'purchase-list': return `${draft.recordedBy||'-'} / ${draft.date||'-'} / ${draft.items?.length||0} รายการ`;
     default:              return '-';
   }
@@ -1382,7 +1392,7 @@ function renderHistoryLine(taskKey, payload) {
     case 'production':    return `${payload.product||'-'} / ${payload.quantity||'0'} ${payload.unit||''} / ${payload.batch||'-'}`;
     case 'inventory':     return `${payload.itemName||'-'} / ${payload.stockLeft||'0'} ${payload.unit||''} / ${payload.status||'-'}`;
     case 'cake-stock':    return `${payload.branchName||'-'} / ${payload.cakeName||'-'} / พร้อมขาย ${payload.available||'0'} จอง ${payload.reserved||'0'} เสีย ${payload.damaged||'0'} / ${payload.status||'-'}`;
-    case 'supplies-count':return `${payload.area||'-'} / ${payload.itemName||'-'} / ${payload.count||'0'} ${payload.unit||''}`;
+    case 'supplies-count':return `${payload.area||'-'} / ${payload.itemName||'-'} / ${payload.count||'0'} ${payload.unit||''} / ${payload.status||'ปกติ'}`;
     case 'purchase-list': return `${payload.recordedBy||'-'} / ${payload.date||'-'} / ${payload.items?.length||0} รายการ`;
     default:              return '-';
   }
