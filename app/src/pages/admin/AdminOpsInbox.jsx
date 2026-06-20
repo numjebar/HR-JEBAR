@@ -43,10 +43,14 @@ export default function AdminOpsInbox() {
   const [dateFilter, setDateFilter] = useState('all');
   const [searchText, setSearchText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState('');
   const [replyEntry, setReplyEntry] = useState(null);
   const [reviewed, setReviewed] = useState(() => loadReviewed());
   const [hideReviewed, setHideReviewed] = useState(false);
+
+  const PAGE_SIZE = 50;
 
   const toggleReviewed = useCallback((id) => {
     setReviewed(prev => {
@@ -67,14 +71,16 @@ export default function AdminOpsInbox() {
           .select('*')
           .eq('org_id', orgId)
           .order('created_at', { ascending: false })
-          .limit(100),
+          .limit(PAGE_SIZE + 1),
         supabase.from('employees').select('id,name,nickname,color').eq('org_id', orgId),
         supabase.from('branches').select('id,label').eq('org_id', orgId),
       ]);
 
       if (entryError) throw entryError;
 
-      setItems(entryRows || []);
+      const rows = entryRows || [];
+      setHasMore(rows.length > PAGE_SIZE);
+      setItems(rows.slice(0, PAGE_SIZE));
       setEmployees(employeeRows || []);
       setBranches(branchRows || []);
     } catch (ex) {
@@ -87,6 +93,26 @@ export default function AdminOpsInbox() {
       setItems([]);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadMore() {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const cursor = items[items.length - 1]?.created_at;
+      const { data } = await supabase
+        .from('employee_ops_entries')
+        .select('*')
+        .eq('org_id', orgId)
+        .order('created_at', { ascending: false })
+        .lt('created_at', cursor)
+        .limit(PAGE_SIZE + 1);
+      const rows = data || [];
+      setHasMore(rows.length > PAGE_SIZE);
+      setItems(prev => [...prev, ...rows.slice(0, PAGE_SIZE)]);
+    } finally {
+      setLoadingMore(false);
     }
   }
 
@@ -129,6 +155,26 @@ export default function AdminOpsInbox() {
     });
     return counts;
   }, [items]);
+
+  const groupedItems = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const groups = new Map();
+    filteredItems.forEach(item => {
+      const day = (item.created_at || '').slice(0, 10);
+      let label;
+      if (day === today) label = 'วันนี้';
+      else if (day === yesterday) label = 'เมื่อวาน';
+      else {
+        try {
+          label = new Date(day + 'T00:00:00').toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        } catch { label = day; }
+      }
+      if (!groups.has(label)) groups.set(label, []);
+      groups.get(label).push(item);
+    });
+    return [...groups.entries()];
+  }, [filteredItems]);
 
   function employeeLabel(empId) {
     const emp = employees.find((row) => row.id === empId);
@@ -206,75 +252,97 @@ export default function AdminOpsInbox() {
         </div>
       )}
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div style={{ display: 'grid', gap: 0 }}>
         {loading ? (
-          <div style={{ padding: 22, color: 'var(--muted)' }}>กำลังโหลดงานร้าน...</div>
+          <div className="card" style={{ padding: 22, color: 'var(--muted)' }}>กำลังโหลดงานร้าน...</div>
         ) : filteredItems.length === 0 ? (
-          <div style={{ padding: 22, color: 'var(--muted)' }}>ยังไม่มีรายการจากพนักงาน</div>
+          <div className="card" style={{ padding: 22, color: 'var(--muted)' }}>ยังไม่มีรายการจากพนักงาน</div>
         ) : (
-          filteredItems.map((item, index) => {
-            const isReviewed = reviewed.has(item.id);
-            return (
-              <div
-                key={item.id}
-                style={{
-                  padding: '16px 18px',
-                  borderBottom: index === filteredItems.length - 1 ? 'none' : '1px solid var(--line)',
-                  display: 'grid',
-                  gap: 10,
-                  opacity: isReviewed ? 0.5 : 1,
-                  transition: 'opacity .2s',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          groupedItems.map(([dateLabel, groupRows]) => (
+            <div key={dateLabel} style={{ marginBottom: 16 }}>
+              <div style={{
+                fontSize: 12, fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase',
+                letterSpacing: 1, padding: '0 4px 8px', display: 'flex', alignItems: 'center', gap: 10,
+              }}>
+                {dateLabel}
+                <span style={{ background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 999, fontSize: 11, padding: '1px 8px', fontWeight: 700, color: 'var(--ink)', textTransform: 'none', letterSpacing: 0 }}>
+                  {groupRows.length} รายการ
+                </span>
+              </div>
+              <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                {groupRows.map((item, index) => {
+                  const isReviewed = reviewed.has(item.id);
+                  return (
                     <div
+                      key={item.id}
                       style={{
-                        minWidth: 40,
-                        height: 40,
-                        borderRadius: 999,
-                        background: employeeColor(item.emp_id),
-                        color: '#fff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 12,
-                        fontWeight: 700,
-                        padding: '0 10px',
+                        padding: '16px 18px',
+                        borderBottom: index === groupRows.length - 1 ? 'none' : '1px solid var(--line)',
+                        display: 'grid',
+                        gap: 10,
+                        opacity: isReviewed ? 0.5 : 1,
+                        transition: 'opacity .2s',
                       }}
                     >
-                      {employeeLabel(item.emp_id)}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {TASK_LABELS[item.task_key] || item.task_key}
-                        {isReviewed && <span style={{ fontSize: 11, color: '#0d7a46', background: '#ecfdf3', border: '1px solid #bbe7cf', borderRadius: 6, padding: '1px 6px', fontWeight: 700 }}>✓ ดูแล้ว</span>}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div
+                            style={{
+                              minWidth: 40,
+                              height: 40,
+                              borderRadius: 999,
+                              background: employeeColor(item.emp_id),
+                              color: '#fff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 12,
+                              fontWeight: 700,
+                              padding: '0 10px',
+                            }}
+                          >
+                            {employeeLabel(item.emp_id)}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                              {TASK_LABELS[item.task_key] || item.task_key}
+                              {isReviewed && <span style={{ fontSize: 11, color: '#0d7a46', background: '#ecfdf3', border: '1px solid #bbe7cf', borderRadius: 6, padding: '1px 6px', fontWeight: 700 }}>✓ ดูแล้ว</span>}
+                            </div>
+                            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                              {employeeLabel(item.emp_id)} • {branchLabel(item.branch_id)} • {formatDateTime(item.created_at)}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                          {item.source && <div style={{ fontSize: 12, color: 'var(--muted)', background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 8, padding: '2px 8px' }}>{SOURCE_LABELS[item.source] || item.source}</div>}
+                          <button
+                            onClick={() => toggleReviewed(item.id)}
+                            style={{ fontSize: 12, color: isReviewed ? '#0d7a46' : 'var(--muted)', background: isReviewed ? '#ecfdf3' : 'var(--bg)', border: `1px solid ${isReviewed ? '#bbe7cf' : 'var(--line)'}`, borderRadius: 8, padding: '2px 9px', cursor: 'pointer', fontWeight: 600 }}
+                          >
+                            {isReviewed ? '✓ ดูแล้ว' : 'ดูแล้ว'}
+                          </button>
+                          <button onClick={() => setReplyEntry(item)} style={{ fontSize: 12, color: 'var(--accent)', background: 'var(--accent-soft)', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 9px', cursor: 'pointer', fontWeight: 600 }}>
+                            ↩ ตอบ
+                          </button>
+                        </div>
                       </div>
-                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                        {employeeLabel(item.emp_id)} • {branchLabel(item.branch_id)} • {formatDateTime(item.created_at)}
-                      </div>
+                      <PayloadPreview payload={item.payload || {}} imageName={item.image_name} />
                     </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-                    {item.source && <div style={{ fontSize: 12, color: 'var(--muted)', background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 8, padding: '2px 8px' }}>{SOURCE_LABELS[item.source] || item.source}</div>}
-                    <button
-                      onClick={() => toggleReviewed(item.id)}
-                      style={{ fontSize: 12, color: isReviewed ? '#0d7a46' : 'var(--muted)', background: isReviewed ? '#ecfdf3' : 'var(--bg)', border: `1px solid ${isReviewed ? '#bbe7cf' : 'var(--line)'}`, borderRadius: 8, padding: '2px 9px', cursor: 'pointer', fontWeight: 600 }}
-                    >
-                      {isReviewed ? '✓ ดูแล้ว' : 'ดูแล้ว'}
-                    </button>
-                    <button onClick={() => setReplyEntry(item)} style={{ fontSize: 12, color: 'var(--accent)', background: 'var(--accent-soft)', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 9px', cursor: 'pointer', fontWeight: 600 }}>
-                      ↩ ตอบ
-                    </button>
-                  </div>
-                </div>
-
-                <PayloadPreview payload={item.payload || {}} imageName={item.image_name} />
+                  );
+                })}
               </div>
-            );
-          })
+            </div>
+          ))
         )}
       </div>
+
+      {hasMore && (
+        <div style={{ textAlign: 'center', marginTop: 8 }}>
+          <button className="btn" onClick={loadMore} disabled={loadingMore} style={{ padding: '10px 28px', fontSize: 14 }}>
+            {loadingMore ? 'กำลังโหลด...' : `โหลดเพิ่ม`}
+          </button>
+        </div>
+      )}
 
       {replyEntry && (
         <ReplyModal
