@@ -1,5 +1,42 @@
 # HR JEBAR Handoff
 
+## Update 2026-06-20 (OPS photo upload to Supabase Storage — v4)
+
+### สิ่งที่เพิ่มใน v4
+
+รูปที่พนักงานถ่ายจาก OPS forms ตอนนี้ **อัปโหลดไปยัง Supabase Storage จริง** และแอดมินดูได้ทันที
+
+**Flow:**
+1. พนักงานถ่ายรูปใน OPS form → รูปเก็บใน session state (blob URL + base64)
+2. กด "บันทึกเข้า backend" → `uploadOpsPhotos()` อัปโหลดรูปไป bucket `ops-photos`
+3. ได้ public URL กลับมา → เก็บใน payload เป็น `photoUrls: [...]`
+4. แอดมินเปิด AdminOpsInbox → เห็น thumbnail รูปจริง คลิกดูเต็มได้
+
+**Bucket path:** `ops-photos/{orgId}/{taskKey}/{timestamp}_{rand}.{ext}`
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/lib/opsStorage.js` — NEW: `uploadOpsPhotos(photos, orgId, taskKey)` → public URLs
+- `app/src/pages/employee/EmpOps.jsx` — upload ก่อน RPC, แสดง progress msg
+- `app/src/pages/admin/AdminOpsInbox.jsx` — `PhotosRow` component + lightbox
+- `supabase/28_ops_photos_bucket.sql` — **ต้องรัน 1 ครั้งใน Supabase SQL Editor**
+- `app/src/lib/version.js` — bump เป็น `Build 2026.06.20-hr-ops-v4`
+
+### SQL ที่ต้องรัน (1 ครั้ง)
+
+```
+supabase/28_ops_photos_bucket.sql
+```
+
+รันใน Supabase SQL Editor ของ project `eoinzxqpqbybwcrmsgww`
+สร้าง bucket `ops-photos` + RLS policy ให้อัปโหลด/อ่านได้
+
+### Commit
+
+- `7f78a9c` feat: upload OPS photos to Supabase Storage + admin lightbox viewer (v4)
+
+---
+
 ## Update 2026-06-20 (OPS photo + voice ครบทั้ง 6 ฟอร์ม — v3)
 
 ### สิ่งที่เพิ่มใน v3
