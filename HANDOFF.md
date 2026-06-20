@@ -1,5 +1,31 @@
 # HR JEBAR Handoff
 
+## Update 2026-06-20 (monthly attendance summary — v60)
+
+### สิ่งที่เพิ่มใน v60
+
+**AdminAttendance — แท็บ "สรุปรายเดือน"**
+
+- เพิ่มปุ่มสลับแท็บ **"รายวัน"** / **"สรุปรายเดือน"** ในหน้าการลงเวลา
+- แท็บรายวัน = เหมือนเดิมทุกอย่าง (เลือกวัน → เห็นใคร check-in/out)
+- แท็บสรุปรายเดือน:
+  - **Month picker** เลือกเดือนที่ต้องการ (default: เดือนปัจจุบัน)
+  - **Summary tiles**: วันทำงานรวม / ครั้งสาย / วันลา / วันขาด / OT รวม (รวมทุกคน)
+  - **ตารางสรุปต่อพนักงาน**: Name | สาขา | ทำงาน | สาย | ลา | ขาด | OT (น.)
+  - **Export CSV** ส่งออกข้อมูลเดือนนั้น
+- ไม่ต้องรัน SQL ใหม่ — ดึงจากตาราง `attendance` ที่มีอยู่แล้ว
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/pages/admin/AdminAttendance.jsx` — tab switcher + `MonthlyReportView` component
+- `app/src/lib/version.js` — bump เป็น `Build 2026.06.20-attendance-monthly-v60`
+
+### Commit
+
+- `4951338`
+
+---
+
 ## Update 2026-06-20 (admin edit attendance per day — v59)
 
 ### สิ่งที่เพิ่มใน v59

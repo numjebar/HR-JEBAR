@@ -80,11 +80,12 @@ The token must have Cloudflare Pages edit/deploy permission for the account that
 
 ## Current Open Concern
 
-The user wants payroll to be understandable per day:
-
-- Show each date in the pay cycle.
-- Show work / late / leave / absent / regular off day.
-- Show advances and deductions attached to the exact date.
-- Allow admin to edit a day by date.
-- Eventually add a persistent "paid already" marker per date or per cycle.
+ไม่มี open concern ที่ค้างอยู่ตอนนี้ ทุกรายการใน payroll per-day ปิดครบแล้ว (v56–v59):
+- ✅ Show each date in the pay cycle (v56)
+- ✅ Show work / late / leave / absent / off day (v56)
+- ✅ Show advances and deductions per date (v56)
+- ✅ Persistent "paid already" marker per cycle (v57)
+- ✅ Employee sees paid status in their app (v58)
+- ✅ Admin edits a day by date from payroll view (v59)
+- ✅ Monthly attendance summary report (v60)
 
