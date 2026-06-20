@@ -375,6 +375,50 @@ Build check:
 - Build passed:
   `npm.cmd run build`
 
+## Update 2026-06-20 (Employee OPS system fully live)
+
+### SQL migrations run in Supabase project `eoinzxqpqbybwcrmsgww`
+
+- `25_employee_ops_entries.sql` — สร้างตาราง `employee_ops_entries` + RLS policies + RPCs:
+  - `employee_submit_ops_entry(uuid, text, jsonb)`
+  - `employee_get_ops_entries(uuid, text, int)`
+  - `employee_submit_ops_entry_v2(session_token, task_key, payload)`
+  - `employee_get_ops_entries_v2(session_token, task_key, limit)`
+- `27_ops_entries_cake_stock.sql` — เพิ่ม `cake-stock` ใน allowed task keys
+- `26_payroll_sync_rpc.sql` — สร้าง `get_payroll_month_summary(year, month)` สำหรับ JE-BAR-Operate ดึงข้อมูล payroll
+
+### EmpOps.jsx — 6 แท็บครบและส่งข้อมูลเข้า Supabase ได้จริง
+
+| Task key        | หน้าที่                             |
+|-----------------|-------------------------------------|
+| `bills`         | ถ่ายบิล + AI อ่านรายการ (Gemini)   |
+| `production`    | บันทึกการผลิตขนม + SearchSelect     |
+| `inventory`     | เช็กวัตถุดิบคงเหลือ + SearchSelect |
+| `cake-stock`    | นับเค้กหน้าตู้ แยกสาขา             |
+| `supplies-count`| นับของใช้สิ้นเปลือง               |
+| `purchase-list` | ใบสั่งซื้อ multi-item + ความด่วน   |
+
+### AdminOpsInbox.jsx — admin เห็นรายการทุกประเภทครบ
+
+- ตาราง summary count 6 ประเภท
+- filter ตาม task_key + วันที่
+- `PurchaseListPreview` แสดงตารางพร้อมคอลัมน์ ความด่วน + ปุ่ม copy เป็น text
+- `PayloadPreview` แสดง generic key-value สำหรับ bills / production / inventory / cake-stock / supplies-count
+
+### Version
+
+- `Build 2026.06.20-hr-ops-v2`
+
+### Deploy status
+
+- โค้ดถูก push ไปที่ `main` และ `claude/continuation-7d4rf1` แล้ว
+- ยังต้องรัน build บนเครื่องที่มี `.env.local` (Supabase URL + anon key) แล้ว deploy ขึ้น Cloudflare Pages
+- หรือเพิ่ม secrets ใน GitHub Actions ให้ครบ:
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_ANON_KEY`
+  - `CLOUDFLARE_API_TOKEN`
+  - `CLOUDFLARE_ACCOUNT_ID`
+
 ## Hotfix 2026-06-19 (production blank page recovery)
 
 - Production `https://hr-jebar.pages.dev` was blank after GitHub auto deploy.
