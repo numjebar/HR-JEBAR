@@ -56,8 +56,17 @@ export default function AdminMessages() {
   }, [employees, location.state?.empId]);
 
   useEffect(() => {
+    if (!orgId) return;
+    const ch = supabase.channel('admin-msgs-list')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `org_id=eq.${orgId}` }, loadEmployees)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `org_id=eq.${orgId}` }, loadEmployees)
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [orgId]);
+
+  useEffect(() => {
     if (!selected) return;
-    const ch = supabase.channel('admin-msgs').on('postgres_changes', {
+    const ch = supabase.channel('admin-msgs-thread').on('postgres_changes', {
       event: 'INSERT', schema: 'public', table: 'messages',
       filter: `emp_id=eq.${selected.id}`,
     }, () => loadThread(selected)).subscribe();
