@@ -675,6 +675,27 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
   const navigate = useNavigate();
   const [saving, setSaving]    = useState(false);
   const [uploadMsg, setUploadMsg] = useState('');
+  const [lastRecord, setLastRecord] = useState(null);
+
+  useEffect(() => {
+    const needsHint = taskKey === 'inventory' || taskKey === 'supplies-count';
+    if (!needsHint || !draft.itemName || !orgId) { setLastRecord(null); return; }
+    let cancelled = false;
+    supabase
+      .from('employee_ops_entries')
+      .select('payload,created_at')
+      .eq('org_id', orgId)
+      .eq('task_key', taskKey)
+      .order('created_at', { ascending: false })
+      .limit(30)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const q = draft.itemName.trim().toLowerCase();
+        const match = (data || []).find(e => (e.payload?.itemName || '').toLowerCase() === q);
+        setLastRecord(match || null);
+      });
+    return () => { cancelled = true; };
+  }, [draft.itemName, taskKey, orgId]);
 
   useEffect(() => {
     setDraft(prev => ({
@@ -755,7 +776,7 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
 
       {taskKey === 'purchase-list'
         ? <PurchaseListForm draft={draft} setDraft={setDraft} catalog={catalog} employeeSessionToken={employeeSessionToken} />
-        : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches)
+        : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches, lastRecord)
       }
 
       <div style={summaryPillStyle}>ร่างล่าสุด: {summary}</div>
@@ -787,7 +808,22 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
 }
 
 // ─── Form fields per task ────────────────────────────────────────────────────
-function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches = []) {
+function LastRecordHint({ record, taskKey }) {
+  if (!record) return null;
+  const p = record.payload || {};
+  const dateStr = record.created_at ? new Date(record.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) : '';
+  let text = '';
+  if (taskKey === 'inventory') text = `ครั้งล่าสุด (${dateStr}): ${p.stockLeft || '?'} ${p.unit || ''} — ${p.status || ''}`;
+  if (taskKey === 'supplies-count') text = `ครั้งล่าสุด (${dateStr}): ${p.count || '?'} ${p.unit || ''}`;
+  if (!text) return null;
+  return (
+    <div style={{ fontSize: 12, color: '#7a5b2b', background: '#fff8e8', border: '1px solid #f4dfab', borderRadius: 10, padding: '6px 10px', marginTop: -8 }}>
+      📋 {text}
+    </div>
+  );
+}
+
+function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches = [], lastRecord = null) {
   switch (taskKey) {
     case 'bills':
       return (
@@ -896,6 +932,7 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               <VoiceBtn onResult={v => setDraft({ ...draft, itemName: v })} />
             </div>
           </Field>
+          <LastRecordHint record={lastRecord} taskKey="inventory" />
           <TwoColRow>
             <Field label="คงเหลือ">
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -1017,6 +1054,7 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               <VoiceBtn onResult={v => setDraft({ ...draft, itemName: v })} />
             </div>
           </Field>
+          <LastRecordHint record={lastRecord} taskKey="supplies-count" />
           <TwoColRow>
             <Field label="จำนวนคงเหลือ">
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
