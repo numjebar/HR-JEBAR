@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
 import { DEFAULT_RULES, parseLocation } from '../../lib/payroll';
@@ -18,6 +18,7 @@ export default function AdminSettings() {
   const [opsKey, setOpsKey] = useState('');
   const [opsSaved, setOpsSaved] = useState(false);
   const [connStatus, setConnStatus] = useState(null); // null | 'testing' | {ok, menus, ingredients, materials} | {ok:false, error}
+  const autoTestedRef = useRef(false);
 
   async function load() {
     const [{ data: brs }, { data: st }] = await Promise.all([
@@ -47,6 +48,13 @@ export default function AdminSettings() {
   }
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    if (opsUrl && opsKey && !autoTestedRef.current) {
+      autoTestedRef.current = true;
+      testOpsConnection();
+    }
+  }, [opsUrl, opsKey]);
 
   function cleanShopRules(rules) {
     return (rules || []).map((r) => r.trim()).filter(Boolean);
