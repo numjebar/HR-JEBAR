@@ -1,1 +1,1 @@
-export const APP_VERSION = 'Build 2026.06.20-lucid-rebrand-v61';
+export const APP_VERSION = 'Build 2026.06.20-lucid-icon-v62';
