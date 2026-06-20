@@ -13,6 +13,7 @@ export default function AdminSettings() {
   const [globalShopRules, setGlobalShopRules] = useState([]);
   const [busy, setBusy] = useState(false);
   const [showAddBranch, setShowAddBranch] = useState(false);
+  const [editBranch, setEditBranch] = useState(null);
 
   async function load() {
     const [{ data: brs }, { data: st }] = await Promise.all([
@@ -118,7 +119,10 @@ export default function AdminSettings() {
           <div className="card" style={{ padding: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ fontWeight: 700, fontSize: 16 }}>{activeBranch.label}</div>
-              <button className="btn btn-danger" style={{ fontSize: 13, padding: '6px 14px' }} onClick={() => deleteBranch(activeBranch.id)}>ลบสาขา</button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn" style={{ fontSize: 13, padding: '6px 14px', background: 'var(--accent-soft)', color: 'var(--accent)' }} onClick={() => setEditBranch(activeBranch)}>แก้ไขสาขา</button>
+                <button className="btn btn-danger" style={{ fontSize: 13, padding: '6px 14px' }} onClick={() => deleteBranch(activeBranch.id)}>ลบสาขา</button>
+              </div>
             </div>
 
             <Section title="⏰ เวลาทำงาน">
@@ -201,6 +205,7 @@ export default function AdminSettings() {
       </div>
 
       {showAddBranch && <BranchFormModal orgId={orgId} onClose={() => { setShowAddBranch(false); load(); }} />}
+      {editBranch && <BranchFormModal orgId={orgId} branch={editBranch} onClose={() => { setEditBranch(null); load(); }} />}
     </div>
   );
 }
@@ -289,9 +294,11 @@ function BranchFormModal({ orgId, branch, onClose }) {
 
   async function save() {
     setBusy(true);
-    const payload = { ...form, org_id: orgId, rules: { ...DEFAULT_RULES }, shop_rules: [] };
-    if (isEdit) await supabase.from('branches').update(payload).eq('id', branch.id);
-    else await supabase.from('branches').insert(payload);
+    if (isEdit) {
+      await supabase.from('branches').update({ label: form.label, lat: form.lat, lng: form.lng, radius: form.radius }).eq('id', branch.id);
+    } else {
+      await supabase.from('branches').insert({ ...form, org_id: orgId, rules: { ...DEFAULT_RULES }, shop_rules: [] });
+    }
     setBusy(false);
     onClose();
   }

@@ -195,9 +195,12 @@ export default function EmpHome() {
           })()}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
             {[
-              { path: '/emp/ops/bills',         icon: '📷', label: 'ถ่ายบิล',    taskKey: 'bills' },
-              { path: '/emp/ops/purchase-list', icon: '🛒', label: 'ใบสั่งซื้อ', taskKey: 'purchase-list' },
-              { path: '/emp/ops/production',    icon: '🏭', label: 'ผลิตขนม',    taskKey: 'production' },
+              { path: '/emp/ops/bills',          icon: '📷', label: 'ถ่ายบิล',    taskKey: 'bills' },
+              { path: '/emp/ops/purchase-list',  icon: '🛒', label: 'ใบสั่งซื้อ', taskKey: 'purchase-list' },
+              { path: '/emp/ops/production',     icon: '🏭', label: 'ผลิตขนม',    taskKey: 'production' },
+              { path: '/emp/ops/inventory',      icon: '📦', label: 'เช็กของ',    taskKey: 'inventory' },
+              { path: '/emp/ops/supplies-count', icon: '🧴', label: 'ของใช้',     taskKey: 'supplies-count' },
+              { path: '/emp/ops/cake-stock',     icon: '🍰', label: 'สต๊อกเค้ก', taskKey: 'cake-stock' },
             ].map(item => {
               const count = todayOpsCounts[item.taskKey] || 0;
               return (

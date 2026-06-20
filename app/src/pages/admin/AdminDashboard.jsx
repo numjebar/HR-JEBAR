@@ -134,6 +134,16 @@ export default function AdminDashboard() {
 
   useEffect(() => { load(); }, []);
 
+  useEffect(() => {
+    if (!orgId) return;
+    const ch = supabase.channel('dashboard-live')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'employee_ops_entries', filter: `org_id=eq.${orgId}` }, () => load())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attendance', filter: `org_id=eq.${orgId}` }, () => load())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'attendance', filter: `org_id=eq.${orgId}` }, () => load())
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [orgId]);
+
   async function approveLeave(id, status) {
     const { data: leave } = await supabase.from('leaves').select('*').eq('id', id).single();
     await supabase.from('leaves').update({ status }).eq('id', id);
