@@ -109,9 +109,13 @@ export default function AdminSettings() {
       }
       const db = rows[0]?.db || {};
       const updatedAt = rows[0]?.updated_at;
-      const menus = (db.menus || []).filter(x => x.name).length;
-      const ingredients = (db.ingredients || []).filter(x => x.name).length;
-      const materials = (db.materials || db.ingredients || []).filter(x => x.name).length;
+      const INACTIVE = new Set(['inactive', 'ไม่ใช้']);
+      const isAct = (x) => x.name && !INACTIVE.has(x.status);
+      const menus = (db.menus || []).filter(isAct).length;
+      const ingredients = (db.ingredients || []).filter(isAct).length;
+      const suppliesCategories = new Set(['ของใช้สิ้นเปลือง', 'supplies', 'ของใช้']);
+      const suppliesList = (db.ingredients || []).filter(x => isAct(x) && suppliesCategories.has(x.category));
+      const materials = suppliesList.length > 0 ? suppliesList.length : (db.stockItems || []).filter(isAct).length;
       const syncAge = updatedAt ? Math.round((Date.now() - new Date(updatedAt)) / 60000) : null;
       setConnStatus({ ok: true, menus, ingredients, materials, syncAge });
     } catch (err) {
