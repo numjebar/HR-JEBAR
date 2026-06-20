@@ -235,14 +235,17 @@ function PurchaseListForm({ draft, setDraft, catalog, employeeSessionToken }) {
 
   useEffect(() => {
     if (!employeeSessionToken) return;
-    supabase.rpc('employee_get_ops_entries_v2', {
-      p_session_token: employeeSessionToken,
-      p_task_key: 'inventory',
-      p_limit: 20,
-    }).then(({ data }) => {
-      const alertRows = (data || []).filter(e => {
+    Promise.all([
+      supabase.rpc('employee_get_ops_entries_v2', { p_session_token: employeeSessionToken, p_task_key: 'inventory', p_limit: 20 }),
+      supabase.rpc('employee_get_ops_entries_v2', { p_session_token: employeeSessionToken, p_task_key: 'supplies-count', p_limit: 20 }),
+    ]).then(([invRes, supRes]) => {
+      const allRows = [...(invRes.data || []), ...(supRes.data || [])];
+      const alertRows = allRows.filter(e => {
         const s = e.payload?.status;
-        return s && s !== 'ปกติ';
+        return s && s !== 'ปกติ' && s !== 'พร้อมขาย';
+      }).sort((a, b) => {
+        const urgentStatuses = new Set(['ต้องสั่งเพิ่ม', 'มีปัญหา', 'หมดแล้ว']);
+        return (urgentStatuses.has(b.payload?.status) ? 1 : 0) - (urgentStatuses.has(a.payload?.status) ? 1 : 0);
       });
       const seen = new Set();
       const unique = alertRows.filter(e => {
@@ -250,7 +253,7 @@ function PurchaseListForm({ draft, setDraft, catalog, employeeSessionToken }) {
         if (!name || seen.has(name)) return false;
         seen.add(name);
         return true;
-      }).slice(0, 5);
+      }).slice(0, 8);
       setSuggestions(unique);
     }).catch(() => {});
   }, [employeeSessionToken]);
@@ -280,19 +283,20 @@ function PurchaseListForm({ draft, setDraft, catalog, employeeSessionToken }) {
     if (!itemName.trim() || !employeeSessionToken) { setStockInfo(null); setStockBlocked(false); return; }
     setStockInfo('checking');
     try {
-      const { data } = await supabase.rpc('employee_get_ops_entries_v2', {
-        p_session_token: employeeSessionToken,
-        p_task_key: 'inventory',
-        p_limit: 30,
-      });
-      const match = (data || []).find(e =>
+      const [invRes, supRes] = await Promise.all([
+        supabase.rpc('employee_get_ops_entries_v2', { p_session_token: employeeSessionToken, p_task_key: 'inventory', p_limit: 30 }),
+        supabase.rpc('employee_get_ops_entries_v2', { p_session_token: employeeSessionToken, p_task_key: 'supplies-count', p_limit: 30 }),
+      ]);
+      const allData = [...(invRes.data || []), ...(supRes.data || [])];
+      const match = allData.find(e =>
         (e.payload?.itemName || '').toLowerCase() === itemName.trim().toLowerCase()
       );
       if (match) {
         const p = match.payload;
-        const qty = parseFloat(p.stockLeft) || 0;
-        const blocked = p.status === 'ปกติ' && qty > 5;
-        setStockInfo({ stockLeft: p.stockLeft, unit: p.unit, status: p.status });
+        const qty = parseFloat(p.stockLeft || p.count) || 0;
+        const normalStatus = match.task_key === 'supplies-count' ? 'ปกติ' : 'ปกติ';
+        const blocked = p.status === normalStatus && qty > 5;
+        setStockInfo({ stockLeft: p.stockLeft || p.count, unit: p.unit, status: p.status });
         setStockBlocked(blocked);
       } else {
         setStockInfo({ notFound: true });
@@ -306,10 +310,14 @@ function PurchaseListForm({ draft, setDraft, catalog, employeeSessionToken }) {
 
   function applySuggestion(item) {
     const p = item.payload || {};
-    const priority = (p.status === 'ต้องสั่งเพิ่ม' || p.status === 'มีปัญหา') ? 'วันนี้' : 'พรุ่งนี้';
-    setNewItem(ni => ({ ...ni, category: 'วัตถุดิบ', itemName: p.itemName || '', unit: p.unit || ni.unit, priority }));
-    setStockInfo({ stockLeft: p.stockLeft, unit: p.unit, status: p.status });
-    setStockBlocked(p.status === 'ปกติ' && parseFloat(p.stockLeft) > 5);
+    const isSupplies = item.task_key === 'supplies-count';
+    const category = isSupplies ? 'ของใช้สิ้นเปลือง' : 'วัตถุดิบ';
+    const urgentStatuses = new Set(['ต้องสั่งเพิ่ม', 'มีปัญหา', 'หมดแล้ว']);
+    const priority = urgentStatuses.has(p.status) ? 'วันนี้' : 'พรุ่งนี้';
+    const stockLeft = p.stockLeft || p.count;
+    setNewItem(ni => ({ ...ni, category, itemName: p.itemName || '', unit: p.unit || ni.unit, priority }));
+    setStockInfo({ stockLeft, unit: p.unit, status: p.status });
+    setStockBlocked(p.status === 'ปกติ' && parseFloat(stockLeft) > 5);
   }
 
   function pickItem(v) {
@@ -338,19 +346,24 @@ function PurchaseListForm({ draft, setDraft, catalog, employeeSessionToken }) {
       {suggestions.length > 0 && (
         <div style={{ background: '#fff8e8', border: '1px solid #f4dfab', borderRadius: 18, padding: 14 }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: '#7a5b2b', marginBottom: 10 }}>
-            ⚡ แนะนำจากสต๊อกล่าสุด ({suggestions.length} รายการ)
+            ⚡ แนะนำจากสต๊อกต้องติดตาม ({suggestions.length} รายการ)
           </div>
           <div style={{ display: 'grid', gap: 8 }}>
             {suggestions.map(item => {
               const p = item.payload || {};
-              const isUrgent = p.status === 'ต้องสั่งเพิ่ม' || p.status === 'มีปัญหา';
+              const isSupplies = item.task_key === 'supplies-count';
+              const urgentStatuses = new Set(['ต้องสั่งเพิ่ม', 'มีปัญหา', 'หมดแล้ว']);
+              const isUrgent = urgentStatuses.has(p.status);
+              const stockLeft = p.stockLeft || p.count;
               const alreadyAdded = (draft.items || []).some(i => i.itemName.toLowerCase() === (p.itemName || '').toLowerCase());
               return (
                 <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '8px 10px', background: '#fff', borderRadius: 12, border: '1px solid #f4dfab' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: '#2f241f' }}>{p.itemName}</div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: '#2f241f' }}>
+                      {isSupplies ? '🧴 ' : '📦 '}{p.itemName}
+                    </div>
                     <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                      เหลือ {p.stockLeft} {p.unit}
+                      เหลือ {stockLeft} {p.unit}
                       <span style={{ marginLeft: 6, fontWeight: 700, color: isUrgent ? '#b42318' : '#7a5b2b' }}>{p.status}</span>
                     </div>
                   </div>
