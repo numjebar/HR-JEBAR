@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/authStore';
 import { APP_VERSION } from '../../lib/version';
 import SearchSelect from '../../components/SearchSelect';
 import VoiceBtn from '../../components/VoiceBtn';
+import PhotoSection from '../../components/PhotoSection';
 import { fetchOperateCatalog } from '../../lib/operateCatalog';
 
 const STORAGE_PREFIX = 'hr_emp_ops_';
@@ -29,11 +30,11 @@ const DEFAULT_DRAFTS = {
     imageName: '', imagePreviewUrl: '', imageBase64: '', imageMimeType: '',
     aiItems: [], date: '', recordedBy: '',
   },
-  production:       { product: '', quantity: '', unit: 'ชิ้น', batch: '', note: '', date: '', recordedBy: '' },
-  inventory:        { itemName: '', stockLeft: '', unit: 'กก.', status: 'ปกติ', note: '', date: '', recordedBy: '' },
-  'cake-stock':     { branchName: 'สาขากาดน้ำทอง', cakeName: '', available: '', reserved: '', damaged: '', status: 'พร้อมขาย', note: '', date: '', recordedBy: '' },
-  'supplies-count': { area: 'หน้าร้าน', itemName: '', count: '', unit: 'ชิ้น', note: '', date: '', recordedBy: '' },
-  'purchase-list':  { date: '', recordedBy: '', items: [] },
+  production:       { product: '', quantity: '', unit: 'ชิ้น', batch: '', note: '', date: '', recordedBy: '', photos: [] },
+  inventory:        { itemName: '', stockLeft: '', unit: 'กก.', status: 'ปกติ', note: '', date: '', recordedBy: '', photos: [] },
+  'cake-stock':     { branchName: 'สาขากาดน้ำทอง', cakeName: '', available: '', reserved: '', damaged: '', status: 'พร้อมขาย', note: '', date: '', recordedBy: '', photos: [] },
+  'supplies-count': { area: 'หน้าร้าน', itemName: '', count: '', unit: 'ชิ้น', note: '', date: '', recordedBy: '', photos: [] },
+  'purchase-list':  { date: '', recordedBy: '', items: [], photos: [] },
 };
 
 // ─── Gemini Vision ───────────────────────────────────────────────────────────
@@ -66,6 +67,7 @@ async function callGeminiVision(base64, mimeType, apiKey) {
 function BillImageSection({ draft, setDraft, geminiKey }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [lightbox, setLightbox] = useState(false);
   const cameraRef = useRef();
   const albumRef  = useRef();
 
@@ -80,6 +82,10 @@ function BillImageSection({ draft, setDraft, geminiKey }) {
     };
     reader.readAsDataURL(file);
     e.target.value = '';
+  };
+
+  const clearImage = () => {
+    setDraft({ ...draft, imageName: '', imagePreviewUrl: '', imageBase64: '', imageMimeType: '', aiItems: [] });
   };
 
   const parseWithAI = async () => {
@@ -116,18 +122,34 @@ function BillImageSection({ draft, setDraft, geminiKey }) {
             {aiLoading ? '⏳ อ่านอยู่...' : '🤖 AI อ่านบิล'}
           </button>
         )}
+        {draft.imagePreviewUrl && (
+          <button type="button" onClick={clearImage}
+            style={{ ...iconBtnStyle, background: '#fff1f1', borderColor: '#fca5a5', color: '#b42318' }}>
+            🗑 ลบรูป
+          </button>
+        )}
       </div>
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFile} />
       <input ref={albumRef}  type="file" accept="image/*"                        style={{ display: 'none' }} onChange={handleFile} />
       {aiError && <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 4 }}>{aiError}</div>}
       {!geminiKey && <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4 }}>ตั้งค่า AI Key ในหน้าโปรไฟล์ → ตั้งค่า AI (Gemini) เพื่อใช้ฟีเจอร์นี้</div>}
       {draft.imagePreviewUrl && (
-        <div style={{ marginTop: 8 }}>
+        <div style={{ marginTop: 8, position: 'relative', display: 'inline-block' }}>
           <img
             src={draft.imagePreviewUrl} alt="รูปบิล"
-            style={{ maxWidth: '100%', maxHeight: 260, objectFit: 'contain', borderRadius: 12, border: '1px solid #eadcc6' }}
+            onClick={() => setLightbox(true)}
+            style={{ maxWidth: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 12, border: '1px solid #eadcc6', cursor: 'zoom-in', display: 'block' }}
           />
-          <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4 }}>{draft.imageName}</div>
+          <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4 }}>{draft.imageName} · แตะรูปเพื่อดูเต็ม</div>
+        </div>
+      )}
+      {lightbox && draft.imagePreviewUrl && (
+        <div onClick={() => setLightbox(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.9)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <img src={draft.imagePreviewUrl} alt="รูปบิล" onClick={e => e.stopPropagation()} style={{ maxWidth: '100%', maxHeight: '86vh', borderRadius: 18, objectFit: 'contain' }} />
+          <div style={{ position: 'absolute', top: 14, right: 14, display: 'flex', gap: 8 }}>
+            <button onClick={e => { e.stopPropagation(); clearImage(); setLightbox(false); }} style={{ background: '#ef4444', border: 'none', color: '#fff', borderRadius: 12, padding: '8px 16px', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>🗑 ลบ</button>
+            <button onClick={() => setLightbox(false)} style={{ background: 'rgba(255,255,255,.22)', border: 'none', color: '#fff', borderRadius: 12, padding: '8px 16px', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>✕ ปิด</button>
+          </div>
         </div>
       )}
     </Field>
@@ -298,8 +320,11 @@ function PurchaseListForm({ draft, setDraft, catalog, employeeSessionToken }) {
 
         <TwoColRow>
           <Field label="จำนวน">
-            <input type="number" value={newItem.quantity} min="0" inputMode="decimal"
-              onChange={e => setNewItem(ni => ({ ...ni, quantity: e.target.value }))} placeholder="0" />
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input type="number" style={{ flex: 1 }} value={newItem.quantity} min="0" inputMode="decimal"
+                onChange={e => setNewItem(ni => ({ ...ni, quantity: e.target.value }))} placeholder="0" />
+              <VoiceBtn onResult={v => setNewItem(ni => ({ ...ni, quantity: v.replace(/[^0-9.]/g, '') }))} size={36} />
+            </div>
           </Field>
           <Field label="หน่วย">
             <select value={newItem.unit}
@@ -376,6 +401,13 @@ function PurchaseListForm({ draft, setDraft, catalog, employeeSessionToken }) {
           ))}
         </div>
       )}
+
+      {/* ── Photos ── */}
+      <PhotoSection
+        photos={draft.photos || []}
+        onChange={photos => setDraft(prev => ({ ...prev, photos }))}
+        label="รูปประกอบใบสั่งซื้อ (ไม่บังคับ)"
+      />
     </div>
   );
 }
@@ -631,8 +663,11 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
           </Field>
           <TwoColRow>
             <Field label="จำนวน">
-              <input value={draft.quantity} inputMode="numeric"
-                onChange={e => setDraft({ ...draft, quantity: e.target.value })} placeholder="0" />
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input style={{ flex: 1 }} value={draft.quantity} inputMode="numeric"
+                  onChange={e => setDraft({ ...draft, quantity: e.target.value })} placeholder="0" />
+                <VoiceBtn onResult={v => setDraft({ ...draft, quantity: v.replace(/[^0-9.]/g, '') })} size={36} />
+              </div>
             </Field>
             <Field label="หน่วย">
               <select value={draft.unit} onChange={e => setDraft({ ...draft, unit: e.target.value })}>
@@ -641,8 +676,11 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
             </Field>
           </TwoColRow>
           <Field label="รอบผลิต / batch">
-            <input value={draft.batch}
-              onChange={e => setDraft({ ...draft, batch: e.target.value })} placeholder="เช่น เช้า / บ่าย / รอบ 1" />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input style={{ flex: 1 }} value={draft.batch}
+                onChange={e => setDraft({ ...draft, batch: e.target.value })} placeholder="เช่น เช้า / บ่าย / รอบ 1" />
+              <VoiceBtn onResult={v => setDraft({ ...draft, batch: v })} size={36} />
+            </div>
           </Field>
           <Field label="หมายเหตุ">
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
@@ -651,6 +689,11 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               <VoiceBtn onResult={v => setDraft({ ...draft, note: (draft.note ? draft.note + ' ' : '') + v })} />
             </div>
           </Field>
+          <PhotoSection
+            photos={draft.photos || []}
+            onChange={photos => setDraft({ ...draft, photos })}
+            label="รูปการผลิต (ไม่บังคับ)"
+          />
         </div>
       );
 
@@ -670,8 +713,11 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
           </Field>
           <TwoColRow>
             <Field label="คงเหลือ">
-              <input value={draft.stockLeft} inputMode="decimal"
-                onChange={e => setDraft({ ...draft, stockLeft: e.target.value })} placeholder="0" />
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input style={{ flex: 1 }} value={draft.stockLeft} inputMode="decimal"
+                  onChange={e => setDraft({ ...draft, stockLeft: e.target.value })} placeholder="0" />
+                <VoiceBtn onResult={v => setDraft({ ...draft, stockLeft: v.replace(/[^0-9.]/g, '') })} size={36} />
+              </div>
             </Field>
             <Field label="หน่วย">
               <select value={draft.unit} onChange={e => setDraft({ ...draft, unit: e.target.value })}>
@@ -691,6 +737,11 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               <VoiceBtn onResult={v => setDraft({ ...draft, note: (draft.note ? draft.note + ' ' : '') + v })} />
             </div>
           </Field>
+          <PhotoSection
+            photos={draft.photos || []}
+            onChange={photos => setDraft({ ...draft, photos })}
+            label="รูปวัตถุดิบ (ไม่บังคับ)"
+          />
         </div>
       );
 
@@ -718,18 +769,27 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
           </Field>
           <TwoColRow>
             <Field label="พร้อมขาย">
-              <input value={draft.available} inputMode="numeric"
-                onChange={e => setDraft({ ...draft, available: e.target.value })} placeholder="0" />
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input style={{ flex: 1 }} value={draft.available} inputMode="numeric"
+                  onChange={e => setDraft({ ...draft, available: e.target.value })} placeholder="0" />
+                <VoiceBtn onResult={v => setDraft({ ...draft, available: v.replace(/[^0-9.]/g, '') })} size={36} />
+              </div>
             </Field>
             <Field label="จอง">
-              <input value={draft.reserved} inputMode="numeric"
-                onChange={e => setDraft({ ...draft, reserved: e.target.value })} placeholder="0" />
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input style={{ flex: 1 }} value={draft.reserved} inputMode="numeric"
+                  onChange={e => setDraft({ ...draft, reserved: e.target.value })} placeholder="0" />
+                <VoiceBtn onResult={v => setDraft({ ...draft, reserved: v.replace(/[^0-9.]/g, '') })} size={36} />
+              </div>
             </Field>
           </TwoColRow>
           <TwoColRow>
             <Field label="เสียหาย / หมดอายุ">
-              <input value={draft.damaged} inputMode="numeric"
-                onChange={e => setDraft({ ...draft, damaged: e.target.value })} placeholder="0" />
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input style={{ flex: 1 }} value={draft.damaged} inputMode="numeric"
+                  onChange={e => setDraft({ ...draft, damaged: e.target.value })} placeholder="0" />
+                <VoiceBtn onResult={v => setDraft({ ...draft, damaged: v.replace(/[^0-9.]/g, '') })} size={36} />
+              </div>
             </Field>
             <Field label="สถานะ">
               <select value={draft.status} onChange={e => setDraft({ ...draft, status: e.target.value })}>
@@ -739,9 +799,17 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
             </Field>
           </TwoColRow>
           <Field label="หมายเหตุ">
-            <textarea rows={3} value={draft.note}
-              onChange={e => setDraft({ ...draft, note: e.target.value })} placeholder="เช่น สาขานี้ต้องเติมเค้กส้ม 2 ชิ้น" />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <textarea rows={3} style={{ flex: 1 }} value={draft.note}
+                onChange={e => setDraft({ ...draft, note: e.target.value })} placeholder="เช่น สาขานี้ต้องเติมเค้กส้ม 2 ชิ้น" />
+              <VoiceBtn onResult={v => setDraft({ ...draft, note: (draft.note ? draft.note + ' ' : '') + v })} />
+            </div>
           </Field>
+          <PhotoSection
+            photos={draft.photos || []}
+            onChange={photos => setDraft({ ...draft, photos })}
+            label="รูปสต๊อกเค้ก (ไม่บังคับ)"
+          />
         </div>
       );
 
@@ -766,8 +834,11 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
           </Field>
           <TwoColRow>
             <Field label="จำนวนคงเหลือ">
-              <input value={draft.count} inputMode="numeric"
-                onChange={e => setDraft({ ...draft, count: e.target.value })} placeholder="0" />
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input style={{ flex: 1 }} value={draft.count} inputMode="numeric"
+                  onChange={e => setDraft({ ...draft, count: e.target.value })} placeholder="0" />
+                <VoiceBtn onResult={v => setDraft({ ...draft, count: v.replace(/[^0-9.]/g, '') })} size={36} />
+              </div>
             </Field>
             <Field label="หน่วย">
               <select value={draft.unit} onChange={e => setDraft({ ...draft, unit: e.target.value })}>
@@ -776,9 +847,17 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
             </Field>
           </TwoColRow>
           <Field label="หมายเหตุ">
-            <textarea rows={3} value={draft.note}
-              onChange={e => setDraft({ ...draft, note: e.target.value })} placeholder="เช่น เหลือน้อยมาก ควรซื้อวันนี้" />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <textarea rows={3} style={{ flex: 1 }} value={draft.note}
+                onChange={e => setDraft({ ...draft, note: e.target.value })} placeholder="เช่น เหลือน้อยมาก ควรซื้อวันนี้" />
+              <VoiceBtn onResult={v => setDraft({ ...draft, note: (draft.note ? draft.note + ' ' : '') + v })} />
+            </div>
           </Field>
+          <PhotoSection
+            photos={draft.photos || []}
+            onChange={photos => setDraft({ ...draft, photos })}
+            label="รูปสต๊อกของใช้ (ไม่บังคับ)"
+          />
         </div>
       );
 
@@ -869,6 +948,7 @@ function useTaskDraft(taskKey) {
     delete toSave.imagePreviewUrl;
     delete toSave.imageBase64;
     delete toSave.imageMimeType;
+    if (toSave.photos) delete toSave.photos; // blob URLs are session-only
     localStorage.setItem(storageKey, JSON.stringify(toSave));
   }, [storageKey, draft]);
 
@@ -946,6 +1026,12 @@ function sanitizePayload(taskKey, draft) {
     delete p.imageBase64;
     delete p.imageMimeType;
   }
+  // Store only photo names, strip base64 & blob URLs
+  if (Array.isArray(p.photos) && p.photos.length > 0) {
+    p.photoNames = p.photos.map(ph => ph.name);
+    p.photoCount = p.photos.length;
+  }
+  delete p.photos;
   return p;
 }
 
