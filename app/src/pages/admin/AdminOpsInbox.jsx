@@ -209,11 +209,17 @@ function PayloadPreview({ payload, imageName }) {
     return <PurchaseListPreview payload={payload} />;
   }
 
-  const SKIP_KEYS = new Set(['date', 'recordedBy', 'aiItems', 'imagePreviewUrl', 'imageBase64', 'imageMimeType']);
+  const SKIP_KEYS = new Set([
+    'date', 'recordedBy', 'aiItems',
+    'imagePreviewUrl', 'imageBase64', 'imageMimeType',
+    'photoNames', 'photoCount',
+  ]);
   const rows = Object.entries(payload).filter(
     ([key, value]) => !SKIP_KEYS.has(key) && value != null && !Array.isArray(value) && typeof value !== 'object' && String(value).trim() !== ''
   );
   const aiItems = Array.isArray(payload.aiItems) ? payload.aiItems : [];
+  const photoNames = Array.isArray(payload.photoNames) ? payload.photoNames : [];
+  const photoCount = payload.photoCount || photoNames.length;
 
   return (
     <div style={{ background: '#faf7f2', border: '1px solid #eadcc6', borderRadius: 16, padding: 14 }}>
@@ -224,7 +230,7 @@ function PayloadPreview({ payload, imageName }) {
         </div>
       )}
       <div style={{ display: 'grid', gap: 8 }}>
-        {rows.length === 0 && aiItems.length === 0 && !imageName ? (
+        {rows.length === 0 && aiItems.length === 0 && !imageName && photoCount === 0 ? (
           <div style={{ fontSize: 13, color: 'var(--muted)' }}>ไม่มีรายละเอียดใน payload</div>
         ) : (
           rows.map(([key, value]) => (
@@ -249,8 +255,23 @@ function PayloadPreview({ payload, imageName }) {
         )}
         {imageName && (
           <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10, fontSize: 13 }}>
-            <div style={{ color: 'var(--muted)', fontWeight: 700 }}>รูปแนบ</div>
+            <div style={{ color: 'var(--muted)', fontWeight: 700 }}>รูปบิล</div>
             <div>{imageName}</div>
+          </div>
+        )}
+        {photoCount > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10, fontSize: 13 }}>
+            <div style={{ color: 'var(--muted)', fontWeight: 700 }}>รูปแนบ</div>
+            <div style={{ color: 'var(--ink)' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#eef2ff', borderRadius: 8, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>
+                📷 {photoCount} รูป
+              </span>
+              {photoNames.length > 0 && (
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                  {photoNames.join(', ')}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -259,7 +280,7 @@ function PayloadPreview({ payload, imageName }) {
 }
 
 function PurchaseListPreview({ payload }) {
-  const { date, recordedBy, items = [] } = payload;
+  const { date, recordedBy, items = [], photoCount, photoNames = [] } = payload;
   const [copied, setCopied] = useState(false);
 
   function copyAsText() {
@@ -279,6 +300,9 @@ function PurchaseListPreview({ payload }) {
         {date && <span>📅 {date}</span>}
         {recordedBy && <span>👤 {recordedBy}</span>}
         <span style={{ fontWeight: 700, color: '#bf6c2a' }}>🛒 {items.length} รายการ</span>
+        {(photoCount > 0 || photoNames.length > 0) && (
+          <span style={{ fontWeight: 700, color: '#4338ca' }}>📷 {photoCount || photoNames.length} รูป</span>
+        )}
         {items.length > 0 && (
           <button onClick={copyAsText} style={{
             marginLeft: 'auto', padding: '4px 12px', borderRadius: 8, fontSize: 12,
@@ -345,6 +369,11 @@ function humanizeKey(key) {
     area: 'จุดที่นับ',
     count: 'จำนวนคงเหลือ',
     priority: 'ความด่วน',
+    branchName: 'สาขา',
+    cakeName: 'ชื่อเค้ก / เมนู',
+    available: 'พร้อมขาย',
+    reserved: 'จอง',
+    damaged: 'เสียหาย / หมดอายุ',
   };
   return map[key] || key;
 }
