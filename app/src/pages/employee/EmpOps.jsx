@@ -846,11 +846,14 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
     try {
       const payload = sanitizePayload(taskKey, draft);
 
+      let photoUploadFailed = false;
+
       // อัปโหลดรูปบิลไปยัง Supabase Storage (bills form)
       if (taskKey === 'bills' && draft.imageBase64 && draft.imageMimeType && orgId) {
         setUploadMsg('⏳ กำลังอัปโหลดรูปบิล...');
         const result = await uploadSingleBase64(draft.imageBase64, draft.imageMimeType, draft.imageName, orgId, 'bills');
-        if (result?.url) payload.billImageUrl = result.url;
+        if (result?.url) { payload.billImageUrl = result.url; }
+        else { photoUploadFailed = true; }
         setUploadMsg('');
       }
 
@@ -863,6 +866,8 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
           payload.photoUrls = uploaded.map(u => u.url);
           payload.photoNames = uploaded.map(u => u.name);
           payload.photoCount = uploaded.length;
+        } else {
+          photoUploadFailed = true;
         }
         setUploadMsg('');
       }
@@ -878,7 +883,11 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
       if (taskKey === 'production') setProdRefreshTick(t => t + 1);
       if (taskKey === 'cake-stock') setCakeRefreshTick(t => t + 1);
       const uploadedCount = (payload.photoUrls?.length || 0) + (payload.billImageUrl ? 1 : 0);
-      setSuccess(`บันทึกเข้า backend แล้ว${uploadedCount > 0 ? ` (อัปโหลด ${uploadedCount} รูปสำเร็จ)` : ''}`);
+      if (photoUploadFailed) {
+        setSuccess(`บันทึกข้อมูลแล้ว — แต่รูปอัปโหลดไม่สำเร็จ (แอดมินต้องรัน SQL ไฟล์ 28 เพื่อเปิด Storage bucket)`);
+      } else {
+        setSuccess(`บันทึกเข้า backend แล้ว${uploadedCount > 0 ? ` (อัปโหลด ${uploadedCount} รูปสำเร็จ)` : ''}`);
+      }
     } catch (error) {
       setUploadMsg('');
       const msg = String(error?.message || '');
