@@ -16,6 +16,7 @@ export default function AdminDashboard() {
   const [opsEntriesCount, setOpsEntriesCount] = useState(0);
   const [opsTodayCounts, setOpsTodayCounts] = useState({});
   const [opsWarning, setOpsWarning] = useState('');
+  const [lowStockItems, setLowStockItems] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [allBranches, setAllBranches] = useState([]);
   const [orgSettings, setOrgSettings] = useState(null);
@@ -24,7 +25,7 @@ export default function AdminDashboard() {
   async function load() {
     const todayStart = `${today}T00:00:00`;
     const todayEnd = `${today}T23:59:59`;
-    const [{ data: att }, { data: leaves }, { data: todayLeaves }, { data: msgs }, { data: emps }, { data: branches }, { data: settings }, opsResult, opsTodayResult] = await Promise.all([
+    const [{ data: att }, { data: leaves }, { data: todayLeaves }, { data: msgs }, { data: emps }, { data: branches }, { data: settings }, opsResult, opsTodayResult, lowStockResult] = await Promise.all([
       supabase.from('attendance').select('*, employees(name,nickname,color)').eq('org_id', orgId).eq('date', today),
       supabase.from('leaves').select('*, employees(name,nickname)').eq('org_id', orgId).eq('status', 'pending'),
       supabase.from('leaves')
@@ -39,6 +40,7 @@ export default function AdminDashboard() {
       supabase.from('org_settings').select('*').eq('org_id', orgId).single(),
       supabase.from('employee_ops_entries').select('id', { count: 'exact', head: true }).eq('org_id', orgId),
       supabase.from('employee_ops_entries').select('task_key').eq('org_id', orgId).gte('created_at', todayStart).lte('created_at', todayEnd),
+      supabase.from('employee_ops_entries').select('id,emp_id,created_at,payload').eq('org_id', orgId).eq('task_key', 'inventory').order('created_at', { ascending: false }).limit(40),
     ]);
 
     const existingEmpIds = new Set((att || []).map((a) => a.emp_id));
@@ -65,6 +67,7 @@ export default function AdminDashboard() {
     if (opsResult?.error) {
       setOpsEntriesCount(0);
       setOpsTodayCounts({});
+      setLowStockItems([]);
       if (String(opsResult.error.message || '').includes('employee_ops_entries')) {
         setOpsWarning('ยังไม่ได้รัน SQL งานร้านพนักงาน');
       } else {
@@ -78,6 +81,20 @@ export default function AdminDashboard() {
         todayCounts[row.task_key] = (todayCounts[row.task_key] || 0) + 1;
       });
       setOpsTodayCounts(todayCounts);
+
+      // low-stock alert: keep only alert-status entries, dedupe by itemName (latest per item)
+      const alertRows = (lowStockResult?.data || []).filter(e => {
+        const s = e.payload?.status;
+        return s && s !== 'ปกติ';
+      });
+      const seen = new Set();
+      const unique = alertRows.filter(e => {
+        const name = e.payload?.itemName;
+        if (!name || seen.has(name)) return false;
+        seen.add(name);
+        return true;
+      }).slice(0, 6);
+      setLowStockItems(unique);
     }
 
     const working = todayRows.filter((a) => a.clock_in && !a.clock_out).length;
@@ -216,6 +233,37 @@ export default function AdminDashboard() {
           </div>
         ))}
       </div>
+
+      {/* low-stock alert */}
+      {lowStockItems.length > 0 && (
+        <div className="card" style={{ padding: '18px 20px', marginBottom: 8, border: '1px solid #f4dfab', background: '#fff8e8' }}>
+          <div style={{ fontWeight: 700, marginBottom: 12, color: '#7a5b2b' }}>⚠️ สต๊อกวัตถุดิบต้องติดตาม ({lowStockItems.length} รายการ)</div>
+          <div style={{ display: 'grid', gap: 6 }}>
+            {lowStockItems.map(item => {
+              const p = item.payload || {};
+              const emp = (employees || []).find(e => e.id === item.emp_id);
+              const empName = emp?.nickname || emp?.name || 'พนักงาน';
+              const isUrgent = p.status === 'ต้องสั่งเพิ่ม' || p.status === 'มีปัญหา';
+              return (
+                <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, fontSize: 13, padding: '7px 0', borderBottom: '1px solid #f0e3c2' }}>
+                  <div>
+                    <span style={{ fontWeight: 700 }}>{p.itemName}</span>
+                    <span style={{ color: 'var(--muted)', marginLeft: 8 }}>
+                      เหลือ {p.stockLeft} {p.unit} · {empName}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 700, borderRadius: 8, padding: '2px 8px', flexShrink: 0, background: isUrgent ? '#fff1f1' : '#fff8e8', color: isUrgent ? '#b42318' : '#7a5b2b' }}>
+                    {p.status}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <button className="btn" onClick={() => nav('/admin/ops-inbox?task=inventory')} style={{ marginTop: 12, fontSize: 13 }}>
+            ดูรายการวัตถุดิบทั้งหมด →
+          </button>
+        </div>
+      )}
 
       {/* today status */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>

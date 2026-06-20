@@ -1,5 +1,32 @@
 # HR JEBAR Handoff
 
+## Update 2026-06-20 (low-stock alert on admin dashboard — v8)
+
+### สิ่งที่เพิ่มใน v8
+
+**AdminDashboard — สต๊อกวัตถุดิบต้องติดตาม**
+- โหลด inventory entries ล่าสุด (40 รายการ) จาก `employee_ops_entries`
+- กรองเฉพาะที่ `status != ปกติ` (คือ ใกล้หมด, ต้องสั่งเพิ่ม, มีปัญหา)
+- Deduplicate ตาม `itemName` เก็บแค่รายการล่าสุดของแต่ละชื่อ
+- แสดง warning card สีส้มอ่อนใต้ stat tiles ถ้ามีรายการต้องติดตาม
+- คลิก "ดูรายการวัตถุดิบทั้งหมด →" ไปที่ AdminOpsInbox filter=inventory
+
+**ข้อมูลที่แสดง:**
+- ชื่อวัตถุดิบ, คงเหลือ (stockLeft + unit), ชื่อพนักงานที่รายงาน
+- สถานะแดง (ต้องสั่งเพิ่ม / มีปัญหา) หรือเหลือง (ใกล้หมด)
+- สูงสุด 6 รายการในหน้า Dashboard
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/pages/admin/AdminDashboard.jsx` — query low-stock inventory + `lowStockItems` state + alert card
+- `app/src/lib/version.js` — bump เป็น `Build 2026.06.20-hr-ops-v8`
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+---
+
 ## Update 2026-06-20 (admin quick-reply from OPS entry — v7)
 
 ### สิ่งที่เพิ่มใน v7
