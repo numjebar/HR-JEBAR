@@ -11,13 +11,14 @@ function nowClock() {
 
 export default function EmpHome() {
   const navigate = useNavigate();
-  const { employee, employeeSessionToken } = useAuthStore();
+  const { employee, employeeSessionToken, orgId } = useAuthStore();
   const [currentEmployee, setCurrentEmployee] = useState(employee);
   const [branch, setBranch] = useState(null);
   const [settings, setSettings] = useState(null);
   const [todayAtt, setTodayAtt] = useState(null);
   const [weekAtt, setWeekAtt] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [todayOpsCounts, setTodayOpsCounts] = useState({});
   const [showCheckin, setShowCheckin] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const [clockText, setClockText] = useState(nowClock());
@@ -40,6 +41,23 @@ export default function EmpHome() {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    if (!employee?.id || !orgId) return;
+    const today = new Date().toISOString().slice(0, 10);
+    supabase
+      .from('employee_ops_entries')
+      .select('task_key')
+      .eq('emp_id', employee.id)
+      .eq('org_id', orgId)
+      .gte('created_at', `${today}T00:00:00`)
+      .lte('created_at', `${today}T23:59:59`)
+      .then(({ data }) => {
+        const counts = {};
+        (data || []).forEach(e => { counts[e.task_key] = (counts[e.task_key] || 0) + 1; });
+        setTodayOpsCounts(counts);
+      }).catch(() => {});
+  }, [employee?.id, orgId]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setClockText(nowClock()), 1000);
@@ -156,27 +174,46 @@ export default function EmpHome() {
 
         {/* OPS quick shortcuts */}
         <div style={{ marginTop: 4 }}>
-          <div style={{ fontSize: 12, color: '#9b7a5a', fontWeight: 700, marginBottom: 8, paddingLeft: 2 }}>งานร้านวันนี้</div>
+          {(() => {
+            const todayOpsTotal = Object.values(todayOpsCounts).reduce((s, v) => s + v, 0);
+            return (
+              <div style={{ fontSize: 12, color: '#9b7a5a', fontWeight: 700, marginBottom: 8, paddingLeft: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>งานร้านวันนี้</span>
+                {todayOpsTotal > 0 && (
+                  <span style={{ background: '#ecfdf3', color: '#0d7a46', borderRadius: 999, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>✓ {todayOpsTotal} รายการ</span>
+                )}
+              </div>
+            );
+          })()}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
             {[
-              { path: '/emp/ops/bills',         icon: '📷', label: 'ถ่ายบิล' },
-              { path: '/emp/ops/purchase-list', icon: '🛒', label: 'ใบสั่งซื้อ' },
-              { path: '/emp/ops/production',    icon: '🏭', label: 'ผลิตขนม' },
-            ].map(item => (
-              <button
-                key={item.path}
-                onClick={() => navigate(item.path)}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  gap: 6, padding: '14px 8px', borderRadius: 18,
-                  border: '1px solid #eadcc6', background: '#fff',
-                  cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#2f241f',
-                }}
-              >
-                <span style={{ fontSize: 26 }}>{item.icon}</span>
-                {item.label}
-              </button>
-            ))}
+              { path: '/emp/ops/bills',         icon: '📷', label: 'ถ่ายบิล',    taskKey: 'bills' },
+              { path: '/emp/ops/purchase-list', icon: '🛒', label: 'ใบสั่งซื้อ', taskKey: 'purchase-list' },
+              { path: '/emp/ops/production',    icon: '🏭', label: 'ผลิตขนม',    taskKey: 'production' },
+            ].map(item => {
+              const count = todayOpsCounts[item.taskKey] || 0;
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => navigate(item.path)}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    gap: 6, padding: '14px 8px', borderRadius: 18,
+                    border: `1px solid ${count > 0 ? '#bbe7cf' : '#eadcc6'}`,
+                    background: count > 0 ? '#f0fdf4' : '#fff',
+                    cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#2f241f',
+                  }}
+                >
+                  <span style={{ fontSize: 26 }}>{item.icon}</span>
+                  {item.label}
+                  {count > 0 && (
+                    <span style={{ background: '#ecfdf3', color: '#0d7a46', borderRadius: 999, padding: '1px 6px', fontSize: 11, fontWeight: 800, lineHeight: 1.4 }}>
+                      ✓{count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
           <button
             onClick={() => navigate('/emp/ops')}

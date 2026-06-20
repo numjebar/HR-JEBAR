@@ -16,16 +16,19 @@ export default function AdminMessages() {
   const bottomRef = useRef(null);
 
   async function loadEmployees() {
-    const { data } = await supabase
-      .from('employees').select('id,name,nickname,color,photo_url,org_id')
-      .eq('org_id', orgId).order('name');
-    // unread count per emp
-    const { data: unreads } = await supabase
-      .from('messages').select('emp_id')
-      .eq('org_id', orgId).eq('from', 'emp').eq('status', 'unread');
+    const [{ data }, { data: unreads }, { data: pendingTasksData }] = await Promise.all([
+      supabase.from('employees').select('id,name,nickname,color,photo_url,org_id')
+        .eq('org_id', orgId).order('name'),
+      supabase.from('messages').select('emp_id')
+        .eq('org_id', orgId).eq('from', 'emp').eq('status', 'unread'),
+      supabase.from('messages').select('emp_id')
+        .eq('org_id', orgId).eq('from', 'admin').eq('kind', 'task').neq('status', 'done'),
+    ]);
     const counts = {};
     (unreads || []).forEach((m) => { counts[m.emp_id] = (counts[m.emp_id] || 0) + 1; });
-    setEmployees((data || []).map((e) => ({ ...e, unread: counts[e.id] || 0 })));
+    const taskCounts = {};
+    (pendingTasksData || []).forEach((m) => { taskCounts[m.emp_id] = (taskCounts[m.emp_id] || 0) + 1; });
+    setEmployees((data || []).map((e) => ({ ...e, unread: counts[e.id] || 0, pendingTasks: taskCounts[e.id] || 0 })));
   }
 
   async function loadThread(emp) {
@@ -94,6 +97,11 @@ export default function AdminMessages() {
               </div>
               <div style={{ fontSize: 12, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.name}</div>
             </div>
+            {emp.pendingTasks > 0 && (
+              <div style={{ background: '#eef2ff', color: '#3730a3', borderRadius: 999, padding: '2px 6px', fontSize: 10, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                📋{emp.pendingTasks}
+              </div>
+            )}
             {emp.unread > 0 && (
               <div style={{ background: 'var(--danger-fg)', color: '#fff', borderRadius: '50%', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
                 {emp.unread}
