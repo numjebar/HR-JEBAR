@@ -1,5 +1,47 @@
 # HR JEBAR Handoff
 
+## Update 2026-06-20 (OPS photo + voice ครบทั้ง 6 ฟอร์ม — v3)
+
+### สิ่งที่เพิ่มใน v3
+
+| ฟอร์ม | SearchSelect | VoiceBtn | PhotoSection |
+|---|---|---|---|
+| ถ่ายบิล (bills) | — | ✅ vendor, note | ✅ (BillImageSection เดิม) |
+| ผลิตขนม (production) | ✅ เมนู | ✅ quantity, batch, note | ✅ รูปการผลิต |
+| วัตถุดิบ (inventory) | ✅ รายการ | ✅ stockLeft, note | ✅ รูปวัตถุดิบ |
+| สต๊อกเค้ก (cake-stock) | ✅ ชื่อเค้ก | ✅ available, reserved, damaged, note | ✅ รูปสต๊อกเค้ก |
+| ของใช้ (supplies-count) | ✅ รายการ | ✅ count, note | ✅ รูปสต๊อกของใช้ |
+| ใบสั่งซื้อ (purchase-list) | ✅ รายการ | ✅ quantity, note | ✅ รูปประกอบ |
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/components/PhotoSection.jsx` — NEW: reusable component (camera, album, lightbox, delete)
+- `app/src/components/SearchSelect.jsx` — เพิ่มปุ่ม ▼/▲ toggle dropdown
+- `app/src/pages/employee/EmpOps.jsx` — ครบทั้ง 6 ฟอร์ม
+- `app/src/pages/admin/AdminOpsInbox.jsx` — แสดง photoCount/photoNames, เพิ่ม humanizeKey สำหรับ cake-stock fields
+- `app/src/lib/version.js` — bump เป็น `Build 2026.06.20-hr-ops-v3`
+
+### Payload sanitization (EmpOps → Supabase)
+
+- blob URLs และ base64 ถูก strip ออกก่อนส่ง
+- photos array ถูกแปลงเป็น `{ photoNames: [...], photoCount: N }`
+- localStorage ไม่เก็บ photos array (blob URLs ใช้ได้แค่ session เดียว)
+
+### Commit
+
+- `bffe31d` feat: complete photo + voice + dropdown for all 6 OPS forms (v3)
+- `28c135b` feat(AdminOpsInbox): show photo count + names for all OPS form types
+
+### Deploy
+
+ต้อง build+deploy จากเครื่อง Windows พร้อม `.env.local` หรือตั้ง GitHub Actions secrets:
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+
+---
+
 ## Update 2026-06-19 (employee Operate handoff)
 
 - HR employee home now opens the live Operate app directly:
