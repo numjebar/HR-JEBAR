@@ -37,6 +37,7 @@ export default function EmpPay() {
   const [branch, setBranch] = useState(null);
   const [settings, setSettings] = useState(null);
   const [payRange, setPayRange] = useState(null);
+  const [payment, setPayment] = useState(null);
   const effectivePeriod = payrollPeriodForEmployee(employee, period);
   const periodOptions = allowedPeriodsForEmployee(employee);
 
@@ -52,6 +53,7 @@ export default function EmpPay() {
     const st = data?.settings || null;
     setBranch(br);
     setSettings(st);
+    setPayment(data?.payment || null);
     const rules = rulesFor(st?.rules, br, employee);
     setPay(computePay(employee, data?.attendance || [], data?.sales || [], data?.adjustments || [], rules, range));
   }
@@ -133,7 +135,7 @@ export default function EmpPay() {
         </div>
       </div>
 
-      <div style={{ background: 'var(--accent)', borderRadius: 22, padding: '24px 20px', color: '#fff', marginBottom: 16, textAlign: 'center' }}>
+      <div style={{ background: 'var(--accent)', borderRadius: 22, padding: '24px 20px', color: '#fff', marginBottom: payment ? 12 : 16, textAlign: 'center' }}>
         <div style={{ fontSize: 13, opacity: 0.8, marginBottom: 6 }}>เงินสุทธิ</div>
         <div className="num" style={{ fontSize: 42, fontWeight: 700 }}>{THB(pay.net)}</div>
         <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginTop: 12, fontSize: 13, opacity: 0.85, flexWrap: 'wrap' }}>
@@ -142,6 +144,19 @@ export default function EmpPay() {
           {pay.absentDays > 0 && <div>{pay.absentDays} วันขาด</div>}
         </div>
       </div>
+
+      {payment && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#e7f4ef', border: '1px solid #0E7C66', borderRadius: 16, padding: '14px 16px', marginBottom: 16 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 999, background: '#0E7C66', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>✓</div>
+          <div>
+            <div style={{ fontWeight: 700, color: '#0E7C66', fontSize: 15 }}>จ่ายเงินงวดนี้แล้ว</div>
+            <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 2 }}>
+              จ่ายเมื่อ {new Date(payment.paid_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}
+              {payment.net_amount > 0 ? ` · ยอด ${THB(payment.net_amount)}` : ''}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="card" style={{ padding: '16px 20px' }}>
         <div style={{ fontWeight: 600, marginBottom: 12 }}>รายละเอียด</div>

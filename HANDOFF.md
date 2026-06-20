@@ -1,5 +1,46 @@
 # HR JEBAR Handoff
 
+## Update 2026-06-20 (employee sees "paid" status — v58)
+
+### สิ่งที่เพิ่มใน v58
+
+**EmpPay — พนักงานเห็นสถานะ "จ่ายเงินงวดนี้แล้ว"**
+
+- ต่อยอดจาก v57 (แอดมินทำเครื่องหมายจ่ายแล้ว)
+- เมื่อแอดมินกด "จ่ายแล้ว" รอบไหน พนักงานเปิดหน้า "รายได้" จะเห็น banner เขียว:
+  - ✓ **"จ่ายเงินงวดนี้แล้ว"**
+  - บรรทัด "จ่ายเมื่อ [วันที่ไทย] · ยอด [จำนวน]"
+- Banner แสดงใต้การ์ดเงินสุทธิ — เห็นชัดทันที
+- ถ้ายังไม่จ่าย → ไม่มี banner (เหมือนเดิม)
+
+### กลไก (สำคัญ)
+
+- `payroll_payments` มี RLS เฉพาะแอดมิน — พนักงานอ่านตรงไม่ได้
+- จึงขยาย RPC `employee_pay_data` (security definer) ให้คืน field `payment`
+  ของรอบที่ตรงกัน (cycle_from = p_from, cycle_to = p_to) เฉพาะของพนักงานคนนั้น
+- พนักงานเรียกผ่าน `employee_pay_data_v2` (session token) เหมือนเดิม ไม่ต้องแก้ session layer
+
+### SQL ที่ต้องรัน (1 ครั้ง)
+
+```
+supabase/30_payroll_payments.sql
+```
+
+> ไฟล์เดียวกับ v57 — มีการ `create or replace` employee_pay_data เพิ่มเข้าไปด้านล่าง
+> ถ้ารัน v57 ไปแล้ว ให้รันไฟล์นี้ซ้ำอีกครั้ง (idempotent — ปลอดภัย)
+
+### ไฟล์ที่เปลี่ยน
+
+- `supabase/30_payroll_payments.sql` — เพิ่ม `create or replace employee_pay_data` คืน `payment`
+- `app/src/pages/employee/EmpPay.jsx` — `payment` state + paid banner
+- `app/src/lib/version.js` — bump เป็น `Build 2026.06.20-emp-paidstatus-v58`
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+---
+
 ## Update 2026-06-20 (payroll "paid already" marker — v57)
 
 ### สิ่งที่เพิ่มใน v57

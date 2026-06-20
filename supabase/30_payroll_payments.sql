@@ -113,3 +113,46 @@ $$;
 
 grant execute on function public.payroll_mark_paid(uuid, text, date, date, numeric, text) to authenticated;
 grant execute on function public.payroll_unmark_paid(uuid, date, date) to authenticated;
+
+-- ─────────────────────────────────────────────────────────────
+-- Extend employee_pay_data to expose the "paid" marker to the
+-- employee for the exact cycle they are viewing. This function is
+-- security definer, so it bypasses the admin-only RLS on
+-- payroll_payments and returns only this employee's own record.
+-- ─────────────────────────────────────────────────────────────
+create or replace function public.employee_pay_data(p_emp_id uuid, p_from date, p_to date)
+returns jsonb
+language sql
+security definer
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'branch', to_jsonb(b),
+    'settings', to_jsonb(s),
+    'attendance', coalesce((
+      select jsonb_agg(to_jsonb(a))
+      from public.attendance a
+      where a.emp_id = e.id and a.date >= p_from and a.date <= p_to
+    ), '[]'::jsonb),
+    'sales', coalesce((
+      select jsonb_agg(to_jsonb(x))
+      from public.sales x
+      where x.emp_id = e.id and x.date >= p_from and x.date <= p_to
+    ), '[]'::jsonb),
+    'adjustments', coalesce((
+      select jsonb_agg(to_jsonb(d))
+      from public.adjustments d
+      where d.emp_id = e.id and d.date >= p_from and d.date <= p_to
+    ), '[]'::jsonb),
+    'payment', (
+      select to_jsonb(pp)
+      from public.payroll_payments pp
+      where pp.emp_id = e.id and pp.cycle_from = p_from and pp.cycle_to = p_to
+      limit 1
+    )
+  )
+  from public.employees e
+  left join public.branches b on b.id = e.branch_id
+  left join public.org_settings s on s.org_id = e.org_id
+  where e.id = p_emp_id;
+$$;
