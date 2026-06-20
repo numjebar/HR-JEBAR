@@ -30,6 +30,7 @@ export default function EmpHome() {
   const [showCheckin, setShowCheckin] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const [clockText, setClockText] = useState(nowClock());
+  const [monthAtt, setMonthAtt] = useState([]);
 
   async function load() {
     const { data } = await supabase.rpc('employee_home_data_v2', {
@@ -53,6 +54,16 @@ export default function EmpHome() {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    if (!employeeSessionToken) return;
+    supabase.rpc('employee_history_data_v2', { p_session_token: employeeSessionToken })
+      .then(({ data }) => {
+        const all = data?.attendance || [];
+        const thisMonth = new Date().toISOString().slice(0, 7);
+        setMonthAtt(all.filter((a) => a.date?.startsWith(thisMonth)));
+      }).catch(() => {});
+  }, [employeeSessionToken]);
 
   useEffect(() => {
     if (!employee?.id || !orgId) return;
@@ -128,6 +139,14 @@ export default function EmpHome() {
   const actionMode = canClockOut ? 'out' : 'in';
   const actionLabel = canClockOut ? 'ลงเวลาออกงาน' : 'ลงเวลาเข้างาน';
 
+  const monthSummary = useMemo(() => {
+    const worked = monthAtt.filter((a) => a.status === 'present').length;
+    const late = monthAtt.filter((a) => a.status === 'late').length;
+    const leave = monthAtt.filter((a) => a.status === 'leave').length;
+    const otMin = monthAtt.reduce((s, a) => s + Number(a.ot_min || 0), 0);
+    return { worked: worked + late, late, leave, otMin };
+  }, [monthAtt]);
+
   const quickStats = [
     { value: weekSummary.presentDays, label: 'มาสัปดาห์นี้' },
     { value: pendingTasks, label: 'งานค้าง' },
@@ -150,8 +169,27 @@ export default function EmpHome() {
           {currentShiftLabel()} · {fmtDateFull(new Date().toISOString().slice(0, 10))}
         </div>
 
-        <div style={{ textAlign: 'center', margin: '18px 0 12px', fontSize: 64, letterSpacing: 6, fontWeight: 500, color: '#3f332e' }}>
-          LUCID
+        {/* Monthly summary card */}
+        <div style={{
+          background: 'linear-gradient(135deg, #0f172a 0%, #1B5EA8 100%)',
+          borderRadius: 20, padding: '14px 16px', margin: '14px 0 12px',
+        }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,.55)', fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 10 }}>
+            สรุปเดือนนี้
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+            {[
+              { value: monthSummary.worked, label: 'มาแล้ว', unit: 'วัน', color: '#4ade80' },
+              { value: monthSummary.late, label: 'มาสาย', unit: 'ครั้ง', color: '#fbbf24' },
+              { value: monthSummary.leave, label: 'ลา', unit: 'วัน', color: '#94a3b8' },
+              { value: monthSummary.otMin > 0 ? (Math.round(monthSummary.otMin / 6) / 10) : 0, label: 'OT', unit: 'ชม.', color: '#60a5fa' },
+            ].map((item) => (
+              <div key={item.label} style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 24, fontWeight: 800, color: item.color, lineHeight: 1.1 }}>{item.value}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,.55)', lineHeight: 1.4, marginTop: 2 }}>{item.unit}<br />{item.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div style={{

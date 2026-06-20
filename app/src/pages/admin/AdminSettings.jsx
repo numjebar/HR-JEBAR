@@ -277,7 +277,7 @@ export default function AdminSettings() {
 
       {/* OPS connection config */}
       <div className="card" style={{ padding: '20px 24px', marginTop: 24 }}>
-        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>🔗 เชื่อมต่อระบบ OPS (JE BAR Operate)</div>
+        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>🔗 เชื่อมต่อระบบ OPS (LUCID Operate)</div>
         <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12 }}>
           ตั้งค่า URL และ Key ของ Supabase จากระบบ Operate เพื่อให้พนักงานเลือกรายการวัตถุดิบ/เมนูในใบสั่งซื้อได้
         </div>
@@ -339,8 +339,8 @@ export default function AdminSettings() {
                 {(connStatus.menus === 0 && connStatus.ingredients === 0) && (
                   <div style={{ width: '100%', marginTop: 6, padding: '8px 10px', background: '#fff8e8', border: '1px solid #f4dfab', borderRadius: 10, color: '#7a5b2b', fontSize: 12, lineHeight: 1.6 }}>
                     {connStatus.noRow
-                      ? '⚠️ ตารางยังว่าง (ยังไม่มีแถวข้อมูล) — ให้เข้า JE BAR Operate แล้วเพิ่มเมนู/วัตถุดิบ จากนั้นไปที่ ตั้งค่า → Supabase กด "ซิงก์ขึ้น" เพื่ออัปโหลด'
-                      : '⚠️ เชื่อมต่อสำเร็จแต่ยังไม่มีข้อมูล — เข้า JE BAR Operate ไปที่ ตั้งค่า → Supabase กด "ซิงก์ขึ้น" เพื่ออัปโหลดเมนูและวัตถุดิบ'
+                      ? '⚠️ ตารางยังว่าง (ยังไม่มีแถวข้อมูล) — ให้เข้า LUCID Operate แล้วเพิ่มเมนู/วัตถุดิบ จากนั้นไปที่ ตั้งค่า → Supabase กด "ซิงก์ขึ้น" เพื่ออัปโหลด'
+                      : '⚠️ เชื่อมต่อสำเร็จแต่ยังไม่มีข้อมูล — เข้า LUCID Operate ไปที่ ตั้งค่า → Supabase กด "ซิงก์ขึ้น" เพื่ออัปโหลดเมนูและวัตถุดิบ'
                     }
                   </div>
                 )}
