@@ -944,6 +944,19 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
                 onChange={e => setDraft({ ...draft, batch: e.target.value })} placeholder="เช่น เช้า / บ่าย / รอบ 1" />
               <VoiceBtn onResult={v => setDraft({ ...draft, batch: v })} size={36} />
             </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+              {['เช้า', 'บ่าย', 'เย็น', 'รอบ 1', 'รอบ 2'].map(b => (
+                <button key={b} type="button" onClick={() => setDraft({ ...draft, batch: b })} style={{
+                  padding: '4px 10px', borderRadius: 999, cursor: 'pointer',
+                  border: `1px solid ${draft.batch === b ? 'var(--accent)' : 'var(--line)'}`,
+                  background: draft.batch === b ? 'var(--accent-soft)' : 'var(--bg)',
+                  color: draft.batch === b ? 'var(--accent)' : 'var(--muted)',
+                  fontSize: 12, fontWeight: 600,
+                }}>
+                  {b}
+                </button>
+              ))}
+            </div>
           </Field>
           <Field label="หมายเหตุ">
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>

@@ -145,9 +145,20 @@ export default function EmpMessages() {
                   </div>
                 )}
                 <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{m.text}</div>
-                {m.due && (
-                  <div style={{ fontSize: 11, opacity: .7, marginTop: 5 }}>⏰ กำหนด: {m.due}</div>
+                {m.due && m.status === 'done' && (
+                  <div style={{ fontSize: 11, opacity: .5, marginTop: 5 }}>⏰ กำหนด: {m.due}</div>
                 )}
+                {m.due && m.status !== 'done' && (() => {
+                  const todayStr = new Date().toISOString().slice(0, 10);
+                  const diffDays = Math.round((new Date(m.due + 'T00:00:00') - new Date(todayStr + 'T00:00:00')) / 86400000);
+                  let text, color, bold;
+                  if (diffDays < 0) { text = `⚠️ เกินกำหนด ${Math.abs(diffDays)} วัน`; color = '#b42318'; bold = true; }
+                  else if (diffDays === 0) { text = '⏰ กำหนดวันนี้!'; color = '#b42318'; bold = true; }
+                  else if (diffDays === 1) { text = '⏰ กำหนดพรุ่งนี้'; color = '#b45309'; bold = false; }
+                  else if (diffDays <= 3) { text = `⏰ กำหนดใน ${diffDays} วัน`; color = '#b45309'; bold = false; }
+                  else { text = `⏰ กำหนด: ${m.due}`; color = null; bold = false; }
+                  return <div style={{ fontSize: 11, marginTop: 5, color: color || undefined, fontWeight: bold ? 700 : 400, opacity: color ? 1 : .7 }}>{text}</div>;
+                })()}
               </div>
 
               {isTask && isAdmin && m.status !== 'done' && (

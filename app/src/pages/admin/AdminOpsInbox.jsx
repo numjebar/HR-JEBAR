@@ -296,7 +296,25 @@ export default function AdminOpsInbox() {
         }}>
           {hideReviewed ? '✓ ซ่อนดูแล้ว' : 'ซ่อนดูแล้ว'}
         </button>
-        <div style={{ fontSize: 13, color: 'var(--muted)', marginLeft: 'auto' }}>แสดง {filteredItems.length} รายการ</div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 'auto' }}>
+          {filteredItems.length > 0 && (
+            <button
+              onClick={() => {
+                setReviewed(prev => {
+                  const next = new Set(prev);
+                  filteredItems.forEach(item => next.add(item.id));
+                  saveReviewed(next);
+                  return next;
+                });
+              }}
+              className="btn"
+              style={{ fontSize: 12, padding: '4px 10px', color: '#0d7a46', border: '1px solid #bbe7cf', background: '#ecfdf3' }}
+            >
+              ✓ ดูทั้งหมดแล้ว
+            </button>
+          )}
+          <div style={{ fontSize: 13, color: 'var(--muted)' }}>แสดง {filteredItems.length} รายการ</div>
+        </div>
       </div>
 
       {productionSummary && productionSummary.length > 0 && (
