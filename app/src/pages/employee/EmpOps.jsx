@@ -227,7 +227,7 @@ function AiItemsTable({ items, catalog, onChange }) {
 }
 
 // ─── Purchase List Form (multi-item + category + stock check) ────────────────
-function PurchaseListForm({ draft, setDraft, catalog, catalogReady, reloadCatalog, employeeSessionToken }) {
+function PurchaseListForm({ draft, setDraft, catalog, catalogReady, catalogRetrying = false, reloadCatalog, employeeSessionToken }) {
   const [newItem, setNewItem] = useState({ category: 'วัตถุดิบ', itemName: '', quantity: '', unit: 'กก.', priority: 'วันนี้', note: '' });
   const [stockInfo, setStockInfo] = useState(null); // null | 'checking' | {stockLeft, unit, status} | {notFound}
   const [stockBlocked, setStockBlocked] = useState(false);
@@ -324,7 +324,9 @@ function PurchaseListForm({ draft, setDraft, catalog, catalogReady, reloadCatalo
   }
 
   function pickItem(v) {
-    setNewItem(ni => ({ ...ni, itemName: v }));
+    const catList = categoryOptions[newItem.category] || [];
+    const catalogItem = catList.find(i => i.name === v);
+    setNewItem(ni => ({ ...ni, itemName: v, ...(catalogItem?.unit ? { unit: catalogItem.unit } : {}) }));
     checkStock(v);
   }
 
@@ -403,9 +405,10 @@ function PurchaseListForm({ draft, setDraft, catalog, catalogReady, reloadCatalo
               placeholder={!catalogReady ? 'กำลังโหลด...' : (!catalog ? 'พิมพ์ชื่อรายการ...' : 'พิมพ์หรือเลือกรายการ...')} />
             <VoiceBtn onResult={pickItem} />
           </div>
-          {catalogReady && !catalog && (
+          {catalogReady && (!catalog || opts.length === 0) && (
             <div style={{ fontSize: 12, color: '#9a8070', marginTop: 6, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span>💡 ยังไม่ได้เชื่อมฐานข้อมูล OPS — พิมพ์ชื่อรายการได้เลย</span>
+              <span>💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีรายการในหมวดนี้ —'} พิมพ์ชื่อรายการได้เลย</span>
+              {catalogRetrying && <span style={{ color: '#0369a1', fontSize: 11 }}>⏳ กำลังลองเชื่อมต่อ...</span>}
               {reloadCatalog && <button type="button" onClick={reloadCatalog} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 8px', cursor: 'pointer', flexShrink: 0 }}>🔄 ลองใหม่</button>}
             </div>
           )}
@@ -440,11 +443,16 @@ function PurchaseListForm({ draft, setDraft, catalog, catalogReady, reloadCatalo
             </div>
           </Field>
           <Field label="หน่วย">
-            <select value={newItem.unit}
-              onChange={e => setNewItem(ni => ({ ...ni, unit: e.target.value }))}>
-              <option>กก.</option><option>กรัม</option><option>ลิตร</option>
-              <option>ชิ้น</option><option>แพค</option><option>ฟอง</option><option>ลัง</option>
-            </select>
+            {(() => {
+              const presets = ['กก.', 'กรัม', 'ลิตร', 'มล.', 'ชิ้น', 'แพค', 'ฟอง', 'ลัง', 'ขวด', 'ถุง'];
+              const extra = newItem.unit && !presets.includes(newItem.unit) ? newItem.unit : null;
+              return (
+                <select value={newItem.unit} onChange={e => setNewItem(ni => ({ ...ni, unit: e.target.value }))}>
+                  {extra && <option value={extra}>{extra}</option>}
+                  {presets.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              );
+            })()}
           </Field>
         </TwoColRow>
 
@@ -639,6 +647,7 @@ function OpsTaskPage({ taskKey, navigate }) {
   const [localHistory, saveLocalDraft] = useTaskLocalHistory(taskKey);
   const [catalog, setCatalog] = useState(null);
   const [catalogReady, setCatalogReady] = useState(false); // true once fetch attempt completes
+  const [catalogRetrying, setCatalogRetrying] = useState(false); // true while auto-retrying
   const [branches, setBranches] = useState([]);
   const backend = useTaskBackend(taskKey);
   const { orgId, employeeSessionToken: taskPageToken } = useAuthStore();
@@ -664,16 +673,19 @@ function OpsTaskPage({ taskKey, navigate }) {
 
   useEffect(() => {
     let alive = true;
-    // Retry up to 4 times (at 3s, 7s, 13s, 21s) while EmpHome is still loading ops_config
+    // Retry up to 4 times (at 3s, 7s, 13s, 21s) while EmpShell is still loading ops_config
     const RETRY_DELAYS = [3000, 4000, 6000, 8000];
     let retryIdx = 0;
     function tryFetch() {
       fetchOperateCatalog().then(c => {
         if (!alive) return;
-        if (c) { setCatalog(c); setCatalogReady(true); return; }
+        if (c) { setCatalog(c); setCatalogReady(true); setCatalogRetrying(false); return; }
         if (retryIdx === 0) setCatalogReady(true); // show UI after first attempt
         if (retryIdx < RETRY_DELAYS.length) {
+          setCatalogRetrying(true);
           setTimeout(() => { if (alive) { retryIdx++; tryFetch(); } }, RETRY_DELAYS[retryIdx]);
+        } else {
+          setCatalogRetrying(false);
         }
       });
     }
@@ -720,7 +732,7 @@ function OpsTaskPage({ taskKey, navigate }) {
       <OpsFormCard
         taskKey={taskKey} draft={draft} setDraft={setDraft} resetDraft={resetDraft}
         saveLocalDraft={saveLocalDraft} backend={backend} summary={summary}
-        catalog={catalog} catalogReady={catalogReady} reloadCatalog={reloadCatalog} geminiKey={geminiKey} branches={branches}
+        catalog={catalog} catalogReady={catalogReady} catalogRetrying={catalogRetrying} reloadCatalog={reloadCatalog} geminiKey={geminiKey} branches={branches}
       />
 
       <HistorySection
@@ -745,7 +757,7 @@ function OpsTaskPage({ taskKey, navigate }) {
   );
 }
 
-function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, backend, summary, catalog, catalogReady, reloadCatalog, geminiKey, branches = [] }) {
+function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, backend, summary, catalog, catalogReady, catalogRetrying = false, reloadCatalog, geminiKey, branches = [] }) {
   const { employeeSessionToken, employee, orgId } = useAuthStore();
   const empName = employee?.name || '';
   const navigate = useNavigate();
@@ -951,8 +963,8 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
       </TwoColRow>
 
       {taskKey === 'purchase-list'
-        ? <PurchaseListForm draft={draft} setDraft={setDraft} catalog={catalog} catalogReady={catalogReady} reloadCatalog={reloadCatalog} employeeSessionToken={employeeSessionToken} />
-        : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches, lastRecord, todayProductionTotal, lastCakeRecord, todayProductionBatches, todayCakeLog, catalogReady, reloadCatalog)
+        ? <PurchaseListForm draft={draft} setDraft={setDraft} catalog={catalog} catalogReady={catalogReady} catalogRetrying={catalogRetrying} reloadCatalog={reloadCatalog} employeeSessionToken={employeeSessionToken} />
+        : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches, lastRecord, todayProductionTotal, lastCakeRecord, todayProductionBatches, todayCakeLog, catalogReady, reloadCatalog, catalogRetrying)
       }
 
       <div style={summaryPillStyle}>ร่างล่าสุด: {summary}</div>
@@ -999,7 +1011,7 @@ function LastRecordHint({ record, taskKey }) {
   );
 }
 
-function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches = [], lastRecord = null, todayProductionTotal = null, lastCakeRecord = null, todayProductionBatches = [], todayCakeLog = [], catalogReady = false, reloadCatalog = null) {
+function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches = [], lastRecord = null, todayProductionTotal = null, lastCakeRecord = null, todayProductionBatches = [], todayCakeLog = [], catalogReady = false, reloadCatalog = null, catalogRetrying = false) {
   switch (taskKey) {
     case 'bills':
       return (
@@ -1052,7 +1064,10 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               <SearchSelect
                 options={catalog?.menus || []}
                 value={draft.product}
-                onChange={v => setDraft({ ...draft, product: v })}
+                onChange={v => {
+                  const item = (catalog?.menus || []).find(i => i.name === v);
+                  setDraft({ ...draft, product: v, ...(item?.unit ? { unit: item.unit } : {}) });
+                }}
                 placeholder={!catalogReady ? 'กำลังโหลด...' : (!catalog ? 'พิมพ์ชื่อเมนู...' : (catalog.menus || []).length === 0 ? 'พิมพ์ชื่อเมนู...' : 'พิมพ์หรือเลือกเมนู...')}
               />
               <VoiceBtn onResult={v => setDraft({ ...draft, product: v })} />
@@ -1060,7 +1075,8 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
             {catalogReady && (!catalog || (catalog.menus || []).length === 0) && (
               <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span>💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีเมนูในระบบ Operate —'} พิมพ์ชื่อเมนูได้เลย</span>
-                {!catalog && reloadCatalog && <button type="button" onClick={reloadCatalog} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 8px', cursor: 'pointer', flexShrink: 0 }}>🔄 ลองใหม่</button>}
+                {catalogRetrying && <span style={{ color: '#0369a1', fontSize: 11 }}>⏳ กำลังลองเชื่อมต่อ...</span>}
+                {reloadCatalog && <button type="button" onClick={reloadCatalog} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 8px', cursor: 'pointer', flexShrink: 0 }}>🔄 ลองใหม่</button>}
               </div>
             )}
           </Field>
@@ -1089,9 +1105,16 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               </div>
             </Field>
             <Field label="หน่วย">
-              <select value={draft.unit} onChange={e => setDraft({ ...draft, unit: e.target.value })}>
-                <option>ชิ้น</option><option>ถาด</option><option>ก้อน</option><option>กก.</option>
-              </select>
+              {(() => {
+                const presets = ['ชิ้น', 'ถาด', 'ก้อน', 'กก.', 'กรัม', 'ลิตร'];
+                const extra = draft.unit && !presets.includes(draft.unit) ? draft.unit : null;
+                return (
+                  <select value={draft.unit} onChange={e => setDraft({ ...draft, unit: e.target.value })}>
+                    {extra && <option value={extra}>{extra}</option>}
+                    {presets.map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                );
+              })()}
             </Field>
           </TwoColRow>
           <Field label="รอบผลิต / batch">
@@ -1137,7 +1160,10 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               <SearchSelect
                 options={catalog?.ingredients || []}
                 value={draft.itemName}
-                onChange={v => setDraft({ ...draft, itemName: v })}
+                onChange={v => {
+                  const item = (catalog?.ingredients || []).find(i => i.name === v);
+                  setDraft({ ...draft, itemName: v, ...(item?.unit ? { unit: item.unit } : {}) });
+                }}
                 placeholder={!catalogReady ? 'กำลังโหลด...' : (!catalog ? 'พิมพ์ชื่อวัตถุดิบ...' : (catalog.ingredients || []).length === 0 ? 'พิมพ์ชื่อวัตถุดิบ...' : 'พิมพ์หรือเลือกวัตถุดิบ...')}
               />
               <VoiceBtn onResult={v => setDraft({ ...draft, itemName: v })} />
@@ -1145,7 +1171,8 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
             {catalogReady && (!catalog || (catalog.ingredients || []).length === 0) && (
               <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span>💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีวัตถุดิบในระบบ Operate —'} พิมพ์ชื่อวัตถุดิบได้เลย</span>
-                {!catalog && reloadCatalog && <button type="button" onClick={reloadCatalog} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 8px', cursor: 'pointer', flexShrink: 0 }}>🔄 ลองใหม่</button>}
+                {catalogRetrying && <span style={{ color: '#0369a1', fontSize: 11 }}>⏳ กำลังลองเชื่อมต่อ...</span>}
+                {reloadCatalog && <button type="button" onClick={reloadCatalog} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 8px', cursor: 'pointer', flexShrink: 0 }}>🔄 ลองใหม่</button>}
               </div>
             )}
           </Field>
@@ -1159,9 +1186,16 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               </div>
             </Field>
             <Field label="หน่วย">
-              <select value={draft.unit} onChange={e => setDraft({ ...draft, unit: e.target.value })}>
-                <option>กก.</option><option>กรัม</option><option>ลิตร</option><option>ฟอง</option><option>ชิ้น</option>
-              </select>
+              {(() => {
+                const presets = ['กก.', 'กรัม', 'ลิตร', 'มล.', 'ฟอง', 'ชิ้น', 'ถุง'];
+                const extra = draft.unit && !presets.includes(draft.unit) ? draft.unit : null;
+                return (
+                  <select value={draft.unit} onChange={e => setDraft({ ...draft, unit: e.target.value })}>
+                    {extra && <option value={extra}>{extra}</option>}
+                    {presets.map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                );
+              })()}
             </Field>
           </TwoColRow>
           <Field label="สถานะ">
@@ -1208,7 +1242,8 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
             {catalogReady && (!catalog || (catalog.menus || []).length === 0) && (
               <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span>💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีเมนูในระบบ Operate —'} พิมพ์ชื่อเค้กได้เลย</span>
-                {!catalog && reloadCatalog && <button type="button" onClick={reloadCatalog} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 8px', cursor: 'pointer', flexShrink: 0 }}>🔄 ลองใหม่</button>}
+                {catalogRetrying && <span style={{ color: '#0369a1', fontSize: 11 }}>⏳ กำลังลองเชื่อมต่อ...</span>}
+                {reloadCatalog && <button type="button" onClick={reloadCatalog} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 8px', cursor: 'pointer', flexShrink: 0 }}>🔄 ลองใหม่</button>}
               </div>
             )}
           </Field>
@@ -1294,7 +1329,10 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               <SearchSelect
                 options={catalog?.materials || []}
                 value={draft.itemName}
-                onChange={v => setDraft({ ...draft, itemName: v })}
+                onChange={v => {
+                  const item = (catalog?.materials || []).find(i => i.name === v);
+                  setDraft({ ...draft, itemName: v, ...(item?.unit ? { unit: item.unit } : {}) });
+                }}
                 placeholder={!catalogReady ? 'กำลังโหลด...' : (!catalog ? 'พิมพ์ชื่อของใช้...' : (catalog.materials || []).length === 0 ? 'พิมพ์ชื่อของใช้...' : 'พิมพ์หรือเลือกของใช้...')}
               />
               <VoiceBtn onResult={v => setDraft({ ...draft, itemName: v })} />
@@ -1302,7 +1340,8 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
             {catalogReady && (!catalog || (catalog.materials || []).length === 0) && (
               <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span>💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีรายการของใช้ในระบบ Operate —'} พิมพ์ชื่อของใช้ได้เลย</span>
-                {!catalog && reloadCatalog && <button type="button" onClick={reloadCatalog} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 8px', cursor: 'pointer', flexShrink: 0 }}>🔄 ลองใหม่</button>}
+                {catalogRetrying && <span style={{ color: '#0369a1', fontSize: 11 }}>⏳ กำลังลองเชื่อมต่อ...</span>}
+                {reloadCatalog && <button type="button" onClick={reloadCatalog} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 8px', cursor: 'pointer', flexShrink: 0 }}>🔄 ลองใหม่</button>}
               </div>
             )}
           </Field>
@@ -1316,9 +1355,16 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               </div>
             </Field>
             <Field label="หน่วย">
-              <select value={draft.unit} onChange={e => setDraft({ ...draft, unit: e.target.value })}>
-                <option>ชิ้น</option><option>แพค</option><option>ขวด</option><option>ลัง</option>
-              </select>
+              {(() => {
+                const presets = ['ชิ้น', 'แพค', 'ขวด', 'ลัง', 'ถุง', 'กล่อง'];
+                const extra = draft.unit && !presets.includes(draft.unit) ? draft.unit : null;
+                return (
+                  <select value={draft.unit} onChange={e => setDraft({ ...draft, unit: e.target.value })}>
+                    {extra && <option value={extra}>{extra}</option>}
+                    {presets.map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                );
+              })()}
             </Field>
           </TwoColRow>
           <Field label="สถานะ">
