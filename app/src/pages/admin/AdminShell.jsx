@@ -1,6 +1,7 @@
-﻿import { useState } from 'react';
-import { Routes, Route, NavLink } from 'react-router-dom';
+﻿import { useState, useEffect } from 'react';
+import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
+import { supabase } from '../../lib/supabase';
 import logo from '../../assets/jebar-logo.png';
 import { APP_VERSION } from '../../lib/version';
 import AdminDashboard from './AdminDashboard';
@@ -24,9 +25,44 @@ const NAV = [
 ];
 
 export default function AdminShell() {
-  const { adminLogout } = useAuthStore();
+  const { adminLogout, orgId } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [opsTodayCount, setOpsTodayCount] = useState(0);
+  const location = useLocation();
   const closeSidebar = () => setSidebarOpen(false);
+
+  useEffect(() => {
+    if (!orgId) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const seenKey = `hr_ops_today_seen_${today}`;
+    const seen = parseInt(localStorage.getItem(seenKey) || '0', 10);
+    supabase
+      .from('employee_ops_entries')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', orgId)
+      .gte('created_at', `${today}T00:00:00`)
+      .lte('created_at', `${today}T23:59:59`)
+      .then(({ count }) => {
+        const unseen = Math.max(0, (count || 0) - seen);
+        setOpsTodayCount(unseen);
+      });
+  }, [orgId]);
+
+  useEffect(() => {
+    if (!location.pathname.startsWith('/admin/ops-inbox')) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const seenKey = `hr_ops_today_seen_${today}`;
+    supabase
+      .from('employee_ops_entries')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', orgId)
+      .gte('created_at', `${today}T00:00:00`)
+      .lte('created_at', `${today}T23:59:59`)
+      .then(({ count }) => {
+        if (count) localStorage.setItem(seenKey, String(count));
+        setOpsTodayCount(0);
+      });
+  }, [location.pathname, orgId]);
   const openOps = () => {
     window.location.href = OPS_APP_URL;
   };
@@ -55,7 +91,17 @@ export default function AdminShell() {
               background: isActive ? 'var(--accent-soft)' : 'transparent',
               marginBottom: 2,
             })}>
-              <span>{n.icon}</span>{n.label}
+              <span>{n.icon}</span>
+              <span style={{ flex: 1 }}>{n.label}</span>
+              {n.path === '/admin/ops-inbox' && opsTodayCount > 0 && (
+                <span style={{
+                  background: '#e53e3e', color: '#fff', borderRadius: 999,
+                  fontSize: 11, fontWeight: 800, padding: '2px 7px', lineHeight: 1.4,
+                  minWidth: 20, textAlign: 'center',
+                }}>
+                  {opsTodayCount > 99 ? '99+' : opsTodayCount}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>
