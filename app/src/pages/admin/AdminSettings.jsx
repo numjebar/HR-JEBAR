@@ -17,6 +17,7 @@ export default function AdminSettings() {
   const [opsUrl, setOpsUrl] = useState('');
   const [opsKey, setOpsKey] = useState('');
   const [opsSaved, setOpsSaved] = useState(false);
+  const [connStatus, setConnStatus] = useState(null); // null | 'testing' | {ok, menus, ingredients, materials} | {ok:false, error}
 
   async function load() {
     const [{ data: brs }, { data: st }] = await Promise.all([
@@ -75,6 +76,29 @@ export default function AdminSettings() {
     setBusy(false);
   }
 
+  async function testOpsConnection() {
+    const url = opsUrl.trim();
+    const key = opsKey.trim();
+    if (!url || !key) return;
+    setConnStatus('testing');
+    try {
+      const res = await fetch(
+        `${url.replace(/\/+$/, '')}/rest/v1/jebar_app_state?select=db&limit=1`,
+        { headers: { apikey: key, Authorization: `Bearer ${key}` } }
+      );
+      if (!res.ok) { setConnStatus({ ok: false, error: `HTTP ${res.status}` }); return; }
+      const rows = await res.json();
+      const db = rows?.[0]?.db;
+      if (!db) { setConnStatus({ ok: false, error: 'ไม่พบข้อมูลใน jebar_app_state — ตรวจสอบว่ามีตารางและข้อมูลในระบบ Operate' }); return; }
+      const menus = (db.menus || []).filter(x => x.name).length;
+      const ingredients = (db.ingredients || []).filter(x => x.name).length;
+      const materials = (db.materials || db.ingredients || []).filter(x => x.name).length;
+      setConnStatus({ ok: true, menus, ingredients, materials });
+    } catch (err) {
+      setConnStatus({ ok: false, error: err.message || 'ไม่สามารถเชื่อมต่อได้' });
+    }
+  }
+
   async function saveOpsConfig() {
     setBusy(true);
     setOpsSaved(false);
@@ -88,6 +112,7 @@ export default function AdminSettings() {
     setBusy(false);
     setOpsSaved(true);
     setTimeout(() => setOpsSaved(false), 3000);
+    testOpsConnection();
   }
 
   async function deleteBranch(id) {
@@ -253,12 +278,32 @@ export default function AdminSettings() {
               style={{ width: '100%', fontSize: 14, fontFamily: 'monospace' }}
             />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <button className="btn btn-primary" onClick={saveOpsConfig} disabled={busy || (!opsUrl && !opsKey)} style={{ fontSize: 14 }}>
               บันทึกการเชื่อมต่อ
             </button>
+            <button className="btn" onClick={testOpsConnection} disabled={!opsUrl.trim() || !opsKey.trim() || connStatus === 'testing'} style={{ fontSize: 14 }}>
+              {connStatus === 'testing' ? '⏳ กำลังทดสอบ...' : '🔍 ทดสอบการเชื่อมต่อ'}
+            </button>
             {opsSaved && <span style={{ fontSize: 13, color: '#0d7a46', fontWeight: 700 }}>✓ บันทึกแล้ว — พนักงานจะเห็นรายการวัตถุดิบในครั้งต่อไปที่ล็อกอิน</span>}
           </div>
+          {connStatus && connStatus !== 'testing' && (
+            connStatus.ok ? (
+              <div style={{ background: '#ecfdf3', border: '1px solid #bbe7cf', borderRadius: 12, padding: '10px 14px', fontSize: 13, color: '#0d7a46', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 700 }}>✓ เชื่อมต่อสำเร็จ</span>
+                <span>🍽️ เมนู {connStatus.menus} รายการ</span>
+                <span>📦 วัตถุดิบ {connStatus.ingredients} รายการ</span>
+                <span>🧴 วัสดุ {connStatus.materials} รายการ</span>
+                {connStatus.menus === 0 && connStatus.ingredients === 0 && (
+                  <span style={{ color: '#7a5b2b' }}>— ยังไม่มีข้อมูลในระบบ Operate กรุณาเพิ่มข้อมูลที่ระบบ Operate ก่อน</span>
+                )}
+              </div>
+            ) : (
+              <div style={{ background: '#fff1f1', border: '1px solid #fca5a5', borderRadius: 12, padding: '10px 14px', fontSize: 13, color: '#b42318' }}>
+                ❌ เชื่อมต่อไม่สำเร็จ: {connStatus.error}
+              </div>
+            )
+          )}
         </div>
       </div>
 
