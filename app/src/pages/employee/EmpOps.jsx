@@ -920,7 +920,7 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
 
       {taskKey === 'purchase-list'
         ? <PurchaseListForm draft={draft} setDraft={setDraft} catalog={catalog} catalogReady={catalogReady} employeeSessionToken={employeeSessionToken} />
-        : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches, lastRecord, todayProductionTotal, lastCakeRecord, todayProductionBatches, todayCakeLog)
+        : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches, lastRecord, todayProductionTotal, lastCakeRecord, todayProductionBatches, todayCakeLog, catalogReady)
       }
 
       <div style={summaryPillStyle}>ร่างล่าสุด: {summary}</div>
@@ -967,7 +967,7 @@ function LastRecordHint({ record, taskKey }) {
   );
 }
 
-function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches = [], lastRecord = null, todayProductionTotal = null, lastCakeRecord = null, todayProductionBatches = [], todayCakeLog = []) {
+function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches = [], lastRecord = null, todayProductionTotal = null, lastCakeRecord = null, todayProductionBatches = [], todayCakeLog = [], catalogReady = false) {
   switch (taskKey) {
     case 'bills':
       return (
@@ -1021,10 +1021,15 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
                 options={catalog?.menus || []}
                 value={draft.product}
                 onChange={v => setDraft({ ...draft, product: v })}
-                placeholder="พิมพ์ชื่อเมนู หรือเลือก..."
+                placeholder={!catalogReady ? 'กำลังโหลด...' : (!catalog ? 'พิมพ์ชื่อเมนู...' : (catalog.menus || []).length === 0 ? 'พิมพ์ชื่อเมนู...' : 'พิมพ์หรือเลือกเมนู...')}
               />
               <VoiceBtn onResult={v => setDraft({ ...draft, product: v })} />
             </div>
+            {catalogReady && (!catalog || (catalog.menus || []).length === 0) && (
+              <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4, lineHeight: 1.5 }}>
+                💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีเมนูในระบบ Operate —'} พิมพ์ชื่อเมนูได้เลย
+              </div>
+            )}
           </Field>
           {todayProductionTotal && (
             <div style={{ background: '#ecfdf3', border: '1px solid #bbe7cf', borderRadius: 12, padding: '10px 12px', marginTop: -8 }}>
@@ -1100,10 +1105,15 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
                 options={catalog?.ingredients || []}
                 value={draft.itemName}
                 onChange={v => setDraft({ ...draft, itemName: v })}
-                placeholder="พิมพ์ชื่อวัตถุดิบ หรือเลือก..."
+                placeholder={!catalogReady ? 'กำลังโหลด...' : (!catalog ? 'พิมพ์ชื่อวัตถุดิบ...' : (catalog.ingredients || []).length === 0 ? 'พิมพ์ชื่อวัตถุดิบ...' : 'พิมพ์หรือเลือกวัตถุดิบ...')}
               />
               <VoiceBtn onResult={v => setDraft({ ...draft, itemName: v })} />
             </div>
+            {catalogReady && (!catalog || (catalog.ingredients || []).length === 0) && (
+              <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4, lineHeight: 1.5 }}>
+                💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีวัตถุดิบในระบบ Operate —'} พิมพ์ชื่อวัตถุดิบได้เลย
+              </div>
+            )}
           </Field>
           <LastRecordHint record={lastRecord} taskKey="inventory" />
           <TwoColRow>
@@ -1157,10 +1167,15 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
                 options={catalog?.menus || []}
                 value={draft.cakeName}
                 onChange={v => setDraft({ ...draft, cakeName: v })}
-                placeholder="พิมพ์ชื่อเค้ก หรือเลือก..."
+                placeholder={!catalogReady ? 'กำลังโหลด...' : (!catalog ? 'พิมพ์ชื่อเค้ก...' : (catalog.menus || []).length === 0 ? 'พิมพ์ชื่อเค้ก...' : 'พิมพ์หรือเลือกเค้ก...')}
               />
               <VoiceBtn onResult={v => setDraft({ ...draft, cakeName: v })} />
             </div>
+            {catalogReady && (!catalog || (catalog.menus || []).length === 0) && (
+              <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4, lineHeight: 1.5 }}>
+                💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีเมนูในระบบ Operate —'} พิมพ์ชื่อเค้กได้เลย
+              </div>
+            )}
           </Field>
           {lastCakeRecord && (() => {
             const p = lastCakeRecord.payload || {};
@@ -1245,10 +1260,15 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
                 options={catalog?.materials || []}
                 value={draft.itemName}
                 onChange={v => setDraft({ ...draft, itemName: v })}
-                placeholder="พิมพ์ชื่อของใช้ หรือเลือก..."
+                placeholder={!catalogReady ? 'กำลังโหลด...' : (!catalog ? 'พิมพ์ชื่อของใช้...' : (catalog.materials || []).length === 0 ? 'พิมพ์ชื่อของใช้...' : 'พิมพ์หรือเลือกของใช้...')}
               />
               <VoiceBtn onResult={v => setDraft({ ...draft, itemName: v })} />
             </div>
+            {catalogReady && (!catalog || (catalog.materials || []).length === 0) && (
+              <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4, lineHeight: 1.5 }}>
+                💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีรายการของใช้ในระบบ Operate —'} พิมพ์ชื่อของใช้ได้เลย
+              </div>
+            )}
           </Field>
           <LastRecordHint record={lastRecord} taskKey="supplies-count" />
           <TwoColRow>
