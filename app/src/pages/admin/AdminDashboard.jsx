@@ -41,7 +41,7 @@ export default function AdminDashboard() {
       supabase.from('org_settings').select('*').eq('org_id', orgId).single(),
       supabase.from('employee_ops_entries').select('id', { count: 'exact', head: true }).eq('org_id', orgId),
       supabase.from('employee_ops_entries').select('task_key').eq('org_id', orgId).gte('created_at', todayStart).lte('created_at', todayEnd),
-      supabase.from('employee_ops_entries').select('id,emp_id,created_at,payload').eq('org_id', orgId).eq('task_key', 'inventory').order('created_at', { ascending: false }).limit(40),
+      supabase.from('employee_ops_entries').select('id,emp_id,task_key,created_at,payload').eq('org_id', orgId).in('task_key', ['inventory', 'supplies-count']).order('created_at', { ascending: false }).limit(50),
       supabase.from('messages').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('from', 'admin').eq('kind', 'task').neq('status', 'done'),
     ]);
 
@@ -253,7 +253,7 @@ export default function AdminDashboard() {
       {/* low-stock alert */}
       {lowStockItems.length > 0 && (
         <div className="card" style={{ padding: '18px 20px', marginBottom: 8, border: '1px solid #f4dfab', background: '#fff8e8' }}>
-          <div style={{ fontWeight: 700, marginBottom: 12, color: '#7a5b2b' }}>⚠️ สต๊อกวัตถุดิบต้องติดตาม ({lowStockItems.length} รายการ)</div>
+          <div style={{ fontWeight: 700, marginBottom: 12, color: '#7a5b2b' }}>⚠️ สต๊อกต้องติดตาม ({lowStockItems.length} รายการ)</div>
           <div style={{ display: 'grid', gap: 6 }}>
             {lowStockItems.map(item => {
               const p = item.payload || {};
@@ -275,8 +275,8 @@ export default function AdminDashboard() {
               );
             })}
           </div>
-          <button className="btn" onClick={() => nav('/admin/ops-inbox?task=inventory')} style={{ marginTop: 12, fontSize: 13 }}>
-            ดูรายการวัตถุดิบทั้งหมด →
+          <button className="btn" onClick={() => nav('/admin/ops-inbox')} style={{ marginTop: 12, fontSize: 13 }}>
+            ดูรายการทั้งหมดใน OpsInbox →
           </button>
         </div>
       )}

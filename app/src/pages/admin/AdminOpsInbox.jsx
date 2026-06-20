@@ -944,7 +944,7 @@ function exportCSV(items, employees, branches) {
       case 'production':    return `${p.product||''} / ${p.quantity||''} ${p.unit||''} / ${p.batch||''}`;
       case 'inventory':     return `${p.itemName||''} / ${p.stockLeft||''} ${p.unit||''} / ${p.status||''}`;
       case 'cake-stock':    return `${p.branchName||''} / ${p.cakeName||''} / พร้อมขาย ${p.available||0} จอง ${p.reserved||0} เสีย ${p.damaged||0}`;
-      case 'supplies-count':return `${p.area||''} / ${p.itemName||''} / ${p.count||''} ${p.unit||''}`;
+      case 'supplies-count':return `${p.area||''} / ${p.itemName||''} / ${p.count||''} ${p.unit||''} / ${p.status||'ปกติ'}`;
       case 'purchase-list': return (p.items||[]).map(i=>`${i.itemName} ${i.quantity}${i.unit}`).join(' | ');
       default:              return JSON.stringify(p);
     }
