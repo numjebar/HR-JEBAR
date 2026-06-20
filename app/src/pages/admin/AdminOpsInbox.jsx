@@ -124,6 +124,20 @@ export default function AdminOpsInbox() {
     load();
   }, [orgId]);
 
+  useEffect(() => {
+    if (!orgId) return;
+    const ch = supabase.channel('ops-inbox-live')
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'employee_ops_entries',
+        filter: `org_id=eq.${orgId}`,
+      }, (payload) => {
+        const newRow = payload.new;
+        if (newRow) setItems(prev => [newRow, ...prev]);
+      })
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [orgId]);
+
   const filteredItems = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
