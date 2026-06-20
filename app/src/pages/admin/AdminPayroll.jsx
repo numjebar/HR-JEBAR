@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
-import { computePay, rulesFor, rangeFor, rangeForEmployee, THB, ymd } from '../../lib/payroll';
+import { computePay, rulesFor, rangeFor, rangeForEmployee, THB, ymd, addDays, parseYmd, fmtDateFull, lateMinutesOf, overtimeMinutesOf } from '../../lib/payroll';
 import slipLogo from '../../assets/jebar-logo-slip.png';
 
 const PERIOD_LABEL = {
@@ -27,6 +27,7 @@ export default function AdminPayroll() {
   const [branches, setBranches] = useState([]);
   const [total, setTotal] = useState(0);
   const [expanded, setExpanded] = useState({});
+  const [dayView, setDayView] = useState({});
   const [ssModal, setSsModal] = useState(null);
   const [advanceModal, setAdvanceModal] = useState(null);
   const [netModal, setNetModal] = useState(null);
@@ -65,7 +66,7 @@ export default function AdminPayroll() {
       const empAdj = (adj || []).filter((a) => a.emp_id === emp.id && a.date >= range.from && a.date <= range.to);
       const pay = computePay(emp, empAtt, empSales, empAdj, rules, range);
       totalNet += pay.net;
-      return { emp, br, pay, rules, range, effectivePeriod };
+      return { emp, br, pay, rules, range, effectivePeriod, empAtt, empAdj };
     });
     setRows(result);
     setTotal(totalNet);
@@ -104,6 +105,11 @@ export default function AdminPayroll() {
 
   function toggleDetails(empId) {
     setExpanded((prev) => ({ ...prev, [empId]: !prev[empId] }));
+  }
+
+  function toggleDayView(empId) {
+    setDayView((prev) => ({ ...prev, [empId]: !prev[empId] }));
+    setExpanded((prev) => ({ ...prev, [empId]: true }));
   }
 
   async function saveManualNet(row, targetNet, note) {
@@ -325,7 +331,7 @@ export default function AdminPayroll() {
 
       <div style={{ display: 'grid', gap: 16 }}>
         {rows.map((row) => {
-          const { emp, br, pay, rules, range, effectivePeriod } = row;
+          const { emp, br, pay, rules, range, effectivePeriod, empAtt, empAdj } = row;
           return (
           <div key={emp.id} className="card" style={{ padding: 18 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
@@ -363,7 +369,10 @@ export default function AdminPayroll() {
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16 }}>
               <button className="btn" style={{ padding: '6px 10px', fontSize: 12, background: 'var(--accent-soft)', color: 'var(--accent)' }} onClick={() => toggleDetails(emp.id)}>
-                {expanded[emp.id] ? 'ซ่อนรายละเอียด' : 'รายละเอียด'}
+                {expanded[emp.id] && !dayView[emp.id] ? 'ซ่อนรายละเอียด' : 'รายละเอียด'}
+              </button>
+              <button className="btn" style={{ padding: '6px 10px', fontSize: 12, background: dayView[emp.id] ? 'var(--ink)' : 'var(--bg)', color: dayView[emp.id] ? '#fff' : 'var(--ink)', border: '1px solid var(--line)' }} onClick={() => toggleDayView(emp.id)}>
+                {dayView[emp.id] ? 'ซ่อนรายวัน' : 'ดูรายวัน'}
               </button>
               <button className="btn" style={{ padding: '6px 10px', fontSize: 12, background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }} onClick={() => setSsModal({ emp, rules })}>
                 แก้ประกันสังคม
@@ -382,9 +391,14 @@ export default function AdminPayroll() {
               </button>
             </div>
 
-            {expanded[emp.id] && (
+            {expanded[emp.id] && !dayView[emp.id] && (
               <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
                 <PayDetails pay={pay} rules={rules} />
+              </div>
+            )}
+            {dayView[emp.id] && (
+              <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
+                <DayBreakdown emp={emp} range={range} att={empAtt} adj={empAdj} rules={rules} />
               </div>
             )}
           </div>
@@ -405,6 +419,118 @@ export default function AdminPayroll() {
         setNetModal(null);
         load();
       }} />}
+    </div>
+  );
+}
+
+function DayBreakdown({ emp, range, att, adj, rules }) {
+  const start = parseYmd(range.from);
+  const end = parseYmd(range.to);
+  if (!start || !end) return null;
+
+  const days = [];
+  for (let cursor = new Date(start); cursor <= end; cursor = addDays(cursor, 1)) {
+    days.push(ymd(cursor));
+  }
+
+  const dayOff = new Set((emp.day_off || []).map(Number));
+  const attByDate = {};
+  (att || []).forEach((r) => { attByDate[r.date] = r; });
+  const adjByDate = {};
+  (adj || []).forEach((a) => {
+    if (!adjByDate[a.date]) adjByDate[a.date] = [];
+    adjByDate[a.date].push(a);
+  });
+
+  const STATUS = {
+    work: { label: 'ทำงาน', color: '#0E7C66' },
+    leave: { label: 'ลา', color: '#d97a16' },
+    absent: { label: 'ขาด', color: '#dc2626' },
+    off: { label: 'หยุด', color: 'var(--muted)' },
+    none: { label: '—', color: 'var(--muted)' },
+  };
+
+  return (
+    <div>
+      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>
+        รายวัน · {range.from} – {range.to} · {days.length} วัน
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr style={{ color: 'var(--muted)', fontSize: 12 }}>
+              <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 600, whiteSpace: 'nowrap' }}>วันที่</th>
+              <th style={{ textAlign: 'center', padding: '6px 8px', fontWeight: 600 }}>สถานะ</th>
+              <th style={{ textAlign: 'center', padding: '6px 8px', fontWeight: 600 }}>เข้างาน</th>
+              <th style={{ textAlign: 'center', padding: '6px 8px', fontWeight: 600 }}>ออกงาน</th>
+              <th style={{ textAlign: 'center', padding: '6px 8px', fontWeight: 600 }}>สาย</th>
+              <th style={{ textAlign: 'center', padding: '6px 8px', fontWeight: 600 }}>OT</th>
+              <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 600 }}>ปรับ / หัก</th>
+            </tr>
+          </thead>
+          <tbody>
+            {days.map((dateStr) => {
+              const rec = attByDate[dateStr];
+              const dayAdjs = adjByDate[dateStr] || [];
+              const d = new Date(dateStr + 'T00:00');
+              const isOff = dayOff.has(d.getDay());
+              const lateMins = rec && rec.clock_in ? lateMinutesOf(rec, rules) : 0;
+              const otMins = rec && rec.clock_out ? overtimeMinutesOf(rec, rules) : 0;
+
+              let s = STATUS.none;
+              if (isOff && !rec) s = STATUS.off;
+              else if (rec?.status === 'leave') s = STATUS.leave;
+              else if (rec?.status === 'absent') s = STATUS.absent;
+              else if (rec) s = STATUS.work;
+
+              return (
+                <tr
+                  key={dateStr}
+                  style={{
+                    borderBottom: '1px solid var(--line)',
+                    background: isOff && !rec ? 'var(--surface)' : 'transparent',
+                    opacity: isOff && !rec ? 0.55 : 1,
+                  }}
+                >
+                  <td style={{ padding: '8px 8px', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontWeight: 500 }}>{fmtDateFull(dateStr)}</span>
+                  </td>
+                  <td style={{ textAlign: 'center', padding: '8px 8px' }}>
+                    <span style={{ color: s.color, fontWeight: 700, fontSize: 12 }}>{s.label}</span>
+                  </td>
+                  <td style={{ textAlign: 'center', padding: '8px 8px', color: 'var(--muted)', fontFamily: 'monospace' }}>
+                    {rec?.clock_in || '—'}
+                  </td>
+                  <td style={{ textAlign: 'center', padding: '8px 8px', color: 'var(--muted)', fontFamily: 'monospace' }}>
+                    {rec?.clock_out || '—'}
+                  </td>
+                  <td style={{ textAlign: 'center', padding: '8px 8px' }}>
+                    {lateMins > 0
+                      ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{lateMins} น.</span>
+                      : <span style={{ color: 'var(--muted)' }}>—</span>}
+                  </td>
+                  <td style={{ textAlign: 'center', padding: '8px 8px' }}>
+                    {otMins > 0
+                      ? <span style={{ color: '#0E7C66', fontWeight: 600 }}>{otMins} น.</span>
+                      : <span style={{ color: 'var(--muted)' }}>—</span>}
+                  </td>
+                  <td style={{ padding: '8px 8px' }}>
+                    {dayAdjs.length > 0 ? (
+                      <div style={{ display: 'grid', gap: 2 }}>
+                        {dayAdjs.map((a, i) => (
+                          <span key={i} style={{ fontSize: 11, color: a.type === 'bonus' ? '#0E7C66' : '#dc2626', whiteSpace: 'nowrap' }}>
+                            {a.type === 'bonus' ? '+' : '−'}{THB(a.amount)} {a.note ? `(${a.note.replace(/\[.*?\]/g, '').trim()})` : a.type}
+                          </span>
+                        ))}
+                      </div>
+                    ) : <span style={{ color: 'var(--muted)' }}>—</span>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

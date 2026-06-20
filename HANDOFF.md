@@ -1,5 +1,34 @@
 # HR JEBAR Handoff
 
+## Update 2026-06-20 (payroll day breakdown view — v56)
+
+### สิ่งที่เพิ่มใน v56
+
+**AdminPayroll — ปุ่ม "ดูรายวัน" และ DayBreakdown table**
+
+- เพิ่มปุ่ม **"ดูรายวัน"** ในการ์ดเงินเดือนแต่ละพนักงาน
+- กดแล้วเปิดตาราง `DayBreakdown` ที่แสดงทุกวันในรอบจ่ายเงิน
+- แต่ละแถวในตารางแสดง:
+  - **วันที่** — วัน เดือน ปีไทย (พร้อมวันในสัปดาห์)
+  - **สถานะ** — ทำงาน / ลา / ขาด / หยุดประจำ
+  - **เข้างาน / ออกงาน** — เวลา clock_in / clock_out
+  - **สาย** — นาทีที่มาสาย (ถ้ามี)
+  - **OT** — นาที OT (ถ้ามี)
+  - **ปรับ/หัก** — รายการ adjustments ของวันนั้น (โบนัส/เบิก/หัก)
+- วันหยุดประจำ (day_off) แสดงจางลงเพื่อแยกออกจากวันทำงาน
+- ปุ่ม "ดูรายวัน" กด toggle ซ่อน/แสดงได้
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/pages/admin/AdminPayroll.jsx` — เพิ่ม `DayBreakdown` component + `dayView` state + `toggleDayView()`
+- `app/src/lib/version.js` — bump เป็น `Build 2026.06.20-payroll-dayview-v56`
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+---
+
 ## Update 2026-06-20 (inventory → purchase-list quick-add CTA — v10)
 
 ### สิ่งที่เพิ่มใน v10
