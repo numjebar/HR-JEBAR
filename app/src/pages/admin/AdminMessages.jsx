@@ -147,7 +147,7 @@ export default function AdminMessages() {
                     {m.text}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3, display: 'flex', gap: 8 }}>
-                    <span>{m.created_at?.slice(0, 16).replace('T', ' ')}</span>
+                    <span>{m.created_at ? new Date(m.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : ''}</span>
                     {isAdmin && <span style={{ color: m.status === 'done' ? 'var(--accent)' : 'inherit' }}>{readLabel}</span>}
                   </div>
                 </div>
@@ -202,6 +202,7 @@ export default function AdminMessages() {
 function BroadcastModal({ employees, orgId, onClose }) {
   const [text, setText] = useState('');
   const [kind, setKind] = useState('message');
+  const [due, setDue] = useState('');
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [targetIds, setTargetIds] = useState(null);
@@ -215,6 +216,7 @@ function BroadcastModal({ employees, orgId, onClose }) {
     const rows = targets.map(empId => ({
       emp_id: empId, org_id: orgId,
       from: 'admin', kind, text: text.trim(),
+      due: kind === 'task' && due ? due : null,
       status: 'unread', created_at: new Date().toISOString(),
     }));
     await supabase.from('messages').insert(rows);
@@ -222,6 +224,8 @@ function BroadcastModal({ employees, orgId, onClose }) {
     setBusy(false);
     setTimeout(onClose, 1400);
   }
+
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
@@ -236,12 +240,16 @@ function BroadcastModal({ employees, orgId, onClose }) {
           </div>
         ) : (
           <>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               {['message', 'task'].map(k => (
                 <button key={k} onClick={() => setKind(k)} className="btn" style={{ background: kind === k ? 'var(--accent)' : 'var(--bg)', color: kind === k ? '#fff' : 'var(--muted)', border: '1px solid var(--line)', padding: '6px 14px', fontSize: 13 }}>
                   {k === 'message' ? '💬 ข้อความ' : '📋 มอบงาน'}
                 </button>
               ))}
+              {kind === 'task' && (
+                <input type="date" value={due} onChange={e => setDue(e.target.value)}
+                  min={todayStr} style={{ fontSize: 13, width: 160 }} placeholder="กำหนดส่ง (ไม่บังคับ)" />
+              )}
             </div>
             <textarea
               rows={4}

@@ -1,1 +1,1 @@
-export const APP_VERSION = 'Build 2026.06.20-hr-ops-v35';
+export const APP_VERSION = 'Build 2026.06.20-hr-ops-v36';
