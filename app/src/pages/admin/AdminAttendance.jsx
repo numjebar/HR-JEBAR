@@ -79,6 +79,15 @@ export default function AdminAttendance() {
 
   useEffect(() => { load(); }, [date]);
 
+  useEffect(() => {
+    if (!orgId) return;
+    const ch = supabase.channel(`att-live-${date}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attendance', filter: `org_id=eq.${orgId}` }, () => load())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'attendance', filter: `org_id=eq.${orgId}` }, () => load())
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [orgId, date]);
+
   async function clearClockOut(row) {
     if (!confirm(`ล้างเวลาออกของ ${row.employees?.nickname || row.employees?.name || 'พนักงาน'}?`)) return;
     const { error } = await supabase.rpc('admin_clear_clock_out', { p_attendance_id: row.id });

@@ -227,7 +227,7 @@ function AiItemsTable({ items, catalog, onChange }) {
 }
 
 // ─── Purchase List Form (multi-item + category + stock check) ────────────────
-function PurchaseListForm({ draft, setDraft, catalog, employeeSessionToken }) {
+function PurchaseListForm({ draft, setDraft, catalog, catalogReady, employeeSessionToken }) {
   const [newItem, setNewItem] = useState({ category: 'วัตถุดิบ', itemName: '', quantity: '', unit: 'กก.', priority: 'วันนี้', note: '' });
   const [stockInfo, setStockInfo] = useState(null); // null | 'checking' | {stockLeft, unit, status} | {notFound}
   const [stockBlocked, setStockBlocked] = useState(false);
@@ -400,9 +400,14 @@ function PurchaseListForm({ draft, setDraft, catalog, employeeSessionToken }) {
         <Field label="รายการ">
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <SearchSelect options={opts} value={newItem.itemName} onChange={pickItem}
-              placeholder="พิมพ์หรือเลือกรายการ..." />
+              placeholder={!catalogReady ? 'กำลังโหลด...' : (!catalog ? 'พิมพ์ชื่อรายการ...' : 'พิมพ์หรือเลือกรายการ...')} />
             <VoiceBtn onResult={pickItem} />
           </div>
+          {catalogReady && !catalog && (
+            <div style={{ fontSize: 12, color: '#9a8070', marginTop: 6, lineHeight: 1.5 }}>
+              💡 ยังไม่ได้เชื่อมฐานข้อมูล OPS — พิมพ์ชื่อรายการได้เลยไม่ต้องเลือกจากรายการ
+            </div>
+          )}
         </Field>
 
         {/* stock check feedback */}
@@ -632,6 +637,7 @@ function OpsTaskPage({ taskKey, navigate }) {
   const [draft, setDraft, resetDraft] = useTaskDraft(taskKey);
   const [localHistory, saveLocalDraft] = useTaskLocalHistory(taskKey);
   const [catalog, setCatalog] = useState(null);
+  const [catalogReady, setCatalogReady] = useState(false); // true once fetch attempt completes
   const [branches, setBranches] = useState([]);
   const backend = useTaskBackend(taskKey);
   const { orgId } = useAuthStore();
@@ -640,7 +646,7 @@ function OpsTaskPage({ taskKey, navigate }) {
   const geminiKey = import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('hr_gemini_key') || '';
 
   useEffect(() => {
-    fetchOperateCatalog().then(c => { if (c) setCatalog(c); });
+    fetchOperateCatalog().then(c => { if (c) setCatalog(c); setCatalogReady(true); });
   }, []);
 
   useEffect(() => {
@@ -682,7 +688,7 @@ function OpsTaskPage({ taskKey, navigate }) {
       <OpsFormCard
         taskKey={taskKey} draft={draft} setDraft={setDraft} resetDraft={resetDraft}
         saveLocalDraft={saveLocalDraft} backend={backend} summary={summary}
-        catalog={catalog} geminiKey={geminiKey} branches={branches}
+        catalog={catalog} catalogReady={catalogReady} geminiKey={geminiKey} branches={branches}
       />
 
       <HistorySection
@@ -707,7 +713,7 @@ function OpsTaskPage({ taskKey, navigate }) {
   );
 }
 
-function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, backend, summary, catalog, geminiKey, branches = [] }) {
+function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, backend, summary, catalog, catalogReady, geminiKey, branches = [] }) {
   const { employeeSessionToken, employee, orgId } = useAuthStore();
   const empName = employee?.name || '';
   const navigate = useNavigate();
@@ -904,7 +910,7 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
       </TwoColRow>
 
       {taskKey === 'purchase-list'
-        ? <PurchaseListForm draft={draft} setDraft={setDraft} catalog={catalog} employeeSessionToken={employeeSessionToken} />
+        ? <PurchaseListForm draft={draft} setDraft={setDraft} catalog={catalog} catalogReady={catalogReady} employeeSessionToken={employeeSessionToken} />
         : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches, lastRecord, todayProductionTotal, lastCakeRecord, todayProductionBatches, todayCakeLog)
       }
 
