@@ -6,11 +6,22 @@ import { APP_VERSION } from '../../lib/version';
 import SearchSelect from '../../components/SearchSelect';
 import VoiceBtn from '../../components/VoiceBtn';
 import PhotoSection from '../../components/PhotoSection';
-import { fetchOperateCatalog, clearCatalogCache, OPS_CONFIG_KEY } from '../../lib/operateCatalog';
+import { fetchOperateCatalog, clearCatalogCache, OPS_CONFIG_KEY, getLastCatalogError } from '../../lib/operateCatalog';
 import { uploadOpsPhotos, uploadSingleBase64 } from '../../lib/opsStorage';
 
 const STORAGE_PREFIX = 'hr_emp_ops_';
 const HISTORY_LIMIT = 8;
+
+function catalogNoDataMsg(catalog, listEmpty) {
+  const err = getLastCatalogError();
+  if (err === 'no_config') return 'แอดมินยังไม่ได้ตั้งค่าเชื่อม OPS —';
+  if (err && err.startsWith('http')) return `เชื่อม OPS ไม่สำเร็จ (${err.replace('http_', 'HTTP ')}) —`;
+  if (err === 'network') return 'ไม่สามารถเชื่อมต่อ OPS ได้ —';
+  if (err === 'no_data') return 'ยังไม่มีข้อมูลใน Supabase —';
+  if (!catalog) return 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —';
+  if (listEmpty) return 'ยังไม่มีรายการในระบบ Operate —';
+  return '';
+}
 
 const TASKS = [
   { key: 'bills',          path: '/emp/ops/bills',          title: 'ถ่ายบิลซื้อของ',       subtitle: 'ถ่ายรูปบิล AI อ่านรายการ แล้วส่งให้ระบบจัดการต่อ', icon: '📷' },
@@ -407,7 +418,7 @@ function PurchaseListForm({ draft, setDraft, catalog, catalogReady, catalogRetry
           </div>
           {catalogReady && (!catalog || opts.length === 0) && (
             <div style={{ fontSize: 12, color: '#9a8070', marginTop: 6, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span>💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีรายการในหมวดนี้ —'} พิมพ์ชื่อรายการได้เลย</span>
+              <span>💡 {catalogNoDataMsg(catalog, opts.length === 0)} พิมพ์ชื่อรายการได้เลย</span>
               {catalogRetrying && <span style={{ color: '#0369a1', fontSize: 11 }}>⏳ กำลังลองเชื่อมต่อ...</span>}
               {reloadCatalog && <button type="button" onClick={reloadCatalog} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 8px', cursor: 'pointer', flexShrink: 0 }}>🔄 ลองใหม่</button>}
             </div>
@@ -1089,7 +1100,7 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
             </div>
             {catalogReady && (!catalog || (catalog.menus || []).length === 0) && (
               <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span>💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีเมนูในระบบ Operate —'} พิมพ์ชื่อเมนูได้เลย</span>
+                <span>💡 {catalogNoDataMsg(catalog, (catalog?.menus || []).length === 0)} พิมพ์ชื่อเมนูได้เลย</span>
                 {catalogRetrying && <span style={{ color: '#0369a1', fontSize: 11 }}>⏳ กำลังลองเชื่อมต่อ...</span>}
                 {reloadCatalog && <button type="button" onClick={reloadCatalog} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 8px', cursor: 'pointer', flexShrink: 0 }}>🔄 ลองใหม่</button>}
               </div>
@@ -1185,7 +1196,7 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
             </div>
             {catalogReady && (!catalog || (catalog.ingredients || []).length === 0) && (
               <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span>💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีวัตถุดิบในระบบ Operate —'} พิมพ์ชื่อวัตถุดิบได้เลย</span>
+                <span>💡 {catalogNoDataMsg(catalog, (catalog?.ingredients || []).length === 0)} พิมพ์ชื่อวัตถุดิบได้เลย</span>
                 {catalogRetrying && <span style={{ color: '#0369a1', fontSize: 11 }}>⏳ กำลังลองเชื่อมต่อ...</span>}
                 {reloadCatalog && <button type="button" onClick={reloadCatalog} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 8px', cursor: 'pointer', flexShrink: 0 }}>🔄 ลองใหม่</button>}
               </div>
@@ -1256,7 +1267,7 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
             </div>
             {catalogReady && (!catalog || (catalog.menus || []).length === 0) && (
               <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span>💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีเมนูในระบบ Operate —'} พิมพ์ชื่อเค้กได้เลย</span>
+                <span>💡 {catalogNoDataMsg(catalog, (catalog?.menus || []).length === 0)} พิมพ์ชื่อเค้กได้เลย</span>
                 {catalogRetrying && <span style={{ color: '#0369a1', fontSize: 11 }}>⏳ กำลังลองเชื่อมต่อ...</span>}
                 {reloadCatalog && <button type="button" onClick={reloadCatalog} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 8px', cursor: 'pointer', flexShrink: 0 }}>🔄 ลองใหม่</button>}
               </div>
@@ -1354,7 +1365,7 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
             </div>
             {catalogReady && (!catalog || (catalog.materials || []).length === 0) && (
               <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4, lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span>💡 {!catalog ? 'ยังไม่ได้เชื่อมฐานข้อมูล OPS —' : 'ยังไม่มีรายการของใช้ในระบบ Operate —'} พิมพ์ชื่อของใช้ได้เลย</span>
+                <span>💡 {catalogNoDataMsg(catalog, (catalog?.materials || []).length === 0)} พิมพ์ชื่อของใช้ได้เลย</span>
                 {catalogRetrying && <span style={{ color: '#0369a1', fontSize: 11 }}>⏳ กำลังลองเชื่อมต่อ...</span>}
                 {reloadCatalog && <button type="button" onClick={reloadCatalog} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '2px 8px', cursor: 'pointer', flexShrink: 0 }}>🔄 ลองใหม่</button>}
               </div>
@@ -1582,10 +1593,13 @@ function sanitizePayload(taskKey, draft) {
 }
 
 function hasAnyInput(taskKey, draft) {
-  if (taskKey === 'bills') return !!(draft.vendor || draft.amount || draft.imageName);
-  if (taskKey === 'purchase-list') return (draft.items?.length || 0) > 0;
-  const { date, recordedBy, ...rest } = draft;
-  return Object.values(rest).some(v => v && !Array.isArray(v) && typeof v !== 'object' && String(v).trim() !== '');
+  if (taskKey === 'bills')          return !!(draft.vendor || draft.amount || draft.imageName);
+  if (taskKey === 'purchase-list')  return (draft.items?.length || 0) > 0;
+  if (taskKey === 'production')     return !!(draft.product || draft.quantity || draft.batch || draft.note);
+  if (taskKey === 'inventory')      return !!(draft.itemName || draft.stockLeft || draft.note);
+  if (taskKey === 'cake-stock')     return !!(draft.cakeName || draft.available || draft.reserved || draft.damaged || draft.note);
+  if (taskKey === 'supplies-count') return !!(draft.itemName || draft.count || draft.note);
+  return false;
 }
 
 function summarizeDraft(taskKey, draft) {

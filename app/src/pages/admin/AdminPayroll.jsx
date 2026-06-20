@@ -162,6 +162,7 @@ export default function AdminPayroll() {
   async function sendPayrollSummary(row) {
     const ok = confirm(`ส่งสรุปการจ่ายเงินให้ ${row.emp.nickname || row.emp.name}?`);
     if (!ok) return;
+    // ensure payrollSummaryText uses the employee's own effective period
     const { error } = await supabase.from('messages').insert({
       emp_id: row.emp.id,
       org_id: orgId,
@@ -175,7 +176,7 @@ export default function AdminPayroll() {
   }
 
   async function downloadPayrollSlip(row) {
-    const { emp, br, pay, range } = row;
+    const { emp, br, pay, range, effectivePeriod: ep } = row;
     const logo = await loadImage(slipLogo).catch(() => null);
     const exportScale = 3;
     const slipWidth = 900;
@@ -210,7 +211,7 @@ export default function AdminPayroll() {
     ctx.font = '700 30px sans-serif';
     ctx.fillText('สลิปการจ่ายเงิน', 440, 128);
     ctx.font = '500 22px sans-serif';
-    ctx.fillText(PERIOD_LABEL[period], 440, 166);
+    ctx.fillText(PERIOD_LABEL[ep || period], 440, 166);
     ctx.font = '400 18px sans-serif';
     ctx.fillText(`${range.from} ถึง ${range.to}`, 440, 202);
 
@@ -373,10 +374,10 @@ export default function AdminPayroll() {
               <button className="btn" style={{ padding: '6px 10px', fontSize: 12, background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }} onClick={() => setNetModal({ emp, currentNet: pay.net, range, effectivePeriod, row })}>
                 ปรับยอดจริง
               </button>
-              <button className="btn" style={{ padding: '6px 10px', fontSize: 12, background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }} onClick={() => downloadPayrollSlip({ emp, br, pay, rules, range })}>
+              <button className="btn" style={{ padding: '6px 10px', fontSize: 12, background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }} onClick={() => downloadPayrollSlip({ emp, br, pay, rules, range, effectivePeriod })}>
                 สลิป
               </button>
-              <button className="btn" style={{ padding: '6px 10px', fontSize: 12, background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }} onClick={() => sendPayrollSummary({ emp, br, pay, rules, range })}>
+              <button className="btn" style={{ padding: '6px 10px', fontSize: 12, background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }} onClick={() => sendPayrollSummary({ emp, br, pay, rules, range, effectivePeriod })}>
                 ส่งให้พนักงาน
               </button>
             </div>

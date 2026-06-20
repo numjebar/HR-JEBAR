@@ -10,6 +10,13 @@ function nowClock() {
   return new Date().toLocaleTimeString('th-TH', { hour12: false });
 }
 
+function currentShiftLabel() {
+  const h = new Date().getHours();
+  if (h < 12) return 'กะเช้า';
+  if (h < 17) return 'กะบ่าย';
+  return 'กะเย็น';
+}
+
 export default function EmpHome() {
   const navigate = useNavigate();
   const { employee, employeeSessionToken, orgId } = useAuthStore();
@@ -140,7 +147,7 @@ export default function EmpHome() {
 
         <div style={{ color: '#c77a45', fontWeight: 800, fontSize: 18 }}>สวัสดี, {currentEmployee?.nickname || currentEmployee?.name || 'ทีมงาน'}</div>
         <div style={{ color: 'var(--muted)', fontSize: 14, marginTop: 4 }}>
-          กะเช้า · {fmtDateFull(new Date().toISOString().slice(0, 10))}
+          {currentShiftLabel()} · {fmtDateFull(new Date().toISOString().slice(0, 10))}
         </div>
 
         <div style={{ textAlign: 'center', margin: '18px 0 12px', fontSize: 64, letterSpacing: 6, fontWeight: 500, color: '#3f332e' }}>
