@@ -28,6 +28,7 @@ export default function AdminShell() {
   const { adminLogout, orgId } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [opsTodayCount, setOpsTodayCount] = useState(0);
+  const [unreadMsgCount, setUnreadMsgCount] = useState(0);
   const location = useLocation();
   const closeSidebar = () => setSidebarOpen(false);
 
@@ -46,6 +47,14 @@ export default function AdminShell() {
         const unseen = Math.max(0, (count || 0) - seen);
         setOpsTodayCount(unseen);
       });
+
+    supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', orgId)
+      .eq('from', 'emp')
+      .eq('status', 'unread')
+      .then(({ count }) => setUnreadMsgCount(count || 0));
   }, [orgId]);
 
   useEffect(() => {
@@ -63,6 +72,10 @@ export default function AdminShell() {
         setOpsTodayCount(0);
       });
   }, [location.pathname, orgId]);
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/admin/messages')) setUnreadMsgCount(0);
+  }, [location.pathname]);
   const openOps = () => {
     window.location.href = OPS_APP_URL;
   };
@@ -100,6 +113,15 @@ export default function AdminShell() {
                   minWidth: 20, textAlign: 'center',
                 }}>
                   {opsTodayCount > 99 ? '99+' : opsTodayCount}
+                </span>
+              )}
+              {n.path === '/admin/messages' && unreadMsgCount > 0 && (
+                <span style={{
+                  background: '#e53e3e', color: '#fff', borderRadius: 999,
+                  fontSize: 11, fontWeight: 800, padding: '2px 7px', lineHeight: 1.4,
+                  minWidth: 20, textAlign: 'center',
+                }}>
+                  {unreadMsgCount > 99 ? '99+' : unreadMsgCount}
                 </span>
               )}
             </NavLink>
