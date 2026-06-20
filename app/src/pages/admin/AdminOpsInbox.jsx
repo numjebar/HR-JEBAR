@@ -221,22 +221,34 @@ export default function AdminOpsInbox() {
 
   const inventoryAlertSummary = useMemo(() => {
     const todayStr = new Date().toISOString().slice(0, 10);
-    const alertItems = filteredItems.filter(item =>
-      (item.task_key === 'inventory' || item.task_key === 'supplies-count') &&
-      (item.created_at || '').slice(0, 10) === todayStr &&
-      item.payload?.status && item.payload.status !== 'ปกติ'
-    );
+    const alertItems = filteredItems.filter(item => {
+      if ((item.created_at || '').slice(0, 10) !== todayStr) return false;
+      const s = item.payload?.status;
+      if (!s) return false;
+      if (item.task_key === 'inventory' || item.task_key === 'supplies-count') return s !== 'ปกติ';
+      if (item.task_key === 'cake-stock') return s !== 'พร้อมขาย';
+      return false;
+    });
     if (alertItems.length === 0) return null;
     const seen = new Set();
     return alertItems.filter(item => {
-      const name = item.payload?.itemName;
+      const name = item.task_key === 'cake-stock' ? item.payload?.cakeName : item.payload?.itemName;
       if (!name || seen.has(name)) return false;
       seen.add(name);
       return true;
     }).map(item => {
       const p = item.payload || {};
       const emp = employees.find(e => e.id === item.emp_id);
-      return { itemName: p.itemName || '?', stockLeft: p.stockLeft, unit: p.unit || '', status: p.status || '', empName: emp?.nickname || emp?.name || 'พนักงาน' };
+      const isCake = item.task_key === 'cake-stock';
+      return {
+        itemName: (isCake ? p.cakeName : p.itemName) || '?',
+        stockLeft: isCake ? p.available : p.stockLeft,
+        unit: isCake ? 'ชิ้น' : (p.unit || ''),
+        status: p.status || '',
+        empName: emp?.nickname || emp?.name || 'พนักงาน',
+        isCake,
+        branchName: isCake ? (p.branchName || '') : '',
+      };
     });
   }, [filteredItems, employees]);
 
@@ -307,8 +319,9 @@ export default function AdminOpsInbox() {
 
     if (inventoryAlertSummary && inventoryAlertSummary.length > 0) {
       lines.push('⚠️ สต๊อกต้องติดตาม:');
-      inventoryAlertSummary.forEach(({ itemName, stockLeft, unit, status }) => {
-        lines.push(`  • ${itemName}: ${stockLeft || '?'} ${unit} — ${status}`);
+      inventoryAlertSummary.forEach(({ itemName, stockLeft, unit, status, isCake, branchName }) => {
+        const loc = isCake && branchName ? ` (${branchName})` : '';
+        lines.push(`  • ${isCake ? '🍰 ' : ''}${itemName}${loc}: ${stockLeft || '?'} ${unit} — ${status}`);
       });
       lines.push('');
     }
@@ -470,14 +483,17 @@ export default function AdminOpsInbox() {
         <div className="card" style={{ padding: '16px 18px', marginBottom: 16, border: '1px solid #fca5a5', background: '#fff1f1' }}>
           <div style={{ fontWeight: 700, marginBottom: 12, color: '#b42318', fontSize: 14 }}>⚠️ สต๊อกต้องติดตามวันนี้ ({inventoryAlertSummary.length} รายการ)</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
-            {inventoryAlertSummary.map(({ itemName, stockLeft, unit, status, empName }) => {
-              const isUrgent = status === 'ต้องสั่งเพิ่ม' || status === 'มีปัญหา';
+            {inventoryAlertSummary.map(({ itemName, stockLeft, unit, status, empName, isCake, branchName }) => {
+              const isUrgent = status === 'ต้องสั่งเพิ่ม' || status === 'มีปัญหา' || status === 'หมดแล้ว' || status === 'หมด' || status === 'ต้องเติมจากครัว';
               return (
                 <div key={itemName} style={{ background: '#fff', border: `1px solid ${isUrgent ? '#fca5a5' : '#fed7aa'}`, borderRadius: 12, padding: '10px 12px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#2f241f', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{itemName}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#2f241f', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {isCake ? '🍰 ' : ''}{itemName}
+                  </div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: isUrgent ? '#b42318' : '#c2410c' }}>
                     {stockLeft || '?'} <span style={{ fontSize: 11, fontWeight: 500 }}>{unit}</span>
                   </div>
+                  {isCake && branchName && <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 1 }}>{branchName}</div>}
                   <div style={{ fontSize: 11, color: isUrgent ? '#b42318' : '#9a3412', marginTop: 2, fontWeight: isUrgent ? 700 : 400 }}>{status}</div>
                   <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>{empName}</div>
                 </div>

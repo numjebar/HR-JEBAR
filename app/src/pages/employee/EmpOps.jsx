@@ -546,7 +546,9 @@ function OpsHome({ navigate }) {
           p_limit: 10,
         }).then(({ data }) => {
           const todayEntries = (data || []).filter(e => (e.created_at || '').startsWith(today));
-          const hasAlert = (task.key === 'inventory' || task.key === 'supplies-count') && todayEntries.some(e => e.payload?.status && e.payload.status !== 'ปกติ');
+          const hasAlert =
+            ((task.key === 'inventory' || task.key === 'supplies-count') && todayEntries.some(e => e.payload?.status && e.payload.status !== 'ปกติ')) ||
+            (task.key === 'cake-stock' && todayEntries.some(e => e.payload?.status && e.payload.status !== 'พร้อมขาย'));
           return { key: task.key, count: todayEntries.length, hasAlert };
         })
       )

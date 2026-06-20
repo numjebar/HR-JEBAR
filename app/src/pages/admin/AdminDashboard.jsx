@@ -41,7 +41,7 @@ export default function AdminDashboard() {
       supabase.from('org_settings').select('*').eq('org_id', orgId).single(),
       supabase.from('employee_ops_entries').select('id', { count: 'exact', head: true }).eq('org_id', orgId),
       supabase.from('employee_ops_entries').select('task_key').eq('org_id', orgId).gte('created_at', todayStart).lte('created_at', todayEnd),
-      supabase.from('employee_ops_entries').select('id,emp_id,task_key,created_at,payload').eq('org_id', orgId).in('task_key', ['inventory', 'supplies-count']).order('created_at', { ascending: false }).limit(50),
+      supabase.from('employee_ops_entries').select('id,emp_id,task_key,created_at,payload').eq('org_id', orgId).in('task_key', ['inventory', 'supplies-count', 'cake-stock']).order('created_at', { ascending: false }).limit(60),
       supabase.from('messages').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('from', 'admin').eq('kind', 'task').neq('status', 'done'),
     ]);
 
@@ -85,18 +85,20 @@ export default function AdminDashboard() {
       });
       setOpsTodayCounts(todayCounts);
 
-      // low-stock alert: keep only alert-status entries, dedupe by itemName (latest per item)
+      // low-stock alert: keep only alert-status entries, dedupe by item name (latest per item)
       const alertRows = (lowStockResult?.data || []).filter(e => {
         const s = e.payload?.status;
-        return s && s !== 'ปกติ';
+        if (!s) return false;
+        if (e.task_key === 'cake-stock') return s !== 'พร้อมขาย';
+        return s !== 'ปกติ';
       });
       const seen = new Set();
       const unique = alertRows.filter(e => {
-        const name = e.payload?.itemName;
+        const name = e.task_key === 'cake-stock' ? (e.payload?.cakeName || '') : (e.payload?.itemName || '');
         if (!name || seen.has(name)) return false;
         seen.add(name);
         return true;
-      }).slice(0, 6);
+      }).slice(0, 8);
       setLowStockItems(unique);
     }
 
@@ -259,14 +261,17 @@ export default function AdminDashboard() {
               const p = item.payload || {};
               const emp = (employees || []).find(e => e.id === item.emp_id);
               const empName = emp?.nickname || emp?.name || 'พนักงาน';
-              const isUrgent = p.status === 'ต้องสั่งเพิ่ม' || p.status === 'มีปัญหา';
+              const isCake = item.task_key === 'cake-stock';
+              const isUrgent = p.status === 'ต้องสั่งเพิ่ม' || p.status === 'มีปัญหา' || p.status === 'หมด' || p.status === 'ต้องเติมจากครัว';
+              const displayName = isCake ? p.cakeName : p.itemName;
+              const displayQty = isCake
+                ? `เหลือ ${p.available || '?'} ชิ้น · ${p.branchName || ''}`
+                : `เหลือ ${p.stockLeft || '?'} ${p.unit || ''}`;
               return (
                 <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, fontSize: 13, padding: '7px 0', borderBottom: '1px solid #f0e3c2' }}>
                   <div>
-                    <span style={{ fontWeight: 700 }}>{p.itemName}</span>
-                    <span style={{ color: 'var(--muted)', marginLeft: 8 }}>
-                      เหลือ {p.stockLeft} {p.unit} · {empName}
-                    </span>
+                    <span style={{ fontWeight: 700 }}>{isCake ? '🍰 ' : ''}{displayName}</span>
+                    <span style={{ color: 'var(--muted)', marginLeft: 8 }}>{displayQty} · {empName}</span>
                   </div>
                   <span style={{ fontSize: 12, fontWeight: 700, borderRadius: 8, padding: '2px 8px', flexShrink: 0, background: isUrgent ? '#fff1f1' : '#fff8e8', color: isUrgent ? '#b42318' : '#7a5b2b' }}>
                     {p.status}
