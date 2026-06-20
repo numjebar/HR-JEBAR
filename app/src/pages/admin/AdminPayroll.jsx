@@ -50,11 +50,13 @@ export default function AdminPayroll() {
     const minFrom = empRanges.map((item) => item.range.from).sort()[0] || calendarRange.from;
     const maxTo = empRanges.map((item) => item.range.to).sort().slice(-1)[0] || calendarRange.to;
     setPayRange({ from: minFrom, to: maxTo });
-    const [{ data: att }, { data: sales }, { data: adj }] = await Promise.all([
+    const [{ data: att }, { data: sales }, { data: adj }, paymentsRes] = await Promise.all([
       supabase.from('attendance').select('*').eq('org_id', orgId).gte('date', minFrom).lte('date', maxTo),
       supabase.from('sales').select('*').eq('org_id', orgId).gte('date', minFrom).lte('date', maxTo),
       supabase.from('adjustments').select('*').eq('org_id', orgId).gte('date', minFrom).lte('date', maxTo),
+      supabase.from('payroll_payments').select('*').eq('org_id', orgId).gte('cycle_to', minFrom).lte('cycle_from', maxTo),
     ]);
+    const payments = paymentsRes?.data || [];
     let totalNet = 0;
     const result = filtered.map((emp) => {
       const br = (brs || []).find((b) => b.id === emp.branch_id);
@@ -65,11 +67,35 @@ export default function AdminPayroll() {
       const empSales = (sales || []).filter((s) => s.emp_id === emp.id && s.date >= range.from && s.date <= range.to);
       const empAdj = (adj || []).filter((a) => a.emp_id === emp.id && a.date >= range.from && a.date <= range.to);
       const pay = computePay(emp, empAtt, empSales, empAdj, rules, range);
+      const payment = payments.find((p) => p.emp_id === emp.id && p.cycle_from === range.from && p.cycle_to === range.to) || null;
       totalNet += pay.net;
-      return { emp, br, pay, rules, range, effectivePeriod, empAtt, empAdj };
+      return { emp, br, pay, rules, range, effectivePeriod, empAtt, empAdj, payment };
     });
     setRows(result);
     setTotal(totalNet);
+  }
+
+  async function togglePaid(row) {
+    const { emp, range, effectivePeriod, pay, payment } = row;
+    if (payment) {
+      const { error } = await supabase.rpc('payroll_unmark_paid', {
+        p_emp_id: emp.id,
+        p_cycle_from: range.from,
+        p_cycle_to: range.to,
+      });
+      if (error) { alert('ยกเลิกสถานะจ่ายไม่สำเร็จ: ' + error.message); return; }
+    } else {
+      const { error } = await supabase.rpc('payroll_mark_paid', {
+        p_emp_id: emp.id,
+        p_period: effectivePeriod || period,
+        p_cycle_from: range.from,
+        p_cycle_to: range.to,
+        p_net_amount: Math.round(pay.net),
+        p_note: null,
+      });
+      if (error) { alert('บันทึกสถานะจ่ายไม่สำเร็จ: ' + error.message); return; }
+    }
+    load();
   }
 
   useEffect(() => { load(); }, [period, branchFilter, payTypeFilter]);
@@ -324,25 +350,40 @@ export default function AdminPayroll() {
       <div style={{ background: 'var(--accent)', borderRadius: 16, padding: '20px 24px', color: '#fff', marginBottom: 20 }}>
         <div style={{ fontSize: 13, opacity: .8 }}>ยอดจ่ายรวม ({rows.length} คน)</div>
         <div className="num" style={{ fontSize: 36, fontWeight: 700 }}>{THB(total)}</div>
-        <div style={{ fontSize: 12, opacity: .8, marginTop: 8 }}>
-          ช่วงข้อมูลรวมในหน้านี้ {payRange.from} - {payRange.to}
+        <div style={{ fontSize: 12, opacity: .8, marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <span>ช่วงข้อมูลรวมในหน้านี้ {payRange.from} - {payRange.to}</span>
+          {rows.length > 0 && (
+            <span>· จ่ายแล้ว {rows.filter((r) => r.payment).length}/{rows.length} คน</span>
+          )}
         </div>
       </div>
 
       <div style={{ display: 'grid', gap: 16 }}>
         {rows.map((row) => {
-          const { emp, br, pay, rules, range, effectivePeriod, empAtt, empAdj } = row;
+          const { emp, br, pay, rules, range, effectivePeriod, empAtt, empAdj, payment } = row;
           return (
-          <div key={emp.id} className="card" style={{ padding: 18 }}>
+          <div key={emp.id} className="card" style={{ padding: 18, ...(payment ? { borderColor: '#0E7C66' } : {}) }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 18 }}>{emp.name}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: 700, fontSize: 18 }}>{emp.name}</span>
+                  {payment && (
+                    <span style={{ background: '#0E7C66', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, whiteSpace: 'nowrap' }}>
+                      ✓ จ่ายแล้ว
+                    </span>
+                  )}
+                </div>
                 <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>
                   {br?.label || '—'} · {emp.pay_type === 'daily' ? 'รายวัน' : emp.pay_type === 'weekly' ? 'รายสัปดาห์' : 'รายเดือน'}
                 </div>
                 <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 4 }}>
                   รอบพนักงาน: <span className="num">{range.from}</span> - <span className="num">{range.to}</span>
                 </div>
+                {payment && (
+                  <div style={{ color: '#0E7C66', fontSize: 12, marginTop: 4 }}>
+                    จ่ายเมื่อ {new Date(payment.paid_at).toLocaleDateString('th-TH')} · ยอด {THB(payment.net_amount)}
+                  </div>
+                )}
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ color: 'var(--muted)', fontSize: 12 }}>สุทธิที่ต้องจ่าย</div>
@@ -368,6 +409,13 @@ export default function AdminPayroll() {
             </div>
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16 }}>
+              <button
+                className="btn"
+                style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, background: payment ? 'var(--bg)' : '#0E7C66', color: payment ? '#0E7C66' : '#fff', border: payment ? '1px solid #0E7C66' : 'none' }}
+                onClick={() => togglePaid(row)}
+              >
+                {payment ? '↩ ยกเลิกจ่าย' : '✓ ทำเครื่องหมายจ่ายแล้ว'}
+              </button>
               <button className="btn" style={{ padding: '6px 10px', fontSize: 12, background: 'var(--accent-soft)', color: 'var(--accent)' }} onClick={() => toggleDetails(emp.id)}>
                 {expanded[emp.id] && !dayView[emp.id] ? 'ซ่อนรายละเอียด' : 'รายละเอียด'}
               </button>

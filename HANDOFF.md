@@ -1,5 +1,44 @@
 # HR JEBAR Handoff
 
+## Update 2026-06-20 (payroll "paid already" marker — v57)
+
+### สิ่งที่เพิ่มใน v57
+
+**AdminPayroll — ทำเครื่องหมาย "จ่ายแล้ว" ต่อรอบจ่ายเงิน**
+
+- ปุ่ม **"✓ ทำเครื่องหมายจ่ายแล้ว"** ในการ์ดเงินเดือนแต่ละพนักงาน
+- เมื่อกด → บันทึกลงตาราง `payroll_payments` (เก็บ emp_id, รอบ from–to, ยอดสุทธิ, เวลาจ่าย)
+- การ์ดที่จ่ายแล้วจะมี:
+  - badge เขียว **"✓ จ่ายแล้ว"** ข้างชื่อ
+  - ขอบการ์ดเป็นสีเขียว
+  - บรรทัด "จ่ายเมื่อ [วันที่] · ยอด [จำนวน]"
+- ปุ่มเปลี่ยนเป็น **"↩ ยกเลิกจ่าย"** เพื่อ undo ได้
+- การ์ดยอดรวมด้านบนแสดง "จ่ายแล้ว N/M คน"
+- สถานะคงอยู่ถาวร (persistent) — ผูกกับรอบจ่ายจริงของพนักงาน ไม่หายเมื่อ refresh
+
+### SQL ที่ต้องรัน (1 ครั้ง)
+
+```
+supabase/30_payroll_payments.sql
+```
+
+รันใน Supabase SQL Editor — สร้างตาราง `payroll_payments` + RLS (admin เท่านั้น)
++ RPC `payroll_mark_paid()` / `payroll_unmark_paid()`
+
+> หมายเหตุ: ถ้ายังไม่รัน SQL หน้าจะไม่พัง — แค่ยังกดจ่ายไม่ได้ (จะขึ้น alert บอก) และไม่เห็น badge
+
+### ไฟล์ที่เปลี่ยน
+
+- `supabase/30_payroll_payments.sql` — NEW
+- `app/src/pages/admin/AdminPayroll.jsx` — load payments + `togglePaid()` + paid badge/border + summary count
+- `app/src/lib/version.js` — bump เป็น `Build 2026.06.20-payroll-paidmarker-v57`
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+---
+
 ## Update 2026-06-20 (payroll day breakdown view — v56)
 
 ### สิ่งที่เพิ่มใน v56
