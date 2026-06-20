@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
-import { supabase } from '../../lib/supabase';
+import { supabase, supabaseUrl as hrSupabaseUrl, supabaseAnon as hrSupabaseAnon } from '../../lib/supabase';
 import { DEFAULT_RULES, parseLocation } from '../../lib/payroll';
 
 export default function AdminSettings() {
@@ -262,9 +262,22 @@ export default function AdminSettings() {
       {/* OPS connection config */}
       <div className="card" style={{ padding: '20px 24px', marginTop: 24 }}>
         <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>🔗 เชื่อมต่อระบบ OPS (JE BAR Operate)</div>
-        <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12 }}>
           ตั้งค่า URL และ Key ของ Supabase จากระบบ Operate เพื่อให้พนักงานเลือกรายการวัตถุดิบ/เมนูในใบสั่งซื้อได้
         </div>
+        {hrSupabaseUrl && (
+          <div style={{ marginBottom: 14, padding: '10px 14px', background: '#f0f9ff', border: '1px solid #bae0fd', borderRadius: 12, fontSize: 13, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ color: '#0369a1' }}>💡 ระบบ Operate ใช้ Supabase เดียวกับ HR —</span>
+            <button
+              type="button"
+              onClick={() => { setOpsUrl(hrSupabaseUrl); setOpsKey(hrSupabaseAnon); }}
+              style={{ fontSize: 12, color: '#0369a1', background: '#e0f2fe', border: '1px solid #7dd3fc', borderRadius: 8, padding: '3px 10px', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}
+            >
+              ✨ กรอกอัตโนมัติ
+            </button>
+            <span style={{ color: '#64748b', fontSize: 12 }}>แล้วกด "บันทึก" และ "ทดสอบ"</span>
+          </div>
+        )}
         <div style={{ display: 'grid', gap: 12 }}>
           <div>
             <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Supabase URL (จาก Project Settings → API)</label>

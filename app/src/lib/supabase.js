@@ -11,6 +11,8 @@ if (!isValidSupabaseUrl || !anon) {
 }
 
 export const supabaseConfigError = !isValidSupabaseUrl || !anon;
+export const supabaseUrl = isValidSupabaseUrl ? cleanUrl : '';
+export const supabaseAnon = anon || '';
 export const supabase = createClient(
   isValidSupabaseUrl ? cleanUrl : 'https://invalid.supabase.co',
   anon || 'missing-anon-key',
