@@ -1,5 +1,32 @@
 # HR JEBAR Handoff
 
+## Update 2026-06-20 (purchase-list smart suggestions from inventory — v9)
+
+### สิ่งที่เพิ่มใน v9
+
+**EmpOps PurchaseListForm — แนะนำสินค้าจากสต๊อกล่าสุด**
+- เมื่อเปิดฟอร์มใบสั่งซื้อ ระบบโหลด inventory entries ล่าสุด (20 รายการ)
+- กรองเฉพาะ `status != ปกติ` แล้ว deduplicate ตามชื่อ (เก็บล่าสุดต่อรายการ)
+- แสดง card สีเหลือง "⚡ แนะนำจากสต๊อกล่าสุด" ที่ด้านบนของฟอร์ม (สูงสุด 5 รายการ)
+- กด "+ เลือก" → pre-fill itemName, unit, priority (วันนี้ถ้า ต้องสั่งเพิ่ม/มีปัญหา, พรุ่งนี้ถ้า ใกล้หมด)
+- ถ้าเพิ่มรายการนั้นลงรายการแล้ว แสดง "✓ เพิ่มแล้ว" แทน
+
+**Flow ที่ปิดวงจรได้สมบูรณ์:**
+1. พนักงาน A เช็กสต๊อก → บันทึก "ไข่ไก่ เหลือ 5 ฟอง — ใกล้หมด"
+2. พนักงาน B เปิดใบสั่งซื้อ → เห็น "ไข่ไก่ ใกล้หมด" ในแนะนำ → กด "+ เลือก" → ใส่จำนวน → ส่ง
+3. แอดมินเห็นใบสั่งซื้อใน AdminOpsInbox → กด "↩ ตอบ" ยืนยัน
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/pages/employee/EmpOps.jsx` — `suggestions` state + useEffect + `applySuggestion()` + suggestions UI in PurchaseListForm
+- `app/src/lib/version.js` — bump เป็น `Build 2026.06.20-hr-ops-v9`
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+---
+
 ## Update 2026-06-20 (low-stock alert on admin dashboard — v8)
 
 ### สิ่งที่เพิ่มใน v8

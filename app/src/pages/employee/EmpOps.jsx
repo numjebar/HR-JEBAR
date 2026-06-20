@@ -221,6 +221,29 @@ function PurchaseListForm({ draft, setDraft, catalog, employeeSessionToken }) {
   const [newItem, setNewItem] = useState({ category: 'วัตถุดิบ', itemName: '', quantity: '', unit: 'กก.', priority: 'วันนี้', note: '' });
   const [stockInfo, setStockInfo] = useState(null); // null | 'checking' | {stockLeft, unit, status} | {notFound}
   const [stockBlocked, setStockBlocked] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+
+  useEffect(() => {
+    if (!employeeSessionToken) return;
+    supabase.rpc('employee_get_ops_entries_v2', {
+      p_session_token: employeeSessionToken,
+      p_task_key: 'inventory',
+      p_limit: 20,
+    }).then(({ data }) => {
+      const alertRows = (data || []).filter(e => {
+        const s = e.payload?.status;
+        return s && s !== 'ปกติ';
+      });
+      const seen = new Set();
+      const unique = alertRows.filter(e => {
+        const name = e.payload?.itemName;
+        if (!name || seen.has(name)) return false;
+        seen.add(name);
+        return true;
+      }).slice(0, 5);
+      setSuggestions(unique);
+    }).catch(() => {});
+  }, [employeeSessionToken]);
 
   const categoryOptions = {
     'วัตถุดิบ':          catalog?.ingredients || [],
@@ -256,6 +279,14 @@ function PurchaseListForm({ draft, setDraft, catalog, employeeSessionToken }) {
     }
   }
 
+  function applySuggestion(item) {
+    const p = item.payload || {};
+    const priority = (p.status === 'ต้องสั่งเพิ่ม' || p.status === 'มีปัญหา') ? 'วันนี้' : 'พรุ่งนี้';
+    setNewItem(ni => ({ ...ni, category: 'วัตถุดิบ', itemName: p.itemName || '', unit: p.unit || ni.unit, priority }));
+    setStockInfo({ stockLeft: p.stockLeft, unit: p.unit, status: p.status });
+    setStockBlocked(p.status === 'ปกติ' && parseFloat(p.stockLeft) > 5);
+  }
+
   function pickItem(v) {
     setNewItem(ni => ({ ...ni, itemName: v }));
     checkStock(v);
@@ -278,6 +309,40 @@ function PurchaseListForm({ draft, setDraft, catalog, employeeSessionToken }) {
 
   return (
     <div style={fieldGridStyle}>
+      {/* ── Low-stock suggestions ── */}
+      {suggestions.length > 0 && (
+        <div style={{ background: '#fff8e8', border: '1px solid #f4dfab', borderRadius: 18, padding: 14 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: '#7a5b2b', marginBottom: 10 }}>
+            ⚡ แนะนำจากสต๊อกล่าสุด ({suggestions.length} รายการ)
+          </div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {suggestions.map(item => {
+              const p = item.payload || {};
+              const isUrgent = p.status === 'ต้องสั่งเพิ่ม' || p.status === 'มีปัญหา';
+              const alreadyAdded = (draft.items || []).some(i => i.itemName.toLowerCase() === (p.itemName || '').toLowerCase());
+              return (
+                <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '8px 10px', background: '#fff', borderRadius: 12, border: '1px solid #f4dfab' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: '#2f241f' }}>{p.itemName}</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                      เหลือ {p.stockLeft} {p.unit}
+                      <span style={{ marginLeft: 6, fontWeight: 700, color: isUrgent ? '#b42318' : '#7a5b2b' }}>{p.status}</span>
+                    </div>
+                  </div>
+                  {alreadyAdded ? (
+                    <span style={{ fontSize: 12, color: '#0d7a46', fontWeight: 700, flexShrink: 0 }}>✓ เพิ่มแล้ว</span>
+                  ) : (
+                    <button type="button" onClick={() => applySuggestion(item)} style={{ padding: '6px 12px', borderRadius: 10, border: '1.5px solid var(--accent)', background: 'var(--accent-soft)', color: 'var(--accent)', fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+                      + เลือก
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ── Add item panel ── */}
       <div style={{ background: '#f6f3ee', border: '1px solid #e8dfd4', borderRadius: 20, padding: 16, display: 'grid', gap: 12 }}>
         <div style={{ fontWeight: 800, fontSize: 15, color: '#5a3e2b' }}>+ เพิ่มรายการสั่งซื้อ</div>
