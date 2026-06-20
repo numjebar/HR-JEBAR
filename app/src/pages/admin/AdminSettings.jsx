@@ -94,10 +94,20 @@ export default function AdminSettings() {
         `${url.replace(/\/+$/, '')}/rest/v1/jebar_app_state?select=db&limit=1`,
         { headers: { apikey: key, Authorization: `Bearer ${key}` } }
       );
-      if (!res.ok) { setConnStatus({ ok: false, error: `HTTP ${res.status}` }); return; }
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        const hint = /does not exist|schema cache/i.test(errText)
+          ? ' — ต้องรัน SQL ไฟล์ 29_jebar_app_state.sql ใน Supabase SQL Editor ก่อน'
+          : /JWT|invalid.*key|permission|401|403/i.test(errText || String(res.status))
+          ? ' — Key ไม่ถูกต้อง ตรวจสอบ anon key อีกครั้ง'
+          : '';
+        setConnStatus({ ok: false, error: `HTTP ${res.status}${hint}` }); return;
+      }
       const rows = await res.json();
-      const db = rows?.[0]?.db;
-      if (!db) { setConnStatus({ ok: false, error: 'ไม่พบข้อมูลใน jebar_app_state — ตรวจสอบว่ามีตารางและข้อมูลในระบบ Operate' }); return; }
+      if (!Array.isArray(rows) || rows.length === 0) {
+        setConnStatus({ ok: true, menus: 0, ingredients: 0, materials: 0, noRow: true }); return;
+      }
+      const db = rows[0]?.db || {};
       const menus = (db.menus || []).filter(x => x.name).length;
       const ingredients = (db.ingredients || []).filter(x => x.name).length;
       const materials = (db.materials || db.ingredients || []).filter(x => x.name).length;
@@ -315,8 +325,13 @@ export default function AdminSettings() {
                 <span>🍽️ เมนู {connStatus.menus} รายการ</span>
                 <span>📦 วัตถุดิบ {connStatus.ingredients} รายการ</span>
                 <span>🧴 วัสดุ {connStatus.materials} รายการ</span>
-                {connStatus.menus === 0 && connStatus.ingredients === 0 && (
-                  <span style={{ color: '#7a5b2b' }}>— ยังไม่มีข้อมูลในระบบ Operate กรุณาเพิ่มข้อมูลที่ระบบ Operate ก่อน</span>
+                {(connStatus.menus === 0 && connStatus.ingredients === 0) && (
+                  <div style={{ width: '100%', marginTop: 6, padding: '8px 10px', background: '#fff8e8', border: '1px solid #f4dfab', borderRadius: 10, color: '#7a5b2b', fontSize: 12, lineHeight: 1.6 }}>
+                    {connStatus.noRow
+                      ? '⚠️ ตารางยังว่าง (ยังไม่มีแถวข้อมูล) — ให้เข้า JE BAR Operate แล้วเพิ่มเมนู/วัตถุดิบ จากนั้นไปที่ ตั้งค่า → Supabase กด "ซิงก์ขึ้น" เพื่ออัปโหลด'
+                      : '⚠️ เชื่อมต่อสำเร็จแต่ยังไม่มีข้อมูล — เข้า JE BAR Operate ไปที่ ตั้งค่า → Supabase กด "ซิงก์ขึ้น" เพื่ออัปโหลดเมนูและวัตถุดิบ'
+                    }
+                  </div>
                 )}
               </div>
             ) : (
