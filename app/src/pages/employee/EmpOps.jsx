@@ -258,14 +258,17 @@ function PurchaseListForm({ draft, setDraft, catalog, employeeSessionToken }) {
     }).catch(() => {});
   }, [employeeSessionToken]);
 
-  // Pre-fill from URL params (e.g. coming from inventory quick-add shortcut)
+  // Pre-fill from URL params (e.g. coming from inventory/supplies quick-add shortcut)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const suggestName = params.get('suggest');
     if (!suggestName) return;
+    const validCategories = new Set(['วัตถุดิบ', 'ข้อมูลหลัก', 'ของใช้สิ้นเปลือง']);
+    const catParam = params.get('cat');
+    const category = catParam && validCategories.has(catParam) ? catParam : 'วัตถุดิบ';
     setNewItem(ni => ({
       ...ni,
-      category: 'วัตถุดิบ',
+      category,
       itemName: suggestName,
       unit: params.get('unit') || ni.unit,
       priority: params.get('urgent') === '1' ? 'วันนี้' : 'พรุ่งนี้',
@@ -913,7 +916,7 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
           <span style={{ color: '#7a5b2b' }}>⚡ {draft.itemName} {draft.status} — เพิ่มในใบสั่งซื้อ?</span>
           <button
             type="button"
-            onClick={() => navigate(`/emp/ops/purchase-list?suggest=${encodeURIComponent(draft.itemName)}&unit=${encodeURIComponent(draft.unit || '')}&urgent=${draft.status === 'ต้องสั่งเพิ่ม' || draft.status === 'มีปัญหา' || draft.status === 'หมดแล้ว' ? '1' : '0'}`)}
+            onClick={() => navigate(`/emp/ops/purchase-list?suggest=${encodeURIComponent(draft.itemName)}&unit=${encodeURIComponent(draft.unit || '')}&urgent=${draft.status === 'ต้องสั่งเพิ่ม' || draft.status === 'มีปัญหา' || draft.status === 'หมดแล้ว' ? '1' : '0'}&cat=${encodeURIComponent(taskKey === 'supplies-count' ? 'ของใช้สิ้นเปลือง' : 'วัตถุดิบ')}`)}
             style={{ padding: '6px 12px', borderRadius: 10, border: '1.5px solid var(--accent)', background: 'var(--accent-soft)', color: 'var(--accent)', fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
           >
             + ใบสั่งซื้อ
@@ -1104,7 +1107,7 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
           </TwoColRow>
           <Field label="สถานะ">
             <select value={draft.status} onChange={e => setDraft({ ...draft, status: e.target.value })}>
-              <option>ปกติ</option><option>ใกล้หมด</option><option>ต้องสั่งเพิ่ม</option><option>มีปัญหา</option>
+              <option>ปกติ</option><option>ใกล้หมด</option><option>หมดแล้ว</option><option>ต้องสั่งเพิ่ม</option><option>มีปัญหา</option>
             </select>
           </Field>
           <Field label="หมายเหตุ">
