@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
 import { ymd, addDays, dayRate, rulesFor, parseHM } from '../../lib/payroll';
@@ -210,15 +210,64 @@ export default function AdminAttendance() {
     load();
   }
 
+  const summary = useMemo(() => {
+    const counts = { present: 0, late: 0, leave: 0, absent: 0 };
+    rows.forEach(r => { if (counts[r.status] != null) counts[r.status]++; });
+    const totalOtMin = rows.reduce((sum, r) => sum + Number(r.ot_min || 0), 0);
+    return { ...counts, totalOtMin };
+  }, [rows]);
+
+  function exportAttendanceCSV() {
+    const headers = ['ชื่อ', 'ชื่อเล่น', 'สาขา', 'วันที่', 'เวลาเข้า', 'เวลาออก', 'สถานะ', 'OT (นาที)', 'ระยะห่าง (ม.)'];
+    const STATUS_TH = { present: 'มา', late: 'สาย', leave: 'ลา', absent: 'ขาด' };
+    const csvRows = rows.map(r => [
+      r.employees?.name || '',
+      r.employees?.nickname || '',
+      branches.find(b => b.id === r.employees?.branch_id)?.label || '',
+      r.date,
+      r.clock_in || '',
+      r.clock_out || '',
+      STATUS_TH[r.status] || r.status,
+      r.ot_min || 0,
+      r.checkin_dist != null ? r.checkin_dist : '',
+    ]);
+    const csv = [headers, ...csvRows]
+      .map(row => row.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `jebar-attendance-${date}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
         <h1 style={{ fontWeight: 700, fontSize: 24 }}>การลงเวลา</h1>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button className="btn" onClick={exportAttendanceCSV} disabled={rows.length === 0} title="ส่งออก CSV">📥 CSV</button>
           <button className="btn btn-ghost" onClick={() => setDate(ymd(addDays(new Date(date + 'T00:00'), -1)))}>←</button>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ width: 160 }} />
           <button className="btn btn-ghost" onClick={() => setDate(ymd(addDays(new Date(date + 'T00:00'), 1)))}>→</button>
         </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
+        {[
+          { label: 'มาทำงาน', value: summary.present, color: 'var(--accent)', bg: 'var(--accent-soft)' },
+          { label: 'มาสาย',   value: summary.late,    color: 'var(--late-fg)', bg: 'var(--late-bg)' },
+          { label: 'ลา',      value: summary.leave,   color: 'var(--leave-fg)', bg: 'var(--leave-bg)' },
+          { label: 'ขาด',     value: summary.absent,  color: 'var(--danger-fg)', bg: 'var(--danger-bg)' },
+          { label: 'OT รวม',  value: `${summary.totalOtMin}น.`, color: '#6941c6', bg: '#f9f5ff' },
+        ].map(item => (
+          <div key={item.label} className="card" style={{ padding: '12px 10px', textAlign: 'center', background: item.bg, border: `1px solid ${item.color}22` }}>
+            <div className="num" style={{ fontSize: 26, fontWeight: 800, color: item.color }}>{item.value}</div>
+            <div style={{ fontSize: 12, color: item.color, marginTop: 2, fontWeight: 600 }}>{item.label}</div>
+          </div>
+        ))}
       </div>
 
       <div className="card" style={{ overflow: 'hidden' }}>

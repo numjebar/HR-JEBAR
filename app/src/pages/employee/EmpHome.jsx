@@ -128,6 +128,32 @@ export default function EmpHome() {
           ))}
         </div>
 
+        {/* Unread message preview */}
+        {unreadCount > 0 && (() => {
+          const firstUnread = (messages || []).find(m => m.from === 'admin' && !m.read_at);
+          if (!firstUnread) return null;
+          return (
+            <div
+              onClick={() => navigate('/emp/messages')}
+              style={{
+                marginBottom: 12, padding: '12px 14px', borderRadius: 18,
+                background: '#fff8e8', border: '1.5px solid #f4dfab',
+                cursor: 'pointer', display: 'grid', gap: 4,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#7a5b2b' }}>
+                  💬 ข้อความจากแอดมิน{unreadCount > 1 ? ` (${unreadCount})` : ''}
+                </span>
+                <span style={{ fontSize: 11, color: '#9b7a5a' }}>ดูทั้งหมด ›</span>
+              </div>
+              <div style={{ fontSize: 13, color: '#5a4024', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {firstUnread.text || '…'}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* OPS quick shortcuts */}
         <div style={{ marginTop: 4 }}>
           <div style={{ fontSize: 12, color: '#9b7a5a', fontWeight: 700, marginBottom: 8, paddingLeft: 2 }}>งานร้านวันนี้</div>
