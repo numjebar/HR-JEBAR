@@ -41,6 +41,7 @@ export default function AdminOpsInbox() {
   const [branches, setBranches] = useState([]);
   const [taskFilter, setTaskFilter] = useState(searchParams.get('task') || 'all');
   const [dateFilter, setDateFilter] = useState('all');
+  const [empFilter, setEmpFilter] = useState('all');
   const [searchText, setSearchText] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -129,6 +130,7 @@ export default function AdminOpsInbox() {
       if (taskFilter !== 'all' && item.task_key !== taskFilter) return false;
       if (dateFilter === 'today' && (item.created_at || '').slice(0, 10) !== today) return false;
       if (dateFilter === 'week' && (item.created_at || '').slice(0, 10) < weekAgo) return false;
+      if (empFilter !== 'all' && item.emp_id !== empFilter) return false;
       if (q) {
         const emp = employees.find(r => r.id === item.emp_id);
         const empName = (emp?.nickname || emp?.name || '').toLowerCase();
@@ -146,7 +148,7 @@ export default function AdminOpsInbox() {
       }
       return true;
     });
-  }, [items, taskFilter, dateFilter, searchText, employees, reviewed, hideReviewed]);
+  }, [items, taskFilter, dateFilter, empFilter, searchText, employees, reviewed, hideReviewed]);
 
   const taskCounts = useMemo(() => {
     const counts = Object.keys(TASK_LABELS).reduce((acc, key) => ({ ...acc, [key]: 0 }), {});
@@ -278,6 +280,12 @@ export default function AdminOpsInbox() {
         <select value={taskFilter} onChange={(e) => { setTaskFilter(e.target.value); setSearchParams({}); }} style={{ width: 200 }}>
           {TASK_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+        <select value={empFilter} onChange={(e) => setEmpFilter(e.target.value)} style={{ width: 160 }}>
+          <option value="all">พนักงานทุกคน</option>
+          {employees.map((emp) => (
+            <option key={emp.id} value={emp.id}>{emp.nickname || emp.name}</option>
           ))}
         </select>
         <div style={{ display: 'flex', gap: 6 }}>

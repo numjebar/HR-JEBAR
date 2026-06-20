@@ -533,6 +533,7 @@ function hasDraftData(taskKey) {
 function OpsHome({ navigate }) {
   const { employeeSessionToken } = useAuthStore();
   const [todayCounts, setTodayCounts] = useState({});
+  const [todayAlerts, setTodayAlerts] = useState({});
 
   useEffect(() => {
     if (!employeeSessionToken) return;
@@ -543,15 +544,18 @@ function OpsHome({ navigate }) {
           p_session_token: employeeSessionToken,
           p_task_key: task.key,
           p_limit: 10,
-        }).then(({ data }) => ({
-          key: task.key,
-          count: (data || []).filter(e => (e.created_at || '').startsWith(today)).length,
-        }))
+        }).then(({ data }) => {
+          const todayEntries = (data || []).filter(e => (e.created_at || '').startsWith(today));
+          const hasAlert = task.key === 'inventory' && todayEntries.some(e => e.payload?.status && e.payload.status !== 'ปกติ');
+          return { key: task.key, count: todayEntries.length, hasAlert };
+        })
       )
     ).then(results => {
       const counts = {};
-      results.forEach(r => { counts[r.key] = r.count; });
+      const alerts = {};
+      results.forEach(r => { counts[r.key] = r.count; alerts[r.key] = r.hasAlert; });
       setTodayCounts(counts);
+      setTodayAlerts(alerts);
     }).catch(() => {});
   }, [employeeSessionToken]);
 
@@ -569,6 +573,7 @@ function OpsHome({ navigate }) {
         {TASKS.map((task) => {
           const todayCount = todayCounts[task.key] || 0;
           const hasDraft = hasDraftData(task.key);
+          const hasAlert = todayAlerts[task.key];
           return (
             <button key={task.key} onClick={() => navigate(task.path)} style={taskCardButtonStyle}>
               <div style={taskIconStyle}>{task.icon}</div>
@@ -578,6 +583,11 @@ function OpsHome({ navigate }) {
                   {todayCount > 0 && (
                     <span style={{ background: '#ecfdf3', color: '#0d7a46', borderRadius: 999, padding: '2px 8px', fontSize: 12, fontWeight: 700 }}>
                       ✓ {todayCount}
+                    </span>
+                  )}
+                  {hasAlert && (
+                    <span style={{ background: '#fff1f1', color: '#b42318', borderRadius: 999, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
+                      ⚠️ ต้องติดตาม
                     </span>
                   )}
                   {hasDraft && (
