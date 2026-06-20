@@ -195,7 +195,7 @@ function AiItemsTable({ items, catalog, onChange }) {
 
 // ─── Purchase List Form (multi-item + category + stock check) ────────────────
 function PurchaseListForm({ draft, setDraft, catalog, employeeSessionToken }) {
-  const [newItem, setNewItem] = useState({ category: 'วัตถุดิบ', itemName: '', quantity: '', unit: 'กก.', note: '' });
+  const [newItem, setNewItem] = useState({ category: 'วัตถุดิบ', itemName: '', quantity: '', unit: 'กก.', priority: 'วันนี้', note: '' });
   const [stockInfo, setStockInfo] = useState(null); // null | 'checking' | {stockLeft, unit, status} | {notFound}
   const [stockBlocked, setStockBlocked] = useState(false);
 
@@ -310,6 +310,16 @@ function PurchaseListForm({ draft, setDraft, catalog, employeeSessionToken }) {
           </Field>
         </TwoColRow>
 
+        <Field label="ความด่วน">
+          <select value={newItem.priority}
+            onChange={e => setNewItem(ni => ({ ...ni, priority: e.target.value }))}>
+            <option>วันนี้</option>
+            <option>พรุ่งนี้</option>
+            <option>ภายในสัปดาห์</option>
+            <option>ไม่ด่วน</option>
+          </select>
+        </Field>
+
         <Field label="หมายเหตุ">
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input style={{ flex: 1 }} value={newItem.note}
@@ -347,7 +357,15 @@ function PurchaseListForm({ draft, setDraft, catalog, employeeSessionToken }) {
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, color: '#2f241f', fontSize: 14 }}>{item.itemName}</div>
                 <div style={{ fontSize: 12, color: '#9a8070', marginTop: 2 }}>
-                  {item.category} · {item.quantity} {item.unit}{item.note ? ` · ${item.note}` : ''}
+                  {item.category} · {item.quantity} {item.unit}
+                  {item.priority && item.priority !== 'ไม่ด่วน' && (
+                    <span style={{ marginLeft: 6, padding: '1px 7px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+                      background: item.priority === 'วันนี้' ? '#fff3cd' : '#f6f3ee',
+                      color: item.priority === 'วันนี้' ? '#7a5b2b' : '#9a8070' }}>
+                      ⏰ {item.priority}
+                    </span>
+                  )}
+                  {item.note ? ` · ${item.note}` : ''}
                 </div>
               </div>
               <button type="button" onClick={() => removeItem(item.id)}
@@ -968,7 +986,7 @@ function renderBackendExtra(taskKey, item) {
     if (!items.length) return null;
     return (
       <div style={{ fontSize: 12, color: '#6d5a3f', marginTop: 4 }}>
-        {items.slice(0, 3).map(i => `${i.itemName} ${i.quantity}${i.unit}`).join(' · ')}
+        {items.slice(0, 3).map(i => `${i.itemName} ${i.quantity}${i.unit}${i.priority && i.priority !== 'ไม่ด่วน' ? ` (${i.priority})` : ''}`).join(' · ')}
         {items.length > 3 ? ` +${items.length - 3} รายการ` : ''}
       </div>
     );
@@ -991,7 +1009,7 @@ function renderLocalExtra(taskKey, payload) {
     if (!items.length) return null;
     return (
       <div style={{ fontSize: 12, color: '#6d5a3f', marginTop: 4 }}>
-        {items.slice(0, 3).map(i => `${i.itemName} ${i.quantity}${i.unit}`).join(' · ')}
+        {items.slice(0, 3).map(i => `${i.itemName} ${i.quantity}${i.unit}${i.priority && i.priority !== 'ไม่ด่วน' ? ` (${i.priority})` : ''}`).join(' · ')}
         {items.length > 3 ? ` +${items.length - 3} รายการ` : ''}
       </div>
     );

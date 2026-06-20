@@ -301,6 +301,7 @@ function PurchaseListPreview({ payload }) {
                 <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 700 }}>หมวด</th>
                 <th style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 700 }}>จำนวน</th>
                 <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 700 }}>หน่วย</th>
+                <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 700 }}>ความด่วน</th>
                 <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 700 }}>หมายเหตุ</th>
               </tr>
             </thead>
@@ -312,6 +313,8 @@ function PurchaseListPreview({ payload }) {
                   <td style={{ padding: '6px 10px', color: 'var(--muted)' }}>{item.category}</td>
                   <td style={{ padding: '6px 10px', textAlign: 'right' }}>{item.quantity}</td>
                   <td style={{ padding: '6px 10px' }}>{item.unit}</td>
+                  <td style={{ padding: '6px 10px', fontWeight: item.priority === 'วันนี้' ? 700 : 400,
+                    color: item.priority === 'วันนี้' ? '#bf6c2a' : 'var(--muted)' }}>{item.priority || '-'}</td>
                   <td style={{ padding: '6px 10px', color: 'var(--muted)' }}>{item.note || '-'}</td>
                 </tr>
               ))}
