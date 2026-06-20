@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
 import { fmtDateFull, fmtHM, rulesFor, shopRulesFor } from '../../lib/payroll';
 import CheckInFlow from './CheckInFlow';
+import { OPS_CONFIG_KEY } from '../../lib/operateCatalog';
 
 function nowClock() {
   return new Date().toLocaleTimeString('th-TH', { hour12: false });
@@ -36,6 +37,10 @@ export default function EmpHome() {
     setTodayAtt(data?.today_att || null);
     setWeekAtt(data?.week_att || []);
     setMessages(data?.messages || []);
+    const opsConfig = data?.settings?.rules?.ops_config;
+    if (opsConfig?.url && opsConfig?.key) {
+      try { sessionStorage.setItem(OPS_CONFIG_KEY, JSON.stringify({ url: opsConfig.url, key: opsConfig.key })); } catch { /* ignore */ }
+    }
   }
 
   useEffect(() => {

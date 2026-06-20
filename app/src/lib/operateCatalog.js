@@ -1,5 +1,6 @@
 const CACHE_KEY = 'hr_jebar_catalog';
 const CACHE_TTL = 30 * 60 * 1000; // 30 min
+export const OPS_CONFIG_KEY = 'hr_ops_config'; // set by EmpHome after login
 
 export async function fetchOperateCatalog() {
   try {
@@ -10,8 +11,15 @@ export async function fetchOperateCatalog() {
     }
   } catch { /* ignore */ }
 
-  const url = import.meta.env.VITE_OPERATE_SUPABASE_URL;
-  const key = import.meta.env.VITE_OPERATE_SUPABASE_ANON_KEY;
+  let url = import.meta.env.VITE_OPERATE_SUPABASE_URL;
+  let key = import.meta.env.VITE_OPERATE_SUPABASE_ANON_KEY;
+  if (!url || !key) {
+    try {
+      const cfg = JSON.parse(sessionStorage.getItem(OPS_CONFIG_KEY) || '{}');
+      url = cfg.url || '';
+      key = cfg.key || '';
+    } catch { /* ignore */ }
+  }
   if (!url || !key) return null;
 
   try {

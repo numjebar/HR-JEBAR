@@ -14,6 +14,9 @@ export default function AdminSettings() {
   const [busy, setBusy] = useState(false);
   const [showAddBranch, setShowAddBranch] = useState(false);
   const [editBranch, setEditBranch] = useState(null);
+  const [opsUrl, setOpsUrl] = useState('');
+  const [opsKey, setOpsKey] = useState('');
+  const [opsSaved, setOpsSaved] = useState(false);
 
   async function load() {
     const [{ data: brs }, { data: st }] = await Promise.all([
@@ -24,6 +27,9 @@ export default function AdminSettings() {
     if (st) {
       setGlobalRules({ ...DEFAULT_RULES, ...(st.rules || {}) });
       setGlobalShopRules(st.shop_rules || []);
+      const cfg = st.rules?.ops_config || {};
+      setOpsUrl(cfg.url || '');
+      setOpsKey(cfg.key || '');
     }
     if (brs && brs.length > 0 && !activeBranch) {
       selectBranch(brs[0]);
@@ -58,14 +64,30 @@ export default function AdminSettings() {
   async function saveGlobalRules() {
     setBusy(true);
     const cleanedGlobalShopRules = cleanShopRules(globalShopRules);
-    const { data: st } = await supabase.from('org_settings').select('org_id').eq('org_id', orgId).maybeSingle();
+    const { data: st } = await supabase.from('org_settings').select('org_id,rules').eq('org_id', orgId).maybeSingle();
+    const mergedRules = { ...(st?.rules || {}), ...globalRules };
     if (st) {
-      await supabase.from('org_settings').update({ rules: globalRules, shop_rules: cleanedGlobalShopRules }).eq('org_id', orgId);
+      await supabase.from('org_settings').update({ rules: mergedRules, shop_rules: cleanedGlobalShopRules }).eq('org_id', orgId);
     } else {
-      await supabase.from('org_settings').insert({ org_id: orgId, rules: globalRules, shop_rules: cleanedGlobalShopRules });
+      await supabase.from('org_settings').insert({ org_id: orgId, rules: mergedRules, shop_rules: cleanedGlobalShopRules });
     }
     setGlobalShopRules(cleanedGlobalShopRules);
     setBusy(false);
+  }
+
+  async function saveOpsConfig() {
+    setBusy(true);
+    setOpsSaved(false);
+    const { data: st } = await supabase.from('org_settings').select('org_id,rules').eq('org_id', orgId).maybeSingle();
+    const merged = { ...(st?.rules || {}), ops_config: { url: opsUrl.trim(), key: opsKey.trim() } };
+    if (st) {
+      await supabase.from('org_settings').update({ rules: merged }).eq('org_id', orgId);
+    } else {
+      await supabase.from('org_settings').insert({ org_id: orgId, rules: merged, shop_rules: [] });
+    }
+    setBusy(false);
+    setOpsSaved(true);
+    setTimeout(() => setOpsSaved(false), 3000);
   }
 
   async function deleteBranch(id) {
@@ -202,6 +224,42 @@ export default function AdminSettings() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* OPS connection config */}
+      <div className="card" style={{ padding: '20px 24px', marginTop: 24 }}>
+        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>🔗 เชื่อมต่อระบบ OPS (JE BAR Operate)</div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>
+          ตั้งค่า URL และ Key ของ Supabase จากระบบ Operate เพื่อให้พนักงานเลือกรายการวัตถุดิบ/เมนูในใบสั่งซื้อได้
+        </div>
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Supabase URL (จาก Project Settings → API)</label>
+            <input
+              type="url"
+              value={opsUrl}
+              onChange={e => setOpsUrl(e.target.value)}
+              placeholder="https://xxxx.supabase.co"
+              style={{ width: '100%', fontSize: 14, fontFamily: 'monospace' }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Anon Key (จาก Project Settings → API → anon public)</label>
+            <input
+              type="password"
+              value={opsKey}
+              onChange={e => setOpsKey(e.target.value)}
+              placeholder="eyJhbGciOiJ..."
+              style={{ width: '100%', fontSize: 14, fontFamily: 'monospace' }}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button className="btn btn-primary" onClick={saveOpsConfig} disabled={busy || (!opsUrl && !opsKey)} style={{ fontSize: 14 }}>
+              บันทึกการเชื่อมต่อ
+            </button>
+            {opsSaved && <span style={{ fontSize: 13, color: '#0d7a46', fontWeight: 700 }}>✓ บันทึกแล้ว — พนักงานจะเห็นรายการวัตถุดิบในครั้งต่อไปที่ล็อกอิน</span>}
+          </div>
+        </div>
       </div>
 
       {showAddBranch && <BranchFormModal orgId={orgId} onClose={() => { setShowAddBranch(false); load(); }} />}
