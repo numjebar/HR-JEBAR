@@ -64,6 +64,14 @@ export default function EmpHome() {
     return () => window.clearInterval(timer);
   }, []);
 
+  const upcomingTasks = useMemo(() => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    return (messages || [])
+      .filter(m => m.kind === 'task' && m.from === 'admin' && m.status !== 'done' && m.due && m.due >= todayStr)
+      .sort((a, b) => a.due.localeCompare(b.due))
+      .slice(0, 3);
+  }, [messages]);
+
   const rules = rulesFor(settings?.rules, branch, currentEmployee);
   const shopRules = shopRulesFor(settings?.shop_rules, branch);
   const unreadCount = useMemo(
@@ -226,6 +234,33 @@ export default function EmpHome() {
           >
             ดูทุกเมนูงาน ›
           </button>
+
+          {upcomingTasks.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 12, color: '#9b7a5a', fontWeight: 700, marginBottom: 8, paddingLeft: 2 }}>📋 งานที่ต้องทำ</div>
+              {upcomingTasks.map(task => {
+                const todayStr = new Date().toISOString().slice(0, 10);
+                const diffDays = Math.round((new Date(task.due + 'T00:00:00') - new Date(todayStr + 'T00:00:00')) / 86400000);
+                const isUrgent = diffDays <= 0;
+                const isSoon = diffDays === 1;
+                return (
+                  <div key={task.id} onClick={() => navigate('/emp/messages')} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10,
+                    padding: '10px 12px', borderRadius: 14, marginBottom: 6, cursor: 'pointer',
+                    background: isUrgent ? '#fff1f1' : '#fff',
+                    border: `1px solid ${isUrgent ? '#fca5a5' : isSoon ? '#fde68a' : '#eadcc6'}`,
+                  }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                      {task.text}
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, color: isUrgent ? '#b42318' : isSoon ? '#b45309' : '#0d7a46' }}>
+                      {diffDays === 0 ? 'วันนี้!' : `${diffDays}วัน`}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 

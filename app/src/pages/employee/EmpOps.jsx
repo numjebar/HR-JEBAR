@@ -707,6 +707,31 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
     return () => { cancelled = true; };
   }, [draft.itemName, taskKey, orgId]);
 
+  const [lastCakeRecord, setLastCakeRecord] = useState(null);
+
+  useEffect(() => {
+    if (taskKey !== 'cake-stock' || !draft.cakeName || !draft.branchName || !orgId) { setLastCakeRecord(null); return; }
+    let cancelled = false;
+    supabase
+      .from('employee_ops_entries')
+      .select('payload,created_at')
+      .eq('org_id', orgId)
+      .eq('task_key', 'cake-stock')
+      .order('created_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const qCake = draft.cakeName.trim().toLowerCase();
+        const qBranch = draft.branchName.trim().toLowerCase();
+        const match = (data || []).find(e =>
+          (e.payload?.cakeName || '').toLowerCase() === qCake &&
+          (e.payload?.branchName || '').toLowerCase() === qBranch
+        );
+        setLastCakeRecord(match || null);
+      });
+    return () => { cancelled = true; };
+  }, [draft.cakeName, draft.branchName, taskKey, orgId]);
+
   const [todayProductionTotal, setTodayProductionTotal] = useState(null);
   const [prodRefreshTick, setProdRefreshTick] = useState(0);
 
@@ -813,7 +838,7 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
 
       {taskKey === 'purchase-list'
         ? <PurchaseListForm draft={draft} setDraft={setDraft} catalog={catalog} employeeSessionToken={employeeSessionToken} />
-        : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches, lastRecord, todayProductionTotal)
+        : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches, lastRecord, todayProductionTotal, lastCakeRecord)
       }
 
       <div style={summaryPillStyle}>ร่างล่าสุด: {summary}</div>
@@ -860,7 +885,7 @@ function LastRecordHint({ record, taskKey }) {
   );
 }
 
-function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches = [], lastRecord = null, todayProductionTotal = null) {
+function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches = [], lastRecord = null, todayProductionTotal = null, lastCakeRecord = null) {
   switch (taskKey) {
     case 'bills':
       return (
@@ -1044,6 +1069,15 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               <VoiceBtn onResult={v => setDraft({ ...draft, cakeName: v })} />
             </div>
           </Field>
+          {lastCakeRecord && (() => {
+            const p = lastCakeRecord.payload || {};
+            const dateStr = lastCakeRecord.created_at ? new Date(lastCakeRecord.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) : '';
+            return (
+              <div style={{ fontSize: 12, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '6px 10px', marginTop: -8 }}>
+                🍰 ล่าสุด ({dateStr}): พร้อมขาย {p.available ?? '?'} · จอง {p.reserved ?? '?'} · {p.status || ''}
+              </div>
+            );
+          })()}
           <TwoColRow>
             <Field label="พร้อมขาย">
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
