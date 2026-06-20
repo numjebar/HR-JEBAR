@@ -743,27 +743,34 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
   }, [draft.cakeName, draft.branchName, taskKey, orgId]);
 
   const [todayProductionTotal, setTodayProductionTotal] = useState(null);
+  const [todayProductionBatches, setTodayProductionBatches] = useState([]);
   const [prodRefreshTick, setProdRefreshTick] = useState(0);
 
   useEffect(() => {
-    if (taskKey !== 'production' || !draft.product || !orgId) { setTodayProductionTotal(null); return; }
+    if (taskKey !== 'production' || !draft.product || !orgId) {
+      setTodayProductionTotal(null);
+      setTodayProductionBatches([]);
+      return;
+    }
     let cancelled = false;
     const todayStr = new Date().toISOString().slice(0, 10);
     supabase
       .from('employee_ops_entries')
-      .select('payload')
+      .select('payload,created_at')
       .eq('org_id', orgId)
       .eq('task_key', 'production')
       .gte('created_at', `${todayStr}T00:00:00`)
       .lte('created_at', `${todayStr}T23:59:59`)
+      .order('created_at', { ascending: true })
       .then(({ data }) => {
         if (cancelled) return;
         const q = draft.product.trim().toLowerCase();
         const matching = (data || []).filter(e => (e.payload?.product || '').trim().toLowerCase() === q);
-        if (matching.length === 0) { setTodayProductionTotal(null); return; }
+        if (matching.length === 0) { setTodayProductionTotal(null); setTodayProductionBatches([]); return; }
         let total = 0;
         matching.forEach(e => { total += parseFloat(e.payload?.quantity || 0) || 0; });
         setTodayProductionTotal({ total, unit: matching[0]?.payload?.unit || '', count: matching.length });
+        setTodayProductionBatches(matching.map(e => ({ batch: e.payload?.batch || '', quantity: e.payload?.quantity || '0', unit: e.payload?.unit || '', note: e.payload?.note || '', time: (e.created_at || '').slice(11, 16) })));
       });
     return () => { cancelled = true; };
   }, [draft.product, taskKey, orgId, prodRefreshTick]);
@@ -848,7 +855,7 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
 
       {taskKey === 'purchase-list'
         ? <PurchaseListForm draft={draft} setDraft={setDraft} catalog={catalog} employeeSessionToken={employeeSessionToken} />
-        : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches, lastRecord, todayProductionTotal, lastCakeRecord)
+        : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches, lastRecord, todayProductionTotal, lastCakeRecord, todayProductionBatches)
       }
 
       <div style={summaryPillStyle}>ร่างล่าสุด: {summary}</div>
@@ -895,7 +902,7 @@ function LastRecordHint({ record, taskKey }) {
   );
 }
 
-function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches = [], lastRecord = null, todayProductionTotal = null, lastCakeRecord = null) {
+function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches = [], lastRecord = null, todayProductionTotal = null, lastCakeRecord = null, todayProductionBatches = []) {
   switch (taskKey) {
     case 'bills':
       return (
@@ -955,8 +962,19 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
             </div>
           </Field>
           {todayProductionTotal && (
-            <div style={{ fontSize: 12, color: '#0d7a46', background: '#ecfdf3', border: '1px solid #bbe7cf', borderRadius: 10, padding: '6px 10px', marginTop: -8 }}>
-              🏭 วันนี้ผลิตแล้ว: {todayProductionTotal.total} {todayProductionTotal.unit} ({todayProductionTotal.count} รอบ)
+            <div style={{ background: '#ecfdf3', border: '1px solid #bbe7cf', borderRadius: 12, padding: '10px 12px', marginTop: -8 }}>
+              <div style={{ fontSize: 12, color: '#0d7a46', fontWeight: 700, marginBottom: todayProductionBatches.length > 0 ? 6 : 0 }}>
+                🏭 วันนี้ผลิตแล้ว: {todayProductionTotal.total} {todayProductionTotal.unit} ({todayProductionTotal.count} รอบ)
+              </div>
+              {todayProductionBatches.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {todayProductionBatches.map((b, i) => (
+                    <span key={i} style={{ background: '#fff', border: '1px solid #bbe7cf', borderRadius: 8, padding: '2px 8px', fontSize: 11, color: '#1a5e3a' }}>
+                      {b.batch ? `${b.batch} · ` : ''}{b.quantity} {b.unit}{b.note ? ` (${b.note})` : ''} @{b.time}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           <TwoColRow>

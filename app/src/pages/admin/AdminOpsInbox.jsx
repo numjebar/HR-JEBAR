@@ -533,9 +533,19 @@ export default function AdminOpsInbox() {
 
 function ReplyModal({ entry, employees, orgId, onClose }) {
   const [text, setText] = useState(() => {
+    const p = entry.payload || {};
     if (entry.task_key === 'purchase-list') {
-      const n = (entry.payload?.items || []).length;
+      const n = (p.items || []).length;
       return `อนุมัติใบสั่งซื้อแล้ว ✓ กรุณาดำเนินการตามรายการ${n > 0 ? ` (${n} รายการ)` : ''}`;
+    }
+    if (entry.task_key === 'inventory' && p.status && p.status !== 'ปกติ') {
+      return `ทราบแล้ว ขอบคุณที่แจ้ง${p.itemName ? ` (${p.itemName})` : ''} กรุณาเพิ่มในใบสั่งซื้อด้วย ✓`;
+    }
+    if (entry.task_key === 'supplies-count' && p.status && p.status !== 'ปกติ') {
+      return `ทราบแล้ว ขอบคุณที่แจ้ง${p.itemName ? ` (${p.itemName})` : ''} กรุณาสั่งซื้อเพิ่ม ✓`;
+    }
+    if (entry.task_key === 'production') {
+      return `ทราบแล้ว ผลิต${p.product ? ` ${p.product}` : ''}${p.quantity ? ` ${p.quantity} ${p.unit || ''}` : ''} เรียบร้อย ✓`;
     }
     return '';
   });
