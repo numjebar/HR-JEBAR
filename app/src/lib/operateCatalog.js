@@ -56,6 +56,12 @@ export async function fetchOperateCatalog() {
     const norm = (arr, type) =>
       (arr || []).filter(x => x.name && isActive(x)).map(x => ({ name: x.name, unit: x.unit || '', type }));
 
+    // Build menu image map from mediaAssets
+    const menuImages = {};
+    (db.mediaAssets || []).forEach(a => {
+      if (a.entityType === 'menu' && a.entityId && a.url) menuImages[a.entityId] = a.url;
+    });
+
     // "ของใช้สิ้นเปลือง" — prefer ingredients with that category, otherwise use stockItems
     const suppliesCategory = new Set(['ของใช้สิ้นเปลือง', 'supplies', 'ของใช้']);
     const suppliesList = (db.ingredients || []).filter(x =>
@@ -63,7 +69,11 @@ export async function fetchOperateCatalog() {
     ).map(x => ({ name: x.name, unit: x.unit || '', type: 'วัสดุ' }));
 
     const data = {
-      menus: norm(db.menus, 'เมนู'),
+      menus: (db.menus || []).filter(x => x.name && isActive(x)).map(x => ({
+        name: x.name, unit: x.unit || '', type: 'เมนู',
+        id: x.id || '', category: x.category || '',
+        priceStore: x.priceStore || 0, imageUrl: menuImages[x.id] || null,
+      })),
       ingredients: norm(db.ingredients, 'วัตถุดิบ'),
       materials: suppliesList.length > 0 ? suppliesList : norm(db.stockItems || [], 'วัสดุ'),
     };

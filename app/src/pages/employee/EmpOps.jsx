@@ -783,6 +783,327 @@ function OpsTaskPage({ taskKey, navigate }) {
   );
 }
 
+function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCatalog, draft, setDraft, branches, employeeSessionToken, backend, saveLocalDraft, todayCakeLog, setCakeRefreshTick }) {
+  const buildRows = (menus) => (menus || []).map(m => ({
+    cakeName: m.name, imageUrl: m.imageUrl || null,
+    category: m.category || '', priceStore: m.priceStore || 0,
+    included: false, available: 0, reserved: 0, damaged: 0,
+  }));
+
+  const [rows, setRows] = useState(() => buildRows(catalog?.menus));
+  const [catTab, setCatTab] = useState('all');
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState('');
+  const [errMsg, setErrMsg] = useState('');
+  const [warnDups, setWarnDups] = useState([]);
+  const [dupMode, setDupMode] = useState(false);
+
+  useEffect(() => {
+    setRows(buildRows(catalog?.menus));
+  }, [(catalog?.menus || []).map(m => m.name).join('|')]);
+
+  const categories = [...new Set(rows.map(r => r.category).filter(Boolean))];
+  const includedRows = rows.filter(r => r.included);
+  const includedCount = includedRows.length;
+  const totalQty = includedRows.reduce((s, r) => s + (r.available || 0), 0);
+
+  const displayRows = catTab === 'all' ? rows
+    : catTab === 'selected' ? rows.filter(r => r.included)
+    : rows.filter(r => r.category === catTab);
+
+  function updateRow(cakeName, field, val) {
+    setRows(prev => prev.map(r => r.cakeName === cakeName ? { ...r, [field]: val } : r));
+  }
+  function toggleInclude(cakeName) {
+    setRows(prev => prev.map(r => r.cakeName === cakeName ? { ...r, included: !r.included } : r));
+  }
+
+  function buildLogMap() {
+    const map = {};
+    todayCakeLog.forEach(c => { if (!map[c.cakeName]) map[c.cakeName] = c; });
+    return map;
+  }
+
+  function findDups(toSave) {
+    const logMap = buildLogMap();
+    const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+    return toSave
+      .filter(row => {
+        const entry = logMap[row.cakeName];
+        if (!entry) return false;
+        const [h, m] = entry.time.split(':').map(Number);
+        return Math.abs(nowMin - (h * 60 + m)) < 30;
+      })
+      .map(row => ({ cakeName: row.cakeName, time: logMap[row.cakeName].time }));
+  }
+
+  async function doSave(toSave) {
+    setSaving(true); setErrMsg(''); setSuccess('');
+    let saved = 0;
+    try {
+      for (const row of toSave) {
+        const avail = row.available || 0;
+        const dmg = row.damaged || 0;
+        const autoStatus = avail === 0 ? 'หมด' : (avail <= 2 || dmg > 0) ? 'ใกล้หมด' : 'พร้อมขาย';
+        const payload = {
+          branchName: draft.branchName, cakeName: row.cakeName,
+          available: String(avail), reserved: String(row.reserved || 0), damaged: String(dmg),
+          status: autoStatus, note: '', date: draft.date, recordedBy: draft.recordedBy,
+        };
+        const { error } = await supabase.rpc('employee_submit_ops_entry_v2', {
+          p_session_token: employeeSessionToken, p_task_key: 'cake-stock', p_payload: payload,
+        });
+        if (error) throw error;
+        saveLocalDraft(payload);
+        saved++;
+      }
+      await backend.reload();
+      setCakeRefreshTick(t => t + 1);
+      setSuccess(`บันทึก ${saved} รายการเข้า backend แล้ว`);
+      setRows(prev => prev.map(r => ({ ...r, included: false, available: 0, reserved: 0, damaged: 0 })));
+    } catch (err) {
+      const msg = String(err?.message || '');
+      if (msg.includes('employee_submit_ops_entry_v2') || msg.includes('employee_ops_entries')) {
+        setErrMsg('ยังไม่ได้รันไฟล์ 25_employee_ops_entries.sql ใน Supabase SQL Editor');
+      } else {
+        setErrMsg(msg || 'บันทึกไม่สำเร็จ');
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function saveAll() {
+    const toSave = rows.filter(r => r.included);
+    if (!toSave.length || saving) return;
+    const dups = findDups(toSave);
+    if (dups.length > 0) { setWarnDups(dups); setDupMode(true); return; }
+    doSave(toSave);
+  }
+
+  function confirmDupSave() {
+    const toSave = rows.filter(r => r.included);
+    setWarnDups([]); setDupMode(false);
+    doSave(toSave);
+  }
+
+  function clearAll() {
+    setRows(prev => prev.map(r => ({ ...r, included: false, available: 0, reserved: 0, damaged: 0 })));
+    setSuccess(''); setErrMsg(''); setWarnDups([]); setDupMode(false); setCatTab('all');
+  }
+
+  const accentTeal = '#1aa6a6';
+  const logMap = buildLogMap();
+
+  return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      <Field label="สาขาที่เช็ก">
+        <select value={draft.branchName} onChange={e => setDraft({ ...draft, branchName: e.target.value })}>
+          {branches.length > 0
+            ? branches.map(b => <option key={b.id} value={b.label}>{b.label}</option>)
+            : [<option key="1">สาขากาดน้ำทอง</option>, <option key="2">สาขากาดกองเก่า</option>]
+          }
+        </select>
+      </Field>
+
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+        {[
+          { label: 'รายการทั้งหมด', value: rows.length },
+          { label: 'เลือกแล้ว', value: includedCount, color: accentTeal },
+          { label: 'บันทึกวันนี้', value: todayCakeLog.length, color: 'var(--accent)' },
+        ].map(k => (
+          <div key={k.label} style={{ background: 'var(--surface-2)', borderRadius: 12, padding: '10px 0', textAlign: 'center', border: '1px solid var(--line)' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: k.color || 'var(--ink)', lineHeight: 1.1 }}>{k.value}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Tab bar */}
+      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2, WebkitOverflowScrolling: 'touch' }}>
+        {[
+          { key: 'all', label: `ทั้งหมด (${rows.length})` },
+          { key: 'selected', label: `ที่เลือก (${includedCount})` },
+          ...categories.map(c => ({ key: c, label: c })),
+        ].map(t => (
+          <button key={t.key} onClick={() => setCatTab(t.key)} style={{
+            flexShrink: 0, padding: '6px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+            cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit',
+            border: catTab === t.key ? '1.5px solid var(--accent)' : '1.5px solid var(--line)',
+            background: catTab === t.key ? 'var(--accent-soft)' : 'var(--surface)',
+            color: catTab === t.key ? 'var(--accent)' : 'var(--ink)',
+          }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Card grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {displayRows.map(row => {
+          const logged = logMap[row.cakeName];
+          const isRecentDup = logged && (() => {
+            const [h, m] = logged.time.split(':').map(Number);
+            return Math.abs(new Date().getHours() * 60 + new Date().getMinutes() - (h * 60 + m)) < 30;
+          })();
+          return (
+            <div key={row.cakeName} style={{
+              borderRadius: 14, overflow: 'hidden',
+              border: `2px solid ${row.included ? 'var(--accent)' : 'var(--line)'}`,
+              background: row.included ? '#f0f9ff' : 'var(--surface)',
+            }}>
+              {/* Image */}
+              <div style={{ position: 'relative' }}>
+                {row.imageUrl ? (
+                  <img src={row.imageUrl} alt={row.cakeName}
+                    style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block' }} />
+                ) : (
+                  <div style={{ width: '100%', aspectRatio: '4/3', background: '#f5f0e8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>
+                    🍰
+                  </div>
+                )}
+                {/* Select toggle */}
+                <button onClick={() => toggleInclude(row.cakeName)} style={{
+                  position: 'absolute', top: 7, right: 7,
+                  width: 28, height: 28, borderRadius: 999,
+                  background: row.included ? 'var(--accent)' : 'rgba(255,255,255,.92)',
+                  border: `2px solid ${row.included ? 'var(--accent)' : '#ccc'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', fontSize: 13, fontWeight: 800, color: '#fff', lineHeight: 1,
+                }}>
+                  {row.included ? '✓' : ''}
+                </button>
+                {/* Logged today badge */}
+                {logged && (
+                  <div style={{
+                    position: 'absolute', bottom: 5, left: 5,
+                    background: isRecentDup ? '#f59e0b' : '#22c55e',
+                    color: '#fff', borderRadius: 999, fontSize: 9, fontWeight: 800, padding: '2px 6px',
+                  }}>
+                    {isRecentDup ? '⚠' : '✓'} {logged.time}
+                  </div>
+                )}
+              </div>
+
+              {/* Info */}
+              <div style={{ padding: '8px 10px 6px' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.3, marginBottom: 4 }}>{row.cakeName}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                  {row.category && (
+                    <span style={{ fontSize: 10, background: '#f3f4f6', borderRadius: 999, padding: '1px 7px', color: '#6b7280', fontWeight: 600 }}>
+                      {row.category}
+                    </span>
+                  )}
+                  {row.priceStore > 0 && (
+                    <span style={{ fontSize: 12, fontWeight: 800, color: accentTeal }}>฿{row.priceStore}</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Expanded controls (when selected) */}
+              {row.included && (
+                <div style={{ padding: '0 10px 10px' }}>
+                  <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 600 }}>พร้อมขาย (ชิ้น)</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button onClick={() => updateRow(row.cakeName, 'available', Math.max(0, (row.available || 0) - 1))}
+                      style={{ width: 34, height: 34, borderRadius: 8, border: '1.5px solid var(--line)', background: '#f9fafb', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}>
+                      −
+                    </button>
+                    <span style={{ flex: 1, textAlign: 'center', fontSize: 22, fontWeight: 800, color: 'var(--ink)' }}>{row.available || 0}</span>
+                    <button onClick={() => updateRow(row.cakeName, 'available', (row.available || 0) + 1)}
+                      style={{ width: 34, height: 34, borderRadius: 8, border: `1.5px solid ${accentTeal}`, background: '#e6f7f7', fontSize: 20, cursor: 'pointer', color: accentTeal, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}>
+                      +
+                    </button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 8 }}>
+                    {[['reserved', 'จอง', '#3b82f6'], ['damaged', 'เสีย', '#ef4444']].map(([field, label, clr]) => (
+                      <div key={field}>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 2, fontWeight: 600 }}>{label}</div>
+                        <input type="number" min="0" value={row[field] || 0}
+                          onChange={e => updateRow(row.cakeName, field, parseInt(e.target.value) || 0)}
+                          style={{
+                            width: '100%', padding: '5px 6px', borderRadius: 6, textAlign: 'center',
+                            fontSize: 14, fontWeight: 700, fontFamily: 'inherit',
+                            border: `1.5px solid ${Number(row[field]) > 0 ? clr : 'var(--line)'}`,
+                            background: Number(row[field]) > 0 && field === 'damaged' ? '#fef2f2' : 'var(--surface-2)',
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Today's log */}
+      {todayCakeLog.length > 0 && (
+        <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 12, padding: '10px 12px' }}>
+          <div style={{ fontSize: 12, color: '#92400e', fontWeight: 700, marginBottom: 6 }}>
+            🍰 บันทึกวันนี้แล้ว {todayCakeLog.length} รายการ ({draft.branchName})
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {todayCakeLog.map((c, i) => (
+              <span key={i} style={{ background: '#fff', border: '1px solid #fde68a', borderRadius: 8, padding: '2px 8px', fontSize: 11, color: '#78350f' }}>
+                {c.cakeName} · {c.available}{c.reserved && c.reserved !== '0' ? ` จอง${c.reserved}` : ''} @{c.time}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Dup warning */}
+      {dupMode && warnDups.length > 0 && (
+        <div style={{ background: '#fff8e8', border: '1.5px solid #f59e0b', borderRadius: 14, padding: '14px 16px' }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: '#92400e', marginBottom: 8 }}>
+            ⚠️ พบรายการที่บันทึกไปแล้วภายใน 30 นาที
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+            {warnDups.map((d, i) => (
+              <div key={i} style={{ fontSize: 13, color: '#78350f' }}>• {d.cakeName} — บันทึกแล้วเมื่อ {d.time}</div>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, color: '#92400e', marginBottom: 12 }}>ต้องการบันทึกซ้ำหรือไม่? (เช็ครอบสอง หรือแก้ไขยอด)</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <button className="btn" onClick={() => { setDupMode(false); setWarnDups([]); }}>ยกเลิก</button>
+            <button className="btn btn-primary" onClick={confirmDupSave} style={{ background: '#d97706', borderColor: '#d97706' }}>
+              ยืนยันบันทึกซ้ำ
+            </button>
+          </div>
+        </div>
+      )}
+
+      {success && <Notice tone="success">{success}</Notice>}
+      {errMsg && <Notice tone="danger">{errMsg}</Notice>}
+
+      {/* Bottom summary bar */}
+      {includedCount > 0 && !dupMode && (
+        <div style={{ background: 'var(--accent-soft)', border: '1.5px solid var(--accent)', borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 700 }}>เลือกแล้ว {includedCount} รายการ</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>รวมพร้อมขาย {totalQty} ชิ้น</div>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+            {new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+          </div>
+        </div>
+      )}
+
+      {!dupMode && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <button className="btn btn-primary" onClick={saveAll} disabled={includedCount === 0 || saving}>
+            {saving ? 'กำลังบันทึก...' : `บันทึก${includedCount > 0 ? ` ${includedCount}` : ''} รายการ`}
+          </button>
+          <button className="btn" onClick={clearAll}>ล้างค่า</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, backend, summary, catalog, catalogReady, catalogRetrying = false, reloadCatalog, geminiKey, branches = [] }) {
   const { employeeSessionToken, employee, orgId } = useAuthStore();
   const empName = employee?.name || '';
