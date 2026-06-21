@@ -42,7 +42,7 @@ const DEFAULT_DRAFTS = {
     imageName: '', imagePreviewUrl: '', imageBase64: '', imageMimeType: '',
     aiItems: [], date: '', recordedBy: '',
   },
-  production:       { product: '', quantity: '', unit: 'ชิ้น', batch: '', note: '', date: '', recordedBy: '', photos: [] },
+  production:       { product: '', quantity: '', unit: 'ชิ้น', batch: '', dispatches: [], wasteQty: '', note: '', date: '', recordedBy: '', photos: [] },
   inventory:        { itemName: '', stockLeft: '', unit: 'กก.', status: 'ปกติ', note: '', date: '', recordedBy: '', photos: [] },
   'cake-stock':     { branchName: 'สาขากาดน้ำทอง', cakeName: '', available: '', reserved: '', damaged: '', status: 'พร้อมขาย', note: '', date: '', recordedBy: '', photos: [] },
   'supplies-count': { area: 'หน้าร้าน', itemName: '', count: '', unit: 'ชิ้น', status: 'ปกติ', note: '', date: '', recordedBy: '', photos: [] },
@@ -562,7 +562,7 @@ function hasDraftData(taskKey) {
     switch (taskKey) {
       case 'bills':          return !!(s.vendor || s.amount || s.imageName);
       case 'purchase-list':  return (s.items?.length || 0) > 0;
-      case 'production':     return !!(s.product || s.quantity || s.batch || s.note);
+      case 'production':     return !!(s.product || s.quantity || s.batch || s.note || s.wasteQty || (s.dispatches || []).length > 0);
       case 'inventory':      return !!(s.itemName || s.stockLeft || s.note);
       case 'cake-stock':     return !!(s.cakeName || s.available || s.reserved || s.damaged || s.note);
       case 'supplies-count': return !!(s.itemName || s.count || s.note);
@@ -1400,6 +1400,52 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               ))}
             </div>
           </Field>
+          <Field label="ส่งไปสาขา (ถ้ามี)">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {(draft.dispatches || []).map((d, idx) => (
+                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 80px auto', gap: 6, alignItems: 'center' }}>
+                  <select value={d.branchName} onChange={e => setDraft({ ...draft, dispatches: (draft.dispatches || []).map((x, i) => i === idx ? { ...x, branchName: e.target.value } : x) })} style={{ fontSize: 13 }}>
+                    <option value="">— เลือกสาขา —</option>
+                    {branches.length > 0
+                      ? branches.map(b => <option key={b.id} value={b.label}>{b.label}</option>)
+                      : <option value={draft.branchName}>{draft.branchName}</option>
+                    }
+                  </select>
+                  <input type="number" min="0" value={d.qty} inputMode="numeric"
+                    onChange={e => setDraft({ ...draft, dispatches: (draft.dispatches || []).map((x, i) => i === idx ? { ...x, qty: e.target.value } : x) })}
+                    placeholder="จำนวน" style={{ textAlign: 'center', fontSize: 13 }} />
+                  <button type="button" onClick={() => setDraft({ ...draft, dispatches: (draft.dispatches || []).filter((_, i) => i !== idx) })}
+                    style={{ color: 'var(--red)', fontSize: 18, lineHeight: 1, padding: '0 4px', background: 'none', border: 'none', cursor: 'pointer' }}>×</button>
+                </div>
+              ))}
+              <button type="button"
+                onClick={() => setDraft({ ...draft, dispatches: [...(draft.dispatches || []), { branchName: '', qty: '' }] })}
+                style={{ fontSize: 12, color: 'var(--accent)', background: 'var(--accent-soft)', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', alignSelf: 'flex-start', fontFamily: 'inherit' }}>
+                + เพิ่มสาขา
+              </button>
+              {(draft.dispatches || []).some(d => d.branchName && Number(d.qty) > 0) && (
+                <div style={{ fontSize: 12, color: 'var(--ink-2)' }}>
+                  ส่งรวม {(draft.dispatches || []).filter(d => d.branchName && Number(d.qty) > 0).reduce((s, d) => s + Number(d.qty), 0)} ชิ้น — {(draft.dispatches || []).filter(d => d.branchName && Number(d.qty) > 0).map(d => `${d.branchName} (${d.qty})`).join(', ')}
+                </div>
+              )}
+            </div>
+          </Field>
+          <TwoColRow>
+            <Field label="ของเสีย (ชิ้น)">
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input type="number" min="0" style={{ flex: 1 }} value={draft.wasteQty || ''} inputMode="numeric"
+                  onChange={e => setDraft({ ...draft, wasteQty: e.target.value })} placeholder="0" />
+                <VoiceBtn onResult={v => setDraft({ ...draft, wasteQty: v.replace(/[^0-9.]/g, '') })} size={36} />
+              </div>
+            </Field>
+            {draft.wasteQty && Number(draft.wasteQty) > 0 && Number(draft.quantity) > 0 && (
+              <Field label="อัตราของเสีย">
+                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--red)', paddingTop: 4 }}>
+                  {((Number(draft.wasteQty) / Number(draft.quantity)) * 100).toFixed(1)}%
+                </div>
+              </Field>
+            )}
+          </TwoColRow>
           <Field label="หมายเหตุ">
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
               <textarea rows={3} style={{ flex: 1 }} value={draft.note}
