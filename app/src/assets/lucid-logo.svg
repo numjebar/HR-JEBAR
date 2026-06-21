@@ -1,37 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 52" fill="none">
   <defs>
-    <!-- Neon glow for diamond outline -->
-    <filter id="neon" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="2.8" result="blur"/>
+    <filter id="gem-glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2.2" result="blur"/>
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
-    <!-- Intense sparkle glow -->
-    <filter id="sparkle" x="-120%" y="-120%" width="340%" height="340%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="blur"/>
+    <filter id="glow-outer" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
 
-  <!-- Diamond outline (rhombus): top(24,5) right(46,27) bottom(24,49) left(2,27) -->
-  <!-- Outer glow layer -->
-  <path d="M24,5 L46,27 L24,49 L2,27 Z"
-    stroke="#29b6f6" stroke-width="3.5" fill="none" opacity="0.35" filter="url(#neon)"/>
-  <!-- Main neon line -->
-  <path d="M24,5 L46,27 L24,49 L2,27 Z"
-    stroke="#29b6f6" stroke-width="2" fill="none" filter="url(#neon)"/>
-  <!-- Bright inner highlight -->
-  <path d="M24,5 L46,27 L24,49 L2,27 Z"
-    stroke="#b3e5fc" stroke-width="0.8" fill="none" opacity="0.8"/>
+  <!-- Outer glow halo -->
+  <polygon points="26,2 50,26 26,50 2,26" fill="#60a5fa" opacity="0.18" filter="url(#glow-outer)"/>
 
-  <!-- 4-pointed sparkle star at top point (24,5) -->
-  <!-- outer radius ~5.5, inner radius ~1.2 -->
-  <polygon points="24,-0.5 25,3.8 29.5,5 25,6.2 24,10.5 23,6.2 18.5,5 23,3.8"
-    fill="white" filter="url(#sparkle)"/>
-  <!-- Electric blue core star for visibility on light bg -->
-  <polygon points="24,2 24.7,4.3 27,5 24.7,5.7 24,8 23.3,5.7 21,5 23.3,4.3"
-    fill="#29b6f6" opacity="0.95"/>
-  <!-- Pure white hot center -->
-  <circle cx="24" cy="5" r="1.6" fill="white" filter="url(#sparkle)"/>
+  <!-- 4 gem facets -->
+  <polygon points="26,26 50,26 26,50" fill="#1e40af"/>
+  <polygon points="2,26 26,26 26,50"  fill="#1d4ed8"/>
+  <polygon points="26,2 50,26 26,26"  fill="#2563eb"/>
+  <polygon points="26,2 2,26 26,26"   fill="#60a5fa" filter="url(#gem-glow)"/>
+
+  <!-- Top highlight triangle -->
+  <polygon points="26,2 19,13 33,13"  fill="#bfdbfe" opacity="0.75"/>
 
   <!-- LUCID wordmark -->
   <text x="62" y="37"
