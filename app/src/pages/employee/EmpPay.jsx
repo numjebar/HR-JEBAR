@@ -3,6 +3,124 @@ import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
 import { computePay, rulesFor, rangeForEmployee, THB, fmtHM } from '../../lib/payroll';
 
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function drawSlipSection(ctx, title, rows, y, color, sign) {
+  ctx.fillStyle = color;
+  ctx.font = '600 22px sans-serif';
+  ctx.fillText(title, 100, y);
+  let cy = y + 34;
+  rows.filter(([, v]) => v > 0).forEach(([label, val]) => {
+    ctx.fillStyle = '#374151';
+    ctx.font = '400 20px sans-serif';
+    ctx.fillText(label, 120, cy);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = color;
+    ctx.fillText(`${sign}${THB(val)}`, 800, cy);
+    ctx.textAlign = 'left';
+    cy += 34;
+  });
+  return cy;
+}
+
+async function generatePaySlip({ employee, branch, pay, payRange, settings }) {
+  const scale = 3;
+  const W = 900, H = 1180;
+  const canvas = document.createElement('canvas');
+  canvas.width = W * scale;
+  canvas.height = H * scale;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(scale, scale);
+
+  ctx.fillStyle = '#f3f4f6';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#ffffff';
+  roundRect(ctx, 60, 60, 780, 1060, 28);
+  ctx.fill();
+
+  ctx.fillStyle = '#0E7C66';
+  roundRect(ctx, 60, 60, 780, 190, 28);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  roundRect(ctx, 100, 92, 300, 86, 18);
+  ctx.fill();
+  ctx.fillStyle = '#0f172a';
+  ctx.font = '800 38px sans-serif';
+  ctx.fillText('LUCID HR', 130, 148);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '700 30px sans-serif';
+  ctx.fillText('สลิปการจ่ายเงิน', 440, 128);
+  ctx.font = '400 18px sans-serif';
+  if (payRange) {
+    ctx.fillText(`${payRange.from} ถึง ${payRange.to}`, 440, 166);
+  }
+
+  ctx.fillStyle = '#111827';
+  ctx.font = '700 34px sans-serif';
+  ctx.fillText(employee.name || '', 100, 310);
+  ctx.font = '500 22px sans-serif';
+  ctx.fillStyle = '#6b7280';
+  ctx.fillText(`${employee.nickname ? `"${employee.nickname}" · ` : ''}${branch?.label || ''}`, 100, 348);
+  ctx.fillText(`วันทำงาน ${pay.daysWorked} วัน`, 100, 384);
+
+  const income = [
+    ['ค่าแรงตามรอบ', pay.base],
+    ['OT', pay.otPay],
+    ['คอมมิชชั่น', pay.commission],
+    ['โบนัส', pay.bonus],
+  ];
+  const deduct = [
+    ['หักสาย', pay.lateDeduct],
+    ['เสียหาย', pay.damage],
+    ['เบิกล่วงหน้า', pay.advance],
+    ['หักอื่นๆ', pay.otherDeduct],
+    ['ประกันสังคม', pay.ss],
+  ];
+
+  let y = 460;
+  y = drawSlipSection(ctx, 'รายรับ', income, y, '#0E7C66', '+');
+  y = drawSlipSection(ctx, 'รายการหัก', deduct, y + 24, '#dc2626', '-');
+
+  ctx.strokeStyle = '#e5e7eb';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(100, y + 26);
+  ctx.lineTo(800, y + 26);
+  ctx.stroke();
+
+  ctx.fillStyle = '#111827';
+  ctx.font = '700 30px sans-serif';
+  ctx.fillText('ยอดสุทธิที่จ่าย', 100, y + 88);
+  ctx.fillStyle = '#0E7C66';
+  ctx.textAlign = 'right';
+  ctx.font = '800 44px sans-serif';
+  ctx.fillText(THB(pay.net), 800, y + 92);
+  ctx.textAlign = 'left';
+
+  ctx.fillStyle = '#6b7280';
+  ctx.font = '400 18px sans-serif';
+  ctx.fillText(`สร้างเมื่อ ${new Date().toLocaleString('th-TH')}`, 100, 1060);
+  ctx.textAlign = 'right';
+  ctx.fillText('LUCID HR', 800, 1060);
+  ctx.textAlign = 'left';
+
+  return canvas.toDataURL('image/png');
+}
+
 const PERIODS = [
   { k: 'day', label: 'วันนี้' },
   { k: 'week', label: 'สัปดาห์' },
@@ -38,6 +156,7 @@ export default function EmpPay() {
   const [settings, setSettings] = useState(null);
   const [payRange, setPayRange] = useState(null);
   const [payment, setPayment] = useState(null);
+  const [downloading, setDownloading] = useState(false);
   const effectivePeriod = payrollPeriodForEmployee(employee, period);
   const periodOptions = allowedPeriodsForEmployee(employee);
 
@@ -63,6 +182,22 @@ export default function EmpPay() {
   }, [employee?.id, naturalPeriod]);
 
   useEffect(() => { load(); }, [effectivePeriod, employee?.id]);
+
+  async function downloadSlip() {
+    if (!pay || !payRange) return;
+    setDownloading(true);
+    try {
+      const dataUrl = await generatePaySlip({ employee, branch, pay, payRange, settings });
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `slip-${employee.nickname || employee.name}-${payRange.from}-${payRange.to}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   if (!pay) return <div style={{ padding: 24, color: 'var(--muted)' }}>กำลังโหลด...</div>;
 
@@ -182,6 +317,15 @@ export default function EmpPay() {
           <div className="num" style={{ fontWeight: 700, fontSize: 18, color: 'var(--accent)' }}>{THB(pay.net)}</div>
         </div>
       </div>
+
+      <button
+        className="btn"
+        onClick={downloadSlip}
+        disabled={downloading}
+        style={{ width: '100%', marginTop: 4, padding: '13px', fontSize: 15, fontWeight: 600, background: 'var(--accent-soft)', color: 'var(--accent)', border: '1px solid var(--accent)' }}
+      >
+        {downloading ? 'กำลังสร้างสลิป...' : '⬇ ดาวน์โหลดสลิปเงินเดือน'}
+      </button>
     </div>
   );
 }
