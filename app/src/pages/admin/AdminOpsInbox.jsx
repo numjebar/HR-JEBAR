@@ -704,6 +704,13 @@ function ReplyModal({ entry, employees, orgId, onClose, navigateToMessages }) {
     if (entry.task_key === 'production') {
       return `ทราบแล้ว ผลิต${p.product ? ` ${p.product}` : ''}${p.quantity ? ` ${p.quantity} ${p.unit || ''}` : ''} เรียบร้อย ✓`;
     }
+    if (entry.task_key === 'cake-stock') {
+      const isLow = p.status && p.status !== 'พร้อมขาย';
+      if (isLow) {
+        return `ทราบแล้ว ${p.cakeName || 'เค้ก'} เหลือน้อย (${p.available ?? '?'} ชิ้น) รบกวนเติมจากครัวด้วยนะคะ 🙏`;
+      }
+      return `ทราบสต๊อกเค้กแล้ว ขอบคุณ ✓`;
+    }
     return '';
   });
   const [kind, setKind] = useState('message');
