@@ -175,8 +175,8 @@ export default function AdminShell() {
         <div style={{ position: 'fixed', right: 14, bottom: 12, zIndex: 30, display: 'flex', alignItems: 'center', gap: 8 }}>
           {returnTo && (
             <a href={returnTo}
-              style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,.92)',
-                color: 'var(--accent)', border: '1px solid var(--line)', borderRadius: 999,
+              style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--accent)',
+                color: '#fff', border: 'none', borderRadius: 999,
                 padding: '4px 12px', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>
               ← LUCID Operate
             </a>
