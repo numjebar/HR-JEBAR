@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
+import { fetchOperateCatalog } from '../../lib/operateCatalog';
 
 const REVIEWED_KEY = 'hr_ops_reviewed_ids';
 
@@ -53,6 +54,7 @@ export default function AdminOpsInbox() {
   const [replyEntry, setReplyEntry] = useState(null);
   const [reviewed, setReviewed] = useState(() => loadReviewed());
   const [hideReviewed, setHideReviewed] = useState(false);
+  const [menuImgMap, setMenuImgMap] = useState({});
 
   const PAGE_SIZE = 50;
 
@@ -123,6 +125,15 @@ export default function AdminOpsInbox() {
   useEffect(() => {
     load();
   }, [orgId]);
+
+  useEffect(() => {
+    fetchOperateCatalog().then(cat => {
+      if (!cat?.menus) return;
+      const map = {};
+      cat.menus.forEach(m => { if (m.name && m.imageUrl) map[m.name] = m.imageUrl; });
+      setMenuImgMap(map);
+    });
+  }, []);
 
   useEffect(() => {
     if (!orgId) return;
@@ -474,15 +485,34 @@ export default function AdminOpsInbox() {
           {cakeStockSummary.map(({ branch, cakes }) => (
             <div key={branch} style={{ marginBottom: 12 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#78350f', marginBottom: 8 }}>{branch}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8 }}>
                 {cakes.map(({ name, available, reserved, status }) => {
                   const isLow = status === 'ใกล้หมด' || status === 'หมด' || status === 'ต้องเติมจากครัว' || status === 'มีปัญหา';
+                  const imgUrl = menuImgMap[name] || null;
                   return (
-                    <div key={name} style={{ background: '#fff', border: `1px solid ${isLow ? '#fca5a5' : '#fde68a'}`, borderRadius: 12, padding: '10px 12px' }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#2f241f', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
-                      <div style={{ fontSize: 20, fontWeight: 800, color: isLow ? '#b42318' : '#92400e' }}>{available}</div>
-                      <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
-                        {status || 'พร้อมขาย'}{reserved && reserved !== '0' ? ` · จอง ${reserved}` : ''}
+                    <div key={name} style={{ background: '#fff', border: `1.5px solid ${isLow ? '#fca5a5' : '#fde68a'}`, borderRadius: 14, overflow: 'hidden' }}>
+                      <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1', background: '#f5efe6' }}>
+                        {imgUrl
+                          ? <img src={imgUrl} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                          : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>🍰</div>
+                        }
+                        <div style={{
+                          position: 'absolute', bottom: 4, right: 4,
+                          background: isLow ? '#b42318' : '#92400e',
+                          color: '#fff', borderRadius: 8, padding: '2px 7px',
+                          fontSize: 14, fontWeight: 800, lineHeight: 1.2,
+                        }}>{available}</div>
+                        {isLow && (
+                          <div style={{ position: 'absolute', top: 4, left: 4, background: '#fca5a5', borderRadius: 6, padding: '1px 5px', fontSize: 10, fontWeight: 700, color: '#7f1d1d' }}>
+                            {status}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ padding: '6px 8px 8px' }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#2f241f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                        <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 1 }}>
+                          {isLow ? '' : 'พร้อมขาย'}{reserved && reserved !== '0' ? ` · จอง ${reserved}` : ''}
+                        </div>
                       </div>
                     </div>
                   );
@@ -496,18 +526,48 @@ export default function AdminOpsInbox() {
       {inventoryAlertSummary && inventoryAlertSummary.length > 0 && (
         <div className="card" style={{ padding: '16px 18px', marginBottom: 16, border: '1px solid #fca5a5', background: '#fff1f1' }}>
           <div style={{ fontWeight: 700, marginBottom: 12, color: '#b42318', fontSize: 14 }}>⚠️ สต๊อกต้องติดตามวันนี้ ({inventoryAlertSummary.length} รายการ)</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8 }}>
             {inventoryAlertSummary.map(({ itemName, stockLeft, unit, status, empName, isCake, branchName }) => {
               const isUrgent = status === 'ต้องสั่งเพิ่ม' || status === 'มีปัญหา' || status === 'หมดแล้ว' || status === 'หมด' || status === 'ต้องเติมจากครัว';
+              const imgUrl = isCake ? (menuImgMap[itemName] || null) : null;
+              if (isCake) {
+                return (
+                  <div key={itemName} style={{ background: '#fff', border: `1.5px solid ${isUrgent ? '#fca5a5' : '#fed7aa'}`, borderRadius: 14, overflow: 'hidden' }}>
+                    <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1', background: '#fef2f2' }}>
+                      {imgUrl
+                        ? <img src={imgUrl} alt={itemName} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>🍰</div>
+                      }
+                      <div style={{
+                        position: 'absolute', bottom: 4, right: 4,
+                        background: isUrgent ? '#b42318' : '#c2410c',
+                        color: '#fff', borderRadius: 8, padding: '2px 7px',
+                        fontSize: 14, fontWeight: 800, lineHeight: 1.2,
+                      }}>{stockLeft ?? '?'}</div>
+                      <div style={{
+                        position: 'absolute', top: 4, left: 4,
+                        background: isUrgent ? '#fca5a5' : '#fed7aa',
+                        borderRadius: 6, padding: '1px 5px',
+                        fontSize: 10, fontWeight: 700,
+                        color: isUrgent ? '#7f1d1d' : '#92400e',
+                      }}>{status}</div>
+                    </div>
+                    <div style={{ padding: '6px 8px 8px' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#2f241f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{itemName}</div>
+                      {branchName && <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 1 }}>{branchName}</div>}
+                      <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 1 }}>{empName}</div>
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div key={itemName} style={{ background: '#fff', border: `1px solid ${isUrgent ? '#fca5a5' : '#fed7aa'}`, borderRadius: 12, padding: '10px 12px' }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#2f241f', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {isCake ? '🍰 ' : ''}{itemName}
+                    {itemName}
                   </div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: isUrgent ? '#b42318' : '#c2410c' }}>
                     {stockLeft || '?'} <span style={{ fontSize: 11, fontWeight: 500 }}>{unit}</span>
                   </div>
-                  {isCake && branchName && <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 1 }}>{branchName}</div>}
                   <div style={{ fontSize: 11, color: isUrgent ? '#b42318' : '#9a3412', marginTop: 2, fontWeight: isUrgent ? 700 : 400 }}>{status}</div>
                   <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>{empName}</div>
                 </div>
@@ -643,6 +703,13 @@ function ReplyModal({ entry, employees, orgId, onClose, navigateToMessages }) {
     }
     if (entry.task_key === 'production') {
       return `ทราบแล้ว ผลิต${p.product ? ` ${p.product}` : ''}${p.quantity ? ` ${p.quantity} ${p.unit || ''}` : ''} เรียบร้อย ✓`;
+    }
+    if (entry.task_key === 'cake-stock') {
+      const isLow = p.status && p.status !== 'พร้อมขาย';
+      if (isLow) {
+        return `ทราบแล้ว ${p.cakeName || 'เค้ก'} เหลือน้อย (${p.available ?? '?'} ชิ้น) รบกวนเติมจากครัวด้วยนะคะ 🙏`;
+      }
+      return `ทราบสต๊อกเค้กแล้ว ขอบคุณ ✓`;
     }
     return '';
   });

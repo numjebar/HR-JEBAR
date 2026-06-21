@@ -42,7 +42,7 @@ const DEFAULT_DRAFTS = {
     imageName: '', imagePreviewUrl: '', imageBase64: '', imageMimeType: '',
     aiItems: [], date: '', recordedBy: '',
   },
-  production:       { product: '', quantity: '', unit: 'ชิ้น', batch: '', dispatches: [], wasteQty: '', note: '', date: '', recordedBy: '', photos: [] },
+  production:       { product: '', quantity: '', unit: 'ชิ้น', batch: '', note: '', date: '', recordedBy: '', photos: [] },
   inventory:        { itemName: '', stockLeft: '', unit: 'กก.', status: 'ปกติ', note: '', date: '', recordedBy: '', photos: [] },
   'cake-stock':     { branchName: 'สาขากาดน้ำทอง', cakeName: '', available: '', reserved: '', damaged: '', status: 'พร้อมขาย', note: '', date: '', recordedBy: '', photos: [] },
   'supplies-count': { area: 'หน้าร้าน', itemName: '', count: '', unit: 'ชิ้น', status: 'ปกติ', note: '', date: '', recordedBy: '', photos: [] },
@@ -562,7 +562,7 @@ function hasDraftData(taskKey) {
     switch (taskKey) {
       case 'bills':          return !!(s.vendor || s.amount || s.imageName);
       case 'purchase-list':  return (s.items?.length || 0) > 0;
-      case 'production':     return !!(s.product || s.quantity || s.batch || s.note || s.wasteQty || (s.dispatches || []).length > 0);
+      case 'production':     return !!(s.product || s.quantity || s.batch || s.note);
       case 'inventory':      return !!(s.itemName || s.stockLeft || s.note);
       case 'cake-stock':     return !!(s.cakeName || s.available || s.reserved || s.damaged || s.note);
       case 'supplies-count': return !!(s.itemName || s.count || s.note);
@@ -784,9 +784,14 @@ function OpsTaskPage({ taskKey, navigate }) {
 }
 
 function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCatalog, draft, setDraft, branches, employeeSessionToken, backend, saveLocalDraft, todayCakeLog, setCakeRefreshTick }) {
-  const [rows, setRows] = useState(() =>
-    (catalog?.menus || []).map(m => ({ cakeName: m.name, available: '', reserved: '', damaged: '' }))
-  );
+  const buildRows = (menus) => (menus || []).map(m => ({
+    cakeName: m.name, imageUrl: m.imageUrl || null,
+    category: m.category || '', priceStore: m.priceStore || 0,
+    included: false, available: 0, reserved: 0, damaged: 0,
+  }));
+
+  const [rows, setRows] = useState(() => buildRows(catalog?.menus));
+  const [catTab, setCatTab] = useState('all');
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
   const [errMsg, setErrMsg] = useState('');
@@ -794,11 +799,24 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
   const [dupMode, setDupMode] = useState(false);
 
   useEffect(() => {
-    const menus = catalog?.menus || [];
-    setRows(menus.map(m => ({ cakeName: m.name, available: '', reserved: '', damaged: '' })));
+    setRows(buildRows(catalog?.menus));
   }, [(catalog?.menus || []).map(m => m.name).join('|')]);
 
-  const filledCount = rows.filter(r => r.available !== '' || r.reserved !== '' || r.damaged !== '').length;
+  const categories = [...new Set(rows.map(r => r.category).filter(Boolean))];
+  const includedRows = rows.filter(r => r.included);
+  const includedCount = includedRows.length;
+  const totalQty = includedRows.reduce((s, r) => s + (r.available || 0), 0);
+
+  const displayRows = catTab === 'all' ? rows
+    : catTab === 'selected' ? rows.filter(r => r.included)
+    : rows.filter(r => r.category === catTab);
+
+  function updateRow(cakeName, field, val) {
+    setRows(prev => prev.map(r => r.cakeName === cakeName ? { ...r, [field]: val } : r));
+  }
+  function toggleInclude(cakeName) {
+    setRows(prev => prev.map(r => r.cakeName === cakeName ? { ...r, included: !r.included } : r));
+  }
 
   function buildLogMap() {
     const map = {};
@@ -824,12 +842,12 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
     let saved = 0;
     try {
       for (const row of toSave) {
-        const avail = Number(row.available) || 0;
-        const dmg = Number(row.damaged) || 0;
+        const avail = row.available || 0;
+        const dmg = row.damaged || 0;
         const autoStatus = avail === 0 ? 'หมด' : (avail <= 2 || dmg > 0) ? 'ใกล้หมด' : 'พร้อมขาย';
         const payload = {
           branchName: draft.branchName, cakeName: row.cakeName,
-          available: row.available || '0', reserved: row.reserved || '0', damaged: row.damaged || '0',
+          available: String(avail), reserved: String(row.reserved || 0), damaged: String(dmg),
           status: autoStatus, note: '', date: draft.date, recordedBy: draft.recordedBy,
         };
         const { error } = await supabase.rpc('employee_submit_ops_entry_v2', {
@@ -842,7 +860,7 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
       await backend.reload();
       setCakeRefreshTick(t => t + 1);
       setSuccess(`บันทึก ${saved} รายการเข้า backend แล้ว`);
-      setRows(prev => prev.map(r => ({ ...r, available: '', reserved: '', damaged: '' })));
+      setRows(prev => prev.map(r => ({ ...r, included: false, available: 0, reserved: 0, damaged: 0 })));
     } catch (err) {
       const msg = String(err?.message || '');
       if (msg.includes('employee_submit_ops_entry_v2') || msg.includes('employee_ops_entries')) {
@@ -856,7 +874,7 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
   }
 
   function saveAll() {
-    const toSave = rows.filter(r => r.available !== '' || r.reserved !== '' || r.damaged !== '');
+    const toSave = rows.filter(r => r.included);
     if (!toSave.length || saving) return;
     const dups = findDups(toSave);
     if (dups.length > 0) { setWarnDups(dups); setDupMode(true); return; }
@@ -864,17 +882,14 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
   }
 
   function confirmDupSave() {
-    const toSave = rows.filter(r => r.available !== '' || r.reserved !== '' || r.damaged !== '');
+    const toSave = rows.filter(r => r.included);
     setWarnDups([]); setDupMode(false);
     doSave(toSave);
   }
 
   function clearAll() {
-    setRows(prev => prev.map(r => ({ ...r, available: '', reserved: '', damaged: '' })));
-    setSuccess(''); setErrMsg(''); setWarnDups([]); setDupMode(false);
-  }
-  function setRowField(idx, field, value) {
-    setRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+    setRows(prev => prev.map(r => ({ ...r, included: false, available: 0, reserved: 0, damaged: 0 })));
+    setSuccess(''); setErrMsg(''); setWarnDups([]); setDupMode(false); setCatTab('all');
   }
 
   const accentTeal = '#1aa6a6';
@@ -891,10 +906,11 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
         </select>
       </Field>
 
+      {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
         {[
           { label: 'รายการทั้งหมด', value: rows.length },
-          { label: 'กรอกแล้ว', value: filledCount, color: accentTeal },
+          { label: 'เลือกแล้ว', value: includedCount, color: accentTeal },
           { label: 'บันทึกวันนี้', value: todayCakeLog.length, color: 'var(--accent)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--surface-2)', borderRadius: 12, padding: '10px 0', textAlign: 'center', border: '1px solid var(--line)' }}>
@@ -904,57 +920,126 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 56px 56px', gap: 6, padding: '8px 12px', background: '#e8f5f5', borderRadius: '14px 14px 0 0', fontSize: 11, fontWeight: 700, color: accentTeal }}>
-        <span>เค้ก / ขนม</span>
-        <span style={{ textAlign: 'center' }}>พร้อมขาย</span>
-        <span style={{ textAlign: 'center' }}>จอง</span>
-        <span style={{ textAlign: 'center' }}>เสีย</span>
+      {/* Tab bar */}
+      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2, WebkitOverflowScrolling: 'touch' }}>
+        {[
+          { key: 'all', label: `ทั้งหมด (${rows.length})` },
+          { key: 'selected', label: `ที่เลือก (${includedCount})` },
+          ...categories.map(c => ({ key: c, label: c })),
+        ].map(t => (
+          <button key={t.key} onClick={() => setCatTab(t.key)} style={{
+            flexShrink: 0, padding: '6px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+            cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit',
+            border: catTab === t.key ? '1.5px solid var(--accent)' : '1.5px solid var(--line)',
+            background: catTab === t.key ? 'var(--accent-soft)' : 'var(--surface)',
+            color: catTab === t.key ? 'var(--accent)' : 'var(--ink)',
+          }}>
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderTop: 'none', borderRadius: '0 0 14px 14px', overflow: 'hidden', marginTop: -12 }}>
-        {rows.map((row, idx) => {
-          const filled = row.available !== '' || row.reserved !== '' || row.damaged !== '';
+      {/* Card grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {displayRows.map(row => {
           const logged = logMap[row.cakeName];
           const isRecentDup = logged && (() => {
             const [h, m] = logged.time.split(':').map(Number);
             return Math.abs(new Date().getHours() * 60 + new Date().getMinutes() - (h * 60 + m)) < 30;
           })();
           return (
-            <div key={row.cakeName} style={{ borderTop: idx > 0 ? '1px solid var(--line-2)' : 'none', background: filled ? '#f0faf5' : 'transparent', padding: '10px 12px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 56px 56px', gap: 6, alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: filled ? 700 : 400, color: filled ? '#1a5e3a' : 'var(--ink)' }}>{row.cakeName}</div>
-                  {logged && (
-                    <div style={{ fontSize: 10, fontWeight: 600, marginTop: 1, color: isRecentDup ? '#b45309' : '#15803d' }}>
-                      {isRecentDup ? '⚠️ บันทึกแล้ว' : '✓ บันทึกแล้ว'} {logged.time}
-                    </div>
+            <div key={row.cakeName} style={{
+              borderRadius: 14, overflow: 'hidden',
+              border: `2px solid ${row.included ? 'var(--accent)' : 'var(--line)'}`,
+              background: row.included ? '#f0f9ff' : 'var(--surface)',
+            }}>
+              {/* Image */}
+              <div style={{ position: 'relative' }}>
+                {row.imageUrl ? (
+                  <img src={row.imageUrl} alt={row.cakeName}
+                    style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block' }} />
+                ) : (
+                  <div style={{ width: '100%', aspectRatio: '4/3', background: '#f5f0e8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>
+                    🍰
+                  </div>
+                )}
+                {/* Select toggle */}
+                <button onClick={() => toggleInclude(row.cakeName)} style={{
+                  position: 'absolute', top: 7, right: 7,
+                  width: 28, height: 28, borderRadius: 999,
+                  background: row.included ? 'var(--accent)' : 'rgba(255,255,255,.92)',
+                  border: `2px solid ${row.included ? 'var(--accent)' : '#ccc'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', fontSize: 13, fontWeight: 800, color: '#fff', lineHeight: 1,
+                }}>
+                  {row.included ? '✓' : ''}
+                </button>
+                {/* Logged today badge */}
+                {logged && (
+                  <div style={{
+                    position: 'absolute', bottom: 5, left: 5,
+                    background: isRecentDup ? '#f59e0b' : '#22c55e',
+                    color: '#fff', borderRadius: 999, fontSize: 9, fontWeight: 800, padding: '2px 6px',
+                  }}>
+                    {isRecentDup ? '⚠' : '✓'} {logged.time}
+                  </div>
+                )}
+              </div>
+
+              {/* Info */}
+              <div style={{ padding: '8px 10px 6px' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.3, marginBottom: 4 }}>{row.cakeName}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                  {row.category && (
+                    <span style={{ fontSize: 10, background: '#f3f4f6', borderRadius: 999, padding: '1px 7px', color: '#6b7280', fontWeight: 600 }}>
+                      {row.category}
+                    </span>
+                  )}
+                  {row.priceStore > 0 && (
+                    <span style={{ fontSize: 12, fontWeight: 800, color: accentTeal }}>฿{row.priceStore}</span>
                   )}
                 </div>
-                {[
-                  ['available', '#bbe7cf', 'var(--green)'],
-                  ['reserved', 'var(--line)', 'var(--ink)'],
-                  ['damaged', 'var(--red)', 'var(--red)'],
-                ].map(([field, bClr, numClr]) => (
-                  <input key={field} type="number" min="0"
-                    value={row[field]}
-                    onChange={e => setRowField(idx, field, e.target.value)}
-                    placeholder="–"
-                    style={{
-                      width: '100%', textAlign: 'center', padding: '7px 4px', borderRadius: 8,
-                      border: `1.5px solid ${Number(row[field]) > 0 ? bClr : 'var(--line)'}`,
-                      background: field === 'damaged' && Number(row.damaged) > 0 ? '#fff1f1' : 'var(--surface-2)',
-                      fontSize: 15, fontWeight: 700,
-                      color: Number(row[field]) > 0 ? numClr : 'var(--ink-3)',
-                      fontFamily: 'inherit',
-                    }}
-                  />
-                ))}
               </div>
+
+              {/* Expanded controls (when selected) */}
+              {row.included && (
+                <div style={{ padding: '0 10px 10px' }}>
+                  <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 600 }}>พร้อมขาย (ชิ้น)</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button onClick={() => updateRow(row.cakeName, 'available', Math.max(0, (row.available || 0) - 1))}
+                      style={{ width: 34, height: 34, borderRadius: 8, border: '1.5px solid var(--line)', background: '#f9fafb', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}>
+                      −
+                    </button>
+                    <span style={{ flex: 1, textAlign: 'center', fontSize: 22, fontWeight: 800, color: 'var(--ink)' }}>{row.available || 0}</span>
+                    <button onClick={() => updateRow(row.cakeName, 'available', (row.available || 0) + 1)}
+                      style={{ width: 34, height: 34, borderRadius: 8, border: `1.5px solid ${accentTeal}`, background: '#e6f7f7', fontSize: 20, cursor: 'pointer', color: accentTeal, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}>
+                      +
+                    </button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 8 }}>
+                    {[['reserved', 'จอง', '#3b82f6'], ['damaged', 'เสีย', '#ef4444']].map(([field, label, clr]) => (
+                      <div key={field}>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 2, fontWeight: 600 }}>{label}</div>
+                        <input type="number" min="0" value={row[field] || 0}
+                          onChange={e => updateRow(row.cakeName, field, parseInt(e.target.value) || 0)}
+                          style={{
+                            width: '100%', padding: '5px 6px', borderRadius: 6, textAlign: 'center',
+                            fontSize: 14, fontWeight: 700, fontFamily: 'inherit',
+                            border: `1.5px solid ${Number(row[field]) > 0 ? clr : 'var(--line)'}`,
+                            background: Number(row[field]) > 0 && field === 'damaged' ? '#fef2f2' : 'var(--surface-2)',
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
       </div>
 
+      {/* Today's log */}
       {todayCakeLog.length > 0 && (
         <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 12, padding: '10px 12px' }}>
           <div style={{ fontSize: 12, color: '#92400e', fontWeight: 700, marginBottom: 6 }}>
@@ -970,6 +1055,7 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
         </div>
       )}
 
+      {/* Dup warning */}
       {dupMode && warnDups.length > 0 && (
         <div style={{ background: '#fff8e8', border: '1.5px solid #f59e0b', borderRadius: 14, padding: '14px 16px' }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: '#92400e', marginBottom: 8 }}>
@@ -980,13 +1066,10 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
               <div key={i} style={{ fontSize: 13, color: '#78350f' }}>• {d.cakeName} — บันทึกแล้วเมื่อ {d.time}</div>
             ))}
           </div>
-          <div style={{ fontSize: 12, color: '#92400e', marginBottom: 12 }}>
-            ต้องการบันทึกซ้ำหรือไม่? (เช็ครอบสอง หรือแก้ไขยอด)
-          </div>
+          <div style={{ fontSize: 12, color: '#92400e', marginBottom: 12 }}>ต้องการบันทึกซ้ำหรือไม่? (เช็ครอบสอง หรือแก้ไขยอด)</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <button className="btn" onClick={() => { setDupMode(false); setWarnDups([]); }}>ยกเลิก</button>
-            <button className="btn btn-primary" onClick={confirmDupSave}
-              style={{ background: '#d97706', borderColor: '#d97706' }}>
+            <button className="btn btn-primary" onClick={confirmDupSave} style={{ background: '#d97706', borderColor: '#d97706' }}>
               ยืนยันบันทึกซ้ำ
             </button>
           </div>
@@ -996,12 +1079,25 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
       {success && <Notice tone="success">{success}</Notice>}
       {errMsg && <Notice tone="danger">{errMsg}</Notice>}
 
+      {/* Bottom summary bar */}
+      {includedCount > 0 && !dupMode && (
+        <div style={{ background: 'var(--accent-soft)', border: '1.5px solid var(--accent)', borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 700 }}>เลือกแล้ว {includedCount} รายการ</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>รวมพร้อมขาย {totalQty} ชิ้น</div>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+            {new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+          </div>
+        </div>
+      )}
+
       {!dupMode && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <button className="btn btn-primary" onClick={saveAll} disabled={filledCount === 0 || saving} style={{ flex: 1 }}>
-            {saving ? 'กำลังบันทึก...' : `บันทึก${filledCount > 0 ? ` ${filledCount}` : ''} รายการ`}
+          <button className="btn btn-primary" onClick={saveAll} disabled={includedCount === 0 || saving}>
+            {saving ? 'กำลังบันทึก...' : `บันทึก${includedCount > 0 ? ` ${includedCount}` : ''} รายการ`}
           </button>
-          <button className="btn" onClick={clearAll} style={{ flex: 1 }}>ล้างค่า</button>
+          <button className="btn" onClick={clearAll}>ล้างค่า</button>
         </div>
       )}
     </div>
@@ -1196,8 +1292,39 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
     }
   }
 
-  const cardTitle = taskKey === 'bills' ? 'บันทึกบิลซื้อของ' : taskKey === 'purchase-list' ? 'ใบสั่งซื้อ' : 'บันทึกข้อมูล';
   const isBatchCake = taskKey === 'cake-stock' && catalogReady && (catalog?.menus || []).length > 0;
+  if (isBatchCake) {
+    return (
+      <div style={cardStyle}>
+        <div style={{ fontWeight: 800, fontSize: 20, color: '#2f241f', marginBottom: 6 }}>เช็คสต๊อกเค้ก</div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>เลือกรายการและบันทึกจำนวนพร้อมกันหลายรายการ</div>
+        <TwoColRow>
+          <Field label="วันที่">
+            <input type="date" value={draft.date || ''} onChange={e => setDraft({ ...draft, date: e.target.value })} />
+          </Field>
+          <Field label="ผู้บันทึก">
+            <input value={draft.recordedBy || ''} onChange={e => setDraft({ ...draft, recordedBy: e.target.value })} placeholder="ชื่อ" />
+          </Field>
+        </TwoColRow>
+        <CakeStockBatchForm
+          catalog={catalog}
+          catalogReady={catalogReady}
+          catalogRetrying={catalogRetrying}
+          reloadCatalog={reloadCatalog}
+          draft={draft}
+          setDraft={setDraft}
+          branches={branches}
+          employeeSessionToken={employeeSessionToken}
+          backend={backend}
+          saveLocalDraft={saveLocalDraft}
+          todayCakeLog={todayCakeLog}
+          setCakeRefreshTick={setCakeRefreshTick}
+        />
+      </div>
+    );
+  }
+
+  const cardTitle = taskKey === 'bills' ? 'บันทึกบิลซื้อของ' : taskKey === 'purchase-list' ? 'ใบสั่งซื้อ' : 'บันทึกข้อมูล';
 
   return (
     <div style={cardStyle}>
@@ -1216,44 +1343,33 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
 
       {taskKey === 'purchase-list'
         ? <PurchaseListForm draft={draft} setDraft={setDraft} catalog={catalog} catalogReady={catalogReady} catalogRetrying={catalogRetrying} reloadCatalog={reloadCatalog} employeeSessionToken={employeeSessionToken} />
-        : isBatchCake
-          ? <CakeStockBatchForm
-              catalog={catalog} catalogReady={catalogReady} catalogRetrying={catalogRetrying} reloadCatalog={reloadCatalog}
-              draft={draft} setDraft={setDraft} branches={branches}
-              employeeSessionToken={employeeSessionToken}
-              backend={backend} saveLocalDraft={saveLocalDraft}
-              todayCakeLog={todayCakeLog} setCakeRefreshTick={setCakeRefreshTick}
-            />
-          : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches, lastRecord, todayProductionTotal, lastCakeRecord, todayProductionBatches, todayCakeLog, catalogReady, reloadCatalog, catalogRetrying)
+        : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches, lastRecord, todayProductionTotal, lastCakeRecord, todayProductionBatches, todayCakeLog, catalogReady, reloadCatalog, catalogRetrying)
       }
 
-      {!isBatchCake && taskKey !== 'purchase-list' && (
-        <>
-          <div style={summaryPillStyle}>ร่างล่าสุด: {summary}</div>
-          {uploadMsg && <Notice tone="warning">{uploadMsg}</Notice>}
-          {success && <Notice tone="success">{success}</Notice>}
-          {success && (taskKey === 'inventory' || taskKey === 'supplies-count') && draft.itemName && draft.status && draft.status !== 'ปกติ' && (
-            <div style={{ background: '#fff8e8', border: '1px solid #f4dfab', borderRadius: 16, padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, fontSize: 13 }}>
-              <span style={{ color: '#7a5b2b' }}>⚡ {draft.itemName} {draft.status} — เพิ่มในใบสั่งซื้อ?</span>
-              <button
-                type="button"
-                onClick={() => navigate(`/emp/ops/purchase-list?suggest=${encodeURIComponent(draft.itemName)}&unit=${encodeURIComponent(draft.unit || '')}&urgent=${draft.status === 'ต้องสั่งเพิ่ม' || draft.status === 'มีปัญหา' || draft.status === 'หมดแล้ว' ? '1' : '0'}&cat=${encodeURIComponent(taskKey === 'supplies-count' ? 'ของใช้สิ้นเปลือง' : 'วัตถุดิบ')}`)}
-                style={{ padding: '6px 12px', borderRadius: 10, border: '1.5px solid var(--accent)', background: 'var(--accent-soft)', color: 'var(--accent)', fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
-              >
-                + ใบสั่งซื้อ
-              </button>
-            </div>
-          )}
-          {errMsg && <Notice tone="danger">{errMsg}</Notice>}
-          <div style={actionRowStyle}>
-            <button className="btn btn-primary" onClick={submitBackend}
-              disabled={!hasAnyInput(taskKey, draft) || saving} style={{ flex: 1 }}>
-              {saving ? 'กำลังบันทึก...' : 'บันทึกเข้า backend'}
-            </button>
-            <button className="btn" onClick={resetDraft} style={{ flex: 1 }}>ล้างฟอร์ม</button>
-          </div>
-        </>
+      <div style={summaryPillStyle}>ร่างล่าสุด: {summary}</div>
+      {uploadMsg && <Notice tone="warning">{uploadMsg}</Notice>}
+      {success && <Notice tone="success">{success}</Notice>}
+      {success && (taskKey === 'inventory' || taskKey === 'supplies-count') && draft.itemName && draft.status && draft.status !== 'ปกติ' && (
+        <div style={{ background: '#fff8e8', border: '1px solid #f4dfab', borderRadius: 16, padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, fontSize: 13 }}>
+          <span style={{ color: '#7a5b2b' }}>⚡ {draft.itemName} {draft.status} — เพิ่มในใบสั่งซื้อ?</span>
+          <button
+            type="button"
+            onClick={() => navigate(`/emp/ops/purchase-list?suggest=${encodeURIComponent(draft.itemName)}&unit=${encodeURIComponent(draft.unit || '')}&urgent=${draft.status === 'ต้องสั่งเพิ่ม' || draft.status === 'มีปัญหา' || draft.status === 'หมดแล้ว' ? '1' : '0'}&cat=${encodeURIComponent(taskKey === 'supplies-count' ? 'ของใช้สิ้นเปลือง' : 'วัตถุดิบ')}`)}
+            style={{ padding: '6px 12px', borderRadius: 10, border: '1.5px solid var(--accent)', background: 'var(--accent-soft)', color: 'var(--accent)', fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+          >
+            + ใบสั่งซื้อ
+          </button>
+        </div>
       )}
+      {errMsg  && <Notice tone="danger">{errMsg}</Notice>}
+
+      <div style={actionRowStyle}>
+        <button className="btn btn-primary" onClick={submitBackend}
+          disabled={!hasAnyInput(taskKey, draft) || saving} style={{ flex: 1 }}>
+          {saving ? 'กำลังบันทึก...' : 'บันทึกเข้า backend'}
+        </button>
+        <button className="btn" onClick={resetDraft} style={{ flex: 1 }}>ล้างฟอร์ม</button>
+      </div>
     </div>
   );
 }
@@ -1400,52 +1516,6 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               ))}
             </div>
           </Field>
-          <Field label="ส่งไปสาขา (ถ้ามี)">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {(draft.dispatches || []).map((d, idx) => (
-                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 80px auto', gap: 6, alignItems: 'center' }}>
-                  <select value={d.branchName} onChange={e => setDraft({ ...draft, dispatches: (draft.dispatches || []).map((x, i) => i === idx ? { ...x, branchName: e.target.value } : x) })} style={{ fontSize: 13 }}>
-                    <option value="">— เลือกสาขา —</option>
-                    {branches.length > 0
-                      ? branches.map(b => <option key={b.id} value={b.label}>{b.label}</option>)
-                      : <option value={draft.branchName}>{draft.branchName}</option>
-                    }
-                  </select>
-                  <input type="number" min="0" value={d.qty} inputMode="numeric"
-                    onChange={e => setDraft({ ...draft, dispatches: (draft.dispatches || []).map((x, i) => i === idx ? { ...x, qty: e.target.value } : x) })}
-                    placeholder="จำนวน" style={{ textAlign: 'center', fontSize: 13 }} />
-                  <button type="button" onClick={() => setDraft({ ...draft, dispatches: (draft.dispatches || []).filter((_, i) => i !== idx) })}
-                    style={{ color: 'var(--red)', fontSize: 18, lineHeight: 1, padding: '0 4px', background: 'none', border: 'none', cursor: 'pointer' }}>×</button>
-                </div>
-              ))}
-              <button type="button"
-                onClick={() => setDraft({ ...draft, dispatches: [...(draft.dispatches || []), { branchName: '', qty: '' }] })}
-                style={{ fontSize: 12, color: 'var(--accent)', background: 'var(--accent-soft)', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', alignSelf: 'flex-start', fontFamily: 'inherit' }}>
-                + เพิ่มสาขา
-              </button>
-              {(draft.dispatches || []).some(d => d.branchName && Number(d.qty) > 0) && (
-                <div style={{ fontSize: 12, color: 'var(--ink-2)' }}>
-                  ส่งรวม {(draft.dispatches || []).filter(d => d.branchName && Number(d.qty) > 0).reduce((s, d) => s + Number(d.qty), 0)} ชิ้น — {(draft.dispatches || []).filter(d => d.branchName && Number(d.qty) > 0).map(d => `${d.branchName} (${d.qty})`).join(', ')}
-                </div>
-              )}
-            </div>
-          </Field>
-          <TwoColRow>
-            <Field label="ของเสีย (ชิ้น)">
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <input type="number" min="0" style={{ flex: 1 }} value={draft.wasteQty || ''} inputMode="numeric"
-                  onChange={e => setDraft({ ...draft, wasteQty: e.target.value })} placeholder="0" />
-                <VoiceBtn onResult={v => setDraft({ ...draft, wasteQty: v.replace(/[^0-9.]/g, '') })} size={36} />
-              </div>
-            </Field>
-            {draft.wasteQty && Number(draft.wasteQty) > 0 && Number(draft.quantity) > 0 && (
-              <Field label="อัตราของเสีย">
-                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--red)', paddingTop: 4 }}>
-                  {((Number(draft.wasteQty) / Number(draft.quantity)) * 100).toFixed(1)}%
-                </div>
-              </Field>
-            )}
-          </TwoColRow>
           <Field label="หมายเหตุ">
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
               <textarea rows={3} style={{ flex: 1 }} value={draft.note}
