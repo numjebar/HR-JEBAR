@@ -1,18 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 52" fill="none">
   <defs>
-    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="2" result="blur"/>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="1.8" result="blur"/>
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
 
-  <!-- Diamond icon — dark navy fill -->
-  <polygon points="26,1 51,26 26,51 1,26" fill="#0f172a"/>
-
-  <!-- Light beam — wide soft glow -->
-  <line x1="11" y1="42" x2="41" y2="10" stroke="#2563eb" stroke-width="9" stroke-linecap="round" opacity="0.22"/>
-  <!-- Light beam — sharp core -->
-  <line x1="11" y1="42" x2="41" y2="10" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round" filter="url(#glow)"/>
+  <!-- Diamond icon — electric blue, 4 facets (gem cut look) -->
+  <polygon points="26,26 50,26 26,50" fill="#1e40af"/>
+  <polygon points="2,26 26,26 26,50" fill="#1d4ed8"/>
+  <polygon points="26,2 50,26 26,26" fill="#2563eb"/>
+  <polygon points="26,2 2,26 26,26" fill="#60a5fa" filter="url(#glow)"/>
+  <polygon points="26,2 19,13 33,13" fill="#bfdbfe" opacity="0.7"/>
 
   <!-- LUCID wordmark -->
   <text x="62" y="37"
