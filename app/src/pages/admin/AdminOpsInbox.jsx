@@ -526,18 +526,48 @@ export default function AdminOpsInbox() {
       {inventoryAlertSummary && inventoryAlertSummary.length > 0 && (
         <div className="card" style={{ padding: '16px 18px', marginBottom: 16, border: '1px solid #fca5a5', background: '#fff1f1' }}>
           <div style={{ fontWeight: 700, marginBottom: 12, color: '#b42318', fontSize: 14 }}>⚠️ สต๊อกต้องติดตามวันนี้ ({inventoryAlertSummary.length} รายการ)</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8 }}>
             {inventoryAlertSummary.map(({ itemName, stockLeft, unit, status, empName, isCake, branchName }) => {
               const isUrgent = status === 'ต้องสั่งเพิ่ม' || status === 'มีปัญหา' || status === 'หมดแล้ว' || status === 'หมด' || status === 'ต้องเติมจากครัว';
+              const imgUrl = isCake ? (menuImgMap[itemName] || null) : null;
+              if (isCake) {
+                return (
+                  <div key={itemName} style={{ background: '#fff', border: `1.5px solid ${isUrgent ? '#fca5a5' : '#fed7aa'}`, borderRadius: 14, overflow: 'hidden' }}>
+                    <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1', background: '#fef2f2' }}>
+                      {imgUrl
+                        ? <img src={imgUrl} alt={itemName} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>🍰</div>
+                      }
+                      <div style={{
+                        position: 'absolute', bottom: 4, right: 4,
+                        background: isUrgent ? '#b42318' : '#c2410c',
+                        color: '#fff', borderRadius: 8, padding: '2px 7px',
+                        fontSize: 14, fontWeight: 800, lineHeight: 1.2,
+                      }}>{stockLeft ?? '?'}</div>
+                      <div style={{
+                        position: 'absolute', top: 4, left: 4,
+                        background: isUrgent ? '#fca5a5' : '#fed7aa',
+                        borderRadius: 6, padding: '1px 5px',
+                        fontSize: 10, fontWeight: 700,
+                        color: isUrgent ? '#7f1d1d' : '#92400e',
+                      }}>{status}</div>
+                    </div>
+                    <div style={{ padding: '6px 8px 8px' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#2f241f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{itemName}</div>
+                      {branchName && <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 1 }}>{branchName}</div>}
+                      <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 1 }}>{empName}</div>
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div key={itemName} style={{ background: '#fff', border: `1px solid ${isUrgent ? '#fca5a5' : '#fed7aa'}`, borderRadius: 12, padding: '10px 12px' }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#2f241f', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {isCake ? '🍰 ' : ''}{itemName}
+                    {itemName}
                   </div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: isUrgent ? '#b42318' : '#c2410c' }}>
                     {stockLeft || '?'} <span style={{ fontSize: 11, fontWeight: 500 }}>{unit}</span>
                   </div>
-                  {isCake && branchName && <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 1 }}>{branchName}</div>}
                   <div style={{ fontSize: 11, color: isUrgent ? '#b42318' : '#9a3412', marginTop: 2, fontWeight: isUrgent ? 700 : 400 }}>{status}</div>
                   <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>{empName}</div>
                 </div>
