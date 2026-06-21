@@ -31,6 +31,7 @@ export default function EmpHome() {
   const [showRules, setShowRules] = useState(false);
   const [clockText, setClockText] = useState(nowClock());
   const [monthAtt, setMonthAtt] = useState([]);
+  const [leaveBalance, setLeaveBalance] = useState(null);
 
   async function load() {
     const { data } = await supabase.rpc('employee_home_data_v2', {
@@ -63,6 +64,9 @@ export default function EmpHome() {
         const thisMonth = new Date().toISOString().slice(0, 7);
         setMonthAtt(all.filter((a) => a.date?.startsWith(thisMonth)));
       }).catch(() => {});
+    supabase.rpc('employee_leave_balance_v2', { p_session_token: employeeSessionToken })
+      .then(({ data }) => { if (data && !data.error) setLeaveBalance(data); })
+      .catch(() => {});
   }, [employeeSessionToken]);
 
   useEffect(() => {
@@ -191,6 +195,59 @@ export default function EmpHome() {
             ))}
           </div>
         </div>
+
+        {/* Leave balance card */}
+        {leaveBalance && (
+          <div style={{
+            background: 'var(--surface)', border: '1px solid var(--line)',
+            borderRadius: 18, padding: '14px 16px', margin: '0 0 12px',
+          }}>
+            <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 10 }}>
+              สิทธิ์ลาคงเหลือ ปี {(new Date().getFullYear() + 543).toString()}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {[
+                {
+                  label: 'ลาพักร้อน',
+                  used: leaveBalance.used_annual,
+                  total: leaveBalance.annual_leave_days,
+                  color: '#60a5fa',
+                },
+                {
+                  label: 'ลาป่วย',
+                  used: leaveBalance.used_sick,
+                  total: leaveBalance.sick_leave_days,
+                  color: '#f87171',
+                },
+                {
+                  label: 'ลากิจ',
+                  used: leaveBalance.used_personal,
+                  total: null,
+                  color: '#fbbf24',
+                },
+              ].map((item) => {
+                const remaining = item.total !== null ? item.total - item.used : null;
+                const pct = item.total ? Math.min(1, item.used / item.total) : 0;
+                return (
+                  <div key={item.label} style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>{item.label}</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: remaining === 0 ? '#f87171' : item.color, lineHeight: 1 }}>
+                      {remaining !== null ? remaining : item.used}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                      {remaining !== null ? `เหลือ / ${item.total} วัน` : `ใช้ไป ${item.used} วัน`}
+                    </div>
+                    {item.total && (
+                      <div style={{ height: 3, background: 'var(--line)', borderRadius: 99, marginTop: 6, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct * 100}%`, background: pct >= 1 ? '#f87171' : item.color, borderRadius: 99, transition: 'width .4s' }} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div style={{
           background: '#f6efe3',

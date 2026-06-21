@@ -672,6 +672,8 @@ function EmpFormModal({ emp, branches, orgId, onClose }) {
     notes: emp?.notes || '',
     closing_tasks_text: isEdit ? (emp?.closing_tasks || []).join('\n') : DEFAULT_CLOSING_TASKS.join('\n'),
     day_off: Array.isArray(emp?.day_off) ? emp.day_off : [],
+    annual_leave_days: emp?.annual_leave_days ?? 6,
+    sick_leave_days: emp?.sick_leave_days ?? 30,
     pin: '',
     currentPin,
   });
@@ -833,6 +835,30 @@ function EmpFormModal({ emp, branches, orgId, onClose }) {
                 })}
               </div>
               <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 6 }}>เลือกได้มากกว่า 1 วัน ถ้าไม่เลือกถือว่าไม่มีวันหยุดประจำ</div>
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 8 }}>โควต้าวันลาต่อปี</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>ลาพักร้อน (วัน/ปี)</label>
+                  <input
+                    type="number" min="0" max="365"
+                    value={form.annual_leave_days}
+                    onChange={(e) => set('annual_leave_days', Math.max(0, +e.target.value))}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--line)', fontSize: 14, background: 'var(--surface)', color: 'var(--text)' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>ลาป่วย (วัน/ปี)</label>
+                  <input
+                    type="number" min="0" max="365"
+                    value={form.sick_leave_days}
+                    onChange={(e) => set('sick_leave_days', Math.max(0, +e.target.value))}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--line)', fontSize: 14, background: 'var(--surface)', color: 'var(--text)' }}
+                  />
+                </div>
+              </div>
+              <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 6 }}>พนักงานจะเห็นสิทธิ์คงเหลือในแอปของตัวเอง</div>
             </div>
             {showPinField && (
               <Field
