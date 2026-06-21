@@ -790,6 +790,8 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
   const [errMsg, setErrMsg] = useState('');
+  const [warnDups, setWarnDups] = useState([]);
+  const [dupMode, setDupMode] = useState(false);
 
   useEffect(() => {
     const menus = catalog?.menus || [];
@@ -798,9 +800,26 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
 
   const filledCount = rows.filter(r => r.available !== '' || r.reserved !== '' || r.damaged !== '').length;
 
-  async function saveAll() {
-    const toSave = rows.filter(r => r.available !== '' || r.reserved !== '' || r.damaged !== '');
-    if (!toSave.length || saving) return;
+  function buildLogMap() {
+    const map = {};
+    todayCakeLog.forEach(c => { if (!map[c.cakeName]) map[c.cakeName] = c; });
+    return map;
+  }
+
+  function findDups(toSave) {
+    const logMap = buildLogMap();
+    const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+    return toSave
+      .filter(row => {
+        const entry = logMap[row.cakeName];
+        if (!entry) return false;
+        const [h, m] = entry.time.split(':').map(Number);
+        return Math.abs(nowMin - (h * 60 + m)) < 30;
+      })
+      .map(row => ({ cakeName: row.cakeName, time: logMap[row.cakeName].time }));
+  }
+
+  async function doSave(toSave) {
     setSaving(true); setErrMsg(''); setSuccess('');
     let saved = 0;
     try {
@@ -836,10 +855,30 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
     }
   }
 
-  function clearAll() { setRows(prev => prev.map(r => ({ ...r, available: '', reserved: '', damaged: '' }))); setSuccess(''); setErrMsg(''); }
-  function setRowField(idx, field, value) { setRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r)); }
+  function saveAll() {
+    const toSave = rows.filter(r => r.available !== '' || r.reserved !== '' || r.damaged !== '');
+    if (!toSave.length || saving) return;
+    const dups = findDups(toSave);
+    if (dups.length > 0) { setWarnDups(dups); setDupMode(true); return; }
+    doSave(toSave);
+  }
+
+  function confirmDupSave() {
+    const toSave = rows.filter(r => r.available !== '' || r.reserved !== '' || r.damaged !== '');
+    setWarnDups([]); setDupMode(false);
+    doSave(toSave);
+  }
+
+  function clearAll() {
+    setRows(prev => prev.map(r => ({ ...r, available: '', reserved: '', damaged: '' })));
+    setSuccess(''); setErrMsg(''); setWarnDups([]); setDupMode(false);
+  }
+  function setRowField(idx, field, value) {
+    setRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+  }
 
   const accentTeal = '#1aa6a6';
+  const logMap = buildLogMap();
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
@@ -875,10 +914,22 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
       <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderTop: 'none', borderRadius: '0 0 14px 14px', overflow: 'hidden', marginTop: -12 }}>
         {rows.map((row, idx) => {
           const filled = row.available !== '' || row.reserved !== '' || row.damaged !== '';
+          const logged = logMap[row.cakeName];
+          const isRecentDup = logged && (() => {
+            const [h, m] = logged.time.split(':').map(Number);
+            return Math.abs(new Date().getHours() * 60 + new Date().getMinutes() - (h * 60 + m)) < 30;
+          })();
           return (
             <div key={row.cakeName} style={{ borderTop: idx > 0 ? '1px solid var(--line-2)' : 'none', background: filled ? '#f0faf5' : 'transparent', padding: '10px 12px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 56px 56px', gap: 6, alignItems: 'center' }}>
-                <span style={{ fontSize: 14, fontWeight: filled ? 700 : 400, color: filled ? '#1a5e3a' : 'var(--ink)' }}>{row.cakeName}</span>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: filled ? 700 : 400, color: filled ? '#1a5e3a' : 'var(--ink)' }}>{row.cakeName}</div>
+                  {logged && (
+                    <div style={{ fontSize: 10, fontWeight: 600, marginTop: 1, color: isRecentDup ? '#b45309' : '#15803d' }}>
+                      {isRecentDup ? '⚠️ บันทึกแล้ว' : '✓ บันทึกแล้ว'} {logged.time}
+                    </div>
+                  )}
+                </div>
                 {[
                   ['available', '#bbe7cf', 'var(--green)'],
                   ['reserved', 'var(--line)', 'var(--ink)'],
@@ -919,15 +970,40 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
         </div>
       )}
 
+      {dupMode && warnDups.length > 0 && (
+        <div style={{ background: '#fff8e8', border: '1.5px solid #f59e0b', borderRadius: 14, padding: '14px 16px' }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: '#92400e', marginBottom: 8 }}>
+            ⚠️ พบรายการที่บันทึกไปแล้วภายใน 30 นาที
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+            {warnDups.map((d, i) => (
+              <div key={i} style={{ fontSize: 13, color: '#78350f' }}>• {d.cakeName} — บันทึกแล้วเมื่อ {d.time}</div>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, color: '#92400e', marginBottom: 12 }}>
+            ต้องการบันทึกซ้ำหรือไม่? (เช็ครอบสอง หรือแก้ไขยอด)
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <button className="btn" onClick={() => { setDupMode(false); setWarnDups([]); }}>ยกเลิก</button>
+            <button className="btn btn-primary" onClick={confirmDupSave}
+              style={{ background: '#d97706', borderColor: '#d97706' }}>
+              ยืนยันบันทึกซ้ำ
+            </button>
+          </div>
+        </div>
+      )}
+
       {success && <Notice tone="success">{success}</Notice>}
       {errMsg && <Notice tone="danger">{errMsg}</Notice>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <button className="btn btn-primary" onClick={saveAll} disabled={filledCount === 0 || saving} style={{ flex: 1 }}>
-          {saving ? 'กำลังบันทึก...' : `บันทึก${filledCount > 0 ? ` ${filledCount}` : ''} รายการ`}
-        </button>
-        <button className="btn" onClick={clearAll} style={{ flex: 1 }}>ล้างค่า</button>
-      </div>
+      {!dupMode && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <button className="btn btn-primary" onClick={saveAll} disabled={filledCount === 0 || saving} style={{ flex: 1 }}>
+            {saving ? 'กำลังบันทึก...' : `บันทึก${filledCount > 0 ? ` ${filledCount}` : ''} รายการ`}
+          </button>
+          <button className="btn" onClick={clearAll} style={{ flex: 1 }}>ล้างค่า</button>
+        </div>
+      )}
     </div>
   );
 }
