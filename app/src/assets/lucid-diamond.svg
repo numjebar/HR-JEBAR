@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52" fill="none">
+  <defs>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="1.8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <polygon points="26,26 50,26 26,50" fill="#1e40af"/>
+  <polygon points="2,26 26,26 26,50" fill="#1d4ed8"/>
+  <polygon points="26,2 50,26 26,26" fill="#2563eb"/>
+  <polygon points="26,2 2,26 26,26" fill="#60a5fa" filter="url(#glow)"/>
+  <polygon points="26,2 19,13 33,13" fill="#bfdbfe" opacity="0.7"/>
+</svg>
