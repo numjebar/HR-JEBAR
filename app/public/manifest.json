@@ -1,7 +1,7 @@
 {
-  "name": "LUCID",
-  "short_name": "LUCID",
-  "description": "AI Business Platform",
+  "name": "LUCID HR",
+  "short_name": "LUCID HR",
+  "description": "Human Resource Platform",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",

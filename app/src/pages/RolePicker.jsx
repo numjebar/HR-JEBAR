@@ -1,14 +1,19 @@
 ﻿import { useNavigate } from 'react-router-dom';
-import logo from '../assets/lucid-logo.svg';
+import diamond from '../assets/lucid-diamond.svg';
 
 export default function RolePicker() {
   const nav = useNavigate();
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 32, padding: 24 }}>
-      <img src={logo} alt="LUCID" style={{ height: 64 }} />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+        <img src={diamond} alt="LUCID HR" style={{ height: 72 }} />
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--ink)', letterSpacing: '-.5px', lineHeight: 1 }}>LUCID HR</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', letterSpacing: '2px', marginTop: 4 }}>HUMAN RESOURCE PLATFORM</div>
+        </div>
+      </div>
       <div style={{ textAlign: 'center' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginBottom: 8 }}>LUCID OPERATIONS SYSTEM</h1>
         <p style={{ color: 'var(--muted)', textAlign: 'center', maxWidth: 520 }}>
           ระบบกลางสำหรับพนักงาน เจ้าของร้าน และการจัดการหน้าร้านในแอปเดียว
         </p>

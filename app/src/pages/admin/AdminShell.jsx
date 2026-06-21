@@ -2,7 +2,7 @@
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
-import logo from '../../assets/lucid-logo.svg';
+import diamond from '../../assets/lucid-diamond.svg';
 import { APP_VERSION } from '../../lib/version';
 import AdminDashboard from './AdminDashboard';
 import AdminEmployees from './AdminEmployees';
@@ -98,14 +98,23 @@ export default function AdminShell() {
     <div className="admin-shell">
       <div className="admin-topbar">
         <button className="admin-menu-btn" onClick={() => setSidebarOpen(true)} aria-label="เปิดเมนู">☰</button>
-        <img src={logo} alt="LUCID" style={{ height: 26 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <img src={diamond} alt="LUCID HR" style={{ height: 26 }} />
+          <span style={{ fontWeight: 800, fontSize: 15, letterSpacing: '-.3px', color: 'var(--ink)' }}>LUCID HR</span>
+        </div>
       </div>
       {sidebarOpen && <button className="admin-sidebar-overlay" onClick={closeSidebar} aria-label="ปิดเมนู" />}
       <aside className={`admin-sidebar ${sidebarOpen ? 'is-open' : ''}`}>
         <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <img src={logo} alt="LUCID" style={{ height: 32 }} />
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>แอดมิน</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <img src={diamond} alt="LUCID HR" style={{ height: 36 }} />
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-.3px', color: 'var(--ink)', lineHeight: 1 }}>LUCID HR</div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '1.5px', marginTop: 3 }}>HUMAN RESOURCE</div>
+              </div>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>แอดมิน</div>
           </div>
           <button className="admin-sidebar-close" onClick={closeSidebar} aria-label="ปิดเมนู">×</button>
         </div>
