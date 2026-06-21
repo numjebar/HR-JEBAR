@@ -1292,6 +1292,38 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
     }
   }
 
+  const isBatchCake = taskKey === 'cake-stock' && catalogReady && (catalog?.menus || []).length > 0;
+  if (isBatchCake) {
+    return (
+      <div style={cardStyle}>
+        <div style={{ fontWeight: 800, fontSize: 20, color: '#2f241f', marginBottom: 6 }}>เช็คสต๊อกเค้ก</div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>เลือกรายการและบันทึกจำนวนพร้อมกันหลายรายการ</div>
+        <TwoColRow>
+          <Field label="วันที่">
+            <input type="date" value={draft.date || ''} onChange={e => setDraft({ ...draft, date: e.target.value })} />
+          </Field>
+          <Field label="ผู้บันทึก">
+            <input value={draft.recordedBy || ''} onChange={e => setDraft({ ...draft, recordedBy: e.target.value })} placeholder="ชื่อ" />
+          </Field>
+        </TwoColRow>
+        <CakeStockBatchForm
+          catalog={catalog}
+          catalogReady={catalogReady}
+          catalogRetrying={catalogRetrying}
+          reloadCatalog={reloadCatalog}
+          draft={draft}
+          setDraft={setDraft}
+          branches={branches}
+          employeeSessionToken={employeeSessionToken}
+          backend={backend}
+          saveLocalDraft={saveLocalDraft}
+          todayCakeLog={todayCakeLog}
+          setCakeRefreshTick={setCakeRefreshTick}
+        />
+      </div>
+    );
+  }
+
   const cardTitle = taskKey === 'bills' ? 'บันทึกบิลซื้อของ' : taskKey === 'purchase-list' ? 'ใบสั่งซื้อ' : 'บันทึกข้อมูล';
 
   return (
