@@ -230,6 +230,17 @@ function LeaveForm({ employee, orgId, branch, settings, employeeSessionToken, on
       p_deduct_amount: 0,
       p_deduct_note: null,
     });
+    if (branch?.line_notify_token) {
+      const name = employee.nickname || employee.name;
+      const dateStr = dateFrom === dateTo ? dateFrom : `${dateFrom} ถึง ${dateTo}`;
+      try {
+        await fetch('https://notify-api.line.me/api/notify', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${branch.line_notify_token}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ message: `\n📋 ใบลาใหม่ (รอการอนุมัติ)\nพนักงาน: ${name}\nประเภท: ${type}\nวันที่: ${dateStr}${reason ? `\nเหตุผล: ${reason}` : ''}` }),
+        });
+      } catch (e) { /* silent */ }
+    }
     setBusy(false);
     onClose();
   }

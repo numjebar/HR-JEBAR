@@ -418,6 +418,7 @@ function BranchFormModal({ orgId, branch, onClose }) {
     lat: branch?.lat || 13.7466,
     lng: branch?.lng || 100.5347,
     radius: branch?.radius || 20,
+    line_notify_token: branch?.line_notify_token || '',
   });
   const [locInput, setLocInput] = useState('');
   const [locErr, setLocErr] = useState('');
@@ -445,7 +446,7 @@ function BranchFormModal({ orgId, branch, onClose }) {
   async function save() {
     setBusy(true);
     if (isEdit) {
-      await supabase.from('branches').update({ label: form.label, lat: form.lat, lng: form.lng, radius: form.radius }).eq('id', branch.id);
+      await supabase.from('branches').update({ label: form.label, lat: form.lat, lng: form.lng, radius: form.radius, line_notify_token: form.line_notify_token || null }).eq('id', branch.id);
     } else {
       await supabase.from('branches').insert({ ...form, org_id: orgId, rules: { ...DEFAULT_RULES }, shop_rules: [] });
     }
@@ -506,6 +507,23 @@ function BranchFormModal({ orgId, branch, onClose }) {
             </div>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
               ปักหมุดร้านบน Google Maps → แชร์ → copy link แล้ววางด้านบน
+            </div>
+          </div>
+
+          {/* LINE Notify */}
+          <div>
+            <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 5 }}>
+              LINE Notify Token <span style={{ fontWeight: 400, opacity: 0.7 }}>(แจ้งเตือนใบลา)</span>
+            </label>
+            <input
+              type="password"
+              value={form.line_notify_token}
+              onChange={(e) => setForm((p) => ({ ...p, line_notify_token: e.target.value }))}
+              placeholder="วาง Token จาก notify-bot.line.me"
+              autoComplete="off"
+            />
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 5 }}>
+              ไปที่ notify-bot.line.me → เลือกกลุ่ม LINE → Generate Token → วางที่นี่
             </div>
           </div>
 

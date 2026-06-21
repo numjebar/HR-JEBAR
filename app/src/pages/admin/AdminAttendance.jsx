@@ -5,6 +5,19 @@ import { ymd, addDays, dayRate, rulesFor, parseHM } from '../../lib/payroll';
 
 const URGENT_LEAVE_NOTE_PREFIX = 'ลาด่วนเช้าวันงานโดยไม่มีเหตุผล';
 
+async function sendLineNotify(token, message) {
+  if (!token) return;
+  try {
+    await fetch('https://notify-api.line.me/api/notify', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ message }),
+    });
+  } catch (e) {
+    console.warn('LINE Notify failed', e);
+  }
+}
+
 export default function AdminAttendance() {
   const { orgId } = useAuthStore();
   const [date, setDate] = useState(ymd(new Date()));
@@ -129,10 +142,10 @@ export default function AdminAttendance() {
         cursor = addDays(cursor, 1);
       }
       await supabase.from('attendance').upsert(days, { onConflict: 'emp_id,date' });
-      if (Boolean(leave.urgent)) {
-        const { data: emp } = await supabase.from('employees').select('*').eq('id', leave.emp_id).single();
-        if (emp) {
-          const br = branches.find((b) => b.id === emp.branch_id);
+      const { data: emp } = await supabase.from('employees').select('*').eq('id', leave.emp_id).single();
+      if (emp) {
+        const br = branches.find((b) => b.id === emp.branch_id);
+        if (Boolean(leave.urgent)) {
           const rules = rulesFor(settings?.rules, br, emp);
           const deductDays = Number(rules?.urgentLeaveDeductDays || 0);
           if (deductDays > 0) {
@@ -148,6 +161,13 @@ export default function AdminAttendance() {
               });
             }
           }
+        }
+        if (br?.line_notify_token) {
+          const name = emp.nickname || emp.name;
+          const dateStr = leave.date_from === leave.date_to ? leave.date_from : `${leave.date_from} ถึง ${leave.date_to}`;
+          await sendLineNotify(br.line_notify_token,
+            `\n✅ อนุมัติใบลา\nพนักงาน: ${name}\nประเภท: ${leave.type}\nวันที่: ${dateStr}`
+          );
         }
       }
     }
@@ -165,6 +185,17 @@ export default function AdminAttendance() {
       await supabase.from('adjustments').delete()
         .eq('emp_id', leave.emp_id).eq('date', leave.date_from).eq('auto', true)
         .like('note', `${URGENT_LEAVE_NOTE_PREFIX}%`);
+      const { data: emp } = await supabase.from('employees').select('*').eq('id', leave.emp_id).single();
+      if (emp) {
+        const br = branches.find((b) => b.id === emp.branch_id);
+        if (br?.line_notify_token) {
+          const name = emp.nickname || emp.name;
+          const dateStr = leave.date_from === leave.date_to ? leave.date_from : `${leave.date_from} ถึง ${leave.date_to}`;
+          await sendLineNotify(br.line_notify_token,
+            `\n❌ ปฏิเสธใบลา\nพนักงาน: ${name}\nประเภท: ${leave.type}\nวันที่: ${dateStr}`
+          );
+        }
+      }
     }
     load();
   }
