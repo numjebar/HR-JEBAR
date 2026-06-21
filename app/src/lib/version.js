@@ -1,1 +1,1 @@
-export const APP_VERSION = 'Build 2026.06.21-emp-payslip-v69';
+export const APP_VERSION = 'Build 2026.06.21-lucid-icons-v70';
