@@ -465,6 +465,14 @@ function BranchFormModal({ orgId, branch, onClose }) {
           <div>
             <label style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 5 }}>รัศมี Geofence (เมตร)</label>
             <input type="number" value={form.radius} onChange={(e) => setForm((p) => ({ ...p, radius: +e.target.value }))} />
+            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+              {[50, 100, 150, 200, 300].map((r) => (
+                <button key={r} className="btn" onClick={() => setForm((p) => ({ ...p, radius: r }))}
+                  style={{ padding: '4px 12px', fontSize: 12, background: form.radius === r ? 'var(--accent)' : 'var(--bg)', color: form.radius === r ? '#fff' : 'var(--muted)', border: '1px solid var(--line)' }}>
+                  {r} ม.
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* location parser */}
@@ -487,9 +495,18 @@ function BranchFormModal({ orgId, branch, onClose }) {
                 <input type="number" value={form.lng} onChange={(e) => setForm((p) => ({ ...p, lng: +e.target.value }))} step="0.000001" />
               </div>
             </div>
-            <button className="btn" onClick={getGPS} disabled={geoLoading} style={{ marginTop: 8, background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--muted)', fontSize: 13 }}>
-              {geoLoading ? 'กำลังรับ GPS...' : '📍 ใช้ตำแหน่งปัจจุบัน'}
-            </button>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button className="btn" onClick={getGPS} disabled={geoLoading} style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--muted)', fontSize: 13 }}>
+                {geoLoading ? 'กำลังรับ GPS...' : '📍 ใช้ตำแหน่งปัจจุบัน'}
+              </button>
+              <a href={`https://www.google.com/maps?q=${form.lat},${form.lng}`} target="_blank" rel="noreferrer"
+                style={{ display: 'flex', alignItems: 'center', padding: '0 14px', background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--muted)', fontSize: 13, borderRadius: 8, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                🗺️ ดูบน Maps
+              </a>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
+              ปักหมุดร้านบน Google Maps → แชร์ → copy link แล้ววางด้านบน
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
