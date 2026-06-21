@@ -783,6 +783,155 @@ function OpsTaskPage({ taskKey, navigate }) {
   );
 }
 
+function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCatalog, draft, setDraft, branches, employeeSessionToken, backend, saveLocalDraft, todayCakeLog, setCakeRefreshTick }) {
+  const [rows, setRows] = useState(() =>
+    (catalog?.menus || []).map(m => ({ cakeName: m.name, available: '', reserved: '', damaged: '' }))
+  );
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState('');
+  const [errMsg, setErrMsg] = useState('');
+
+  useEffect(() => {
+    const menus = catalog?.menus || [];
+    setRows(menus.map(m => ({ cakeName: m.name, available: '', reserved: '', damaged: '' })));
+  }, [(catalog?.menus || []).map(m => m.name).join('|')]);
+
+  const filledCount = rows.filter(r => r.available !== '' || r.reserved !== '' || r.damaged !== '').length;
+
+  async function saveAll() {
+    const toSave = rows.filter(r => r.available !== '' || r.reserved !== '' || r.damaged !== '');
+    if (!toSave.length || saving) return;
+    setSaving(true); setErrMsg(''); setSuccess('');
+    let saved = 0;
+    try {
+      for (const row of toSave) {
+        const avail = Number(row.available) || 0;
+        const dmg = Number(row.damaged) || 0;
+        const autoStatus = avail === 0 ? 'หมด' : (avail <= 2 || dmg > 0) ? 'ใกล้หมด' : 'พร้อมขาย';
+        const payload = {
+          branchName: draft.branchName, cakeName: row.cakeName,
+          available: row.available || '0', reserved: row.reserved || '0', damaged: row.damaged || '0',
+          status: autoStatus, note: '', date: draft.date, recordedBy: draft.recordedBy,
+        };
+        const { error } = await supabase.rpc('employee_submit_ops_entry_v2', {
+          p_session_token: employeeSessionToken, p_task_key: 'cake-stock', p_payload: payload,
+        });
+        if (error) throw error;
+        saveLocalDraft(payload);
+        saved++;
+      }
+      await backend.reload();
+      setCakeRefreshTick(t => t + 1);
+      setSuccess(`บันทึก ${saved} รายการเข้า backend แล้ว`);
+      setRows(prev => prev.map(r => ({ ...r, available: '', reserved: '', damaged: '' })));
+    } catch (err) {
+      const msg = String(err?.message || '');
+      if (msg.includes('employee_submit_ops_entry_v2') || msg.includes('employee_ops_entries')) {
+        setErrMsg('ยังไม่ได้รันไฟล์ 25_employee_ops_entries.sql ใน Supabase SQL Editor');
+      } else {
+        setErrMsg(msg || 'บันทึกไม่สำเร็จ');
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function clearAll() { setRows(prev => prev.map(r => ({ ...r, available: '', reserved: '', damaged: '' }))); setSuccess(''); setErrMsg(''); }
+  function setRowField(idx, field, value) { setRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r)); }
+
+  const accentTeal = '#1aa6a6';
+
+  return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      <Field label="สาขาที่เช็ก">
+        <select value={draft.branchName} onChange={e => setDraft({ ...draft, branchName: e.target.value })}>
+          {branches.length > 0
+            ? branches.map(b => <option key={b.id} value={b.label}>{b.label}</option>)
+            : [<option key="1">สาขากาดน้ำทอง</option>, <option key="2">สาขากาดกองเก่า</option>]
+          }
+        </select>
+      </Field>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+        {[
+          { label: 'รายการทั้งหมด', value: rows.length },
+          { label: 'กรอกแล้ว', value: filledCount, color: accentTeal },
+          { label: 'บันทึกวันนี้', value: todayCakeLog.length, color: 'var(--accent)' },
+        ].map(k => (
+          <div key={k.label} style={{ background: 'var(--surface-2)', borderRadius: 12, padding: '10px 0', textAlign: 'center', border: '1px solid var(--line)' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: k.color || 'var(--ink)', lineHeight: 1.1 }}>{k.value}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 56px 56px', gap: 6, padding: '8px 12px', background: '#e8f5f5', borderRadius: '14px 14px 0 0', fontSize: 11, fontWeight: 700, color: accentTeal }}>
+        <span>เค้ก / ขนม</span>
+        <span style={{ textAlign: 'center' }}>พร้อมขาย</span>
+        <span style={{ textAlign: 'center' }}>จอง</span>
+        <span style={{ textAlign: 'center' }}>เสีย</span>
+      </div>
+
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderTop: 'none', borderRadius: '0 0 14px 14px', overflow: 'hidden', marginTop: -12 }}>
+        {rows.map((row, idx) => {
+          const filled = row.available !== '' || row.reserved !== '' || row.damaged !== '';
+          return (
+            <div key={row.cakeName} style={{ borderTop: idx > 0 ? '1px solid var(--line-2)' : 'none', background: filled ? '#f0faf5' : 'transparent', padding: '10px 12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 56px 56px', gap: 6, alignItems: 'center' }}>
+                <span style={{ fontSize: 14, fontWeight: filled ? 700 : 400, color: filled ? '#1a5e3a' : 'var(--ink)' }}>{row.cakeName}</span>
+                {[
+                  ['available', '#bbe7cf', 'var(--green)'],
+                  ['reserved', 'var(--line)', 'var(--ink)'],
+                  ['damaged', 'var(--red)', 'var(--red)'],
+                ].map(([field, bClr, numClr]) => (
+                  <input key={field} type="number" min="0"
+                    value={row[field]}
+                    onChange={e => setRowField(idx, field, e.target.value)}
+                    placeholder="–"
+                    style={{
+                      width: '100%', textAlign: 'center', padding: '7px 4px', borderRadius: 8,
+                      border: `1.5px solid ${Number(row[field]) > 0 ? bClr : 'var(--line)'}`,
+                      background: field === 'damaged' && Number(row.damaged) > 0 ? '#fff1f1' : 'var(--surface-2)',
+                      fontSize: 15, fontWeight: 700,
+                      color: Number(row[field]) > 0 ? numClr : 'var(--ink-3)',
+                      fontFamily: 'inherit',
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {todayCakeLog.length > 0 && (
+        <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 12, padding: '10px 12px' }}>
+          <div style={{ fontSize: 12, color: '#92400e', fontWeight: 700, marginBottom: 6 }}>
+            🍰 บันทึกวันนี้แล้ว {todayCakeLog.length} รายการ ({draft.branchName})
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {todayCakeLog.map((c, i) => (
+              <span key={i} style={{ background: '#fff', border: '1px solid #fde68a', borderRadius: 8, padding: '2px 8px', fontSize: 11, color: '#78350f' }}>
+                {c.cakeName} · {c.available}{c.reserved && c.reserved !== '0' ? ` จอง${c.reserved}` : ''} @{c.time}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {success && <Notice tone="success">{success}</Notice>}
+      {errMsg && <Notice tone="danger">{errMsg}</Notice>}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <button className="btn btn-primary" onClick={saveAll} disabled={filledCount === 0 || saving} style={{ flex: 1 }}>
+          {saving ? 'กำลังบันทึก...' : `บันทึก${filledCount > 0 ? ` ${filledCount}` : ''} รายการ`}
+        </button>
+        <button className="btn" onClick={clearAll} style={{ flex: 1 }}>ล้างค่า</button>
+      </div>
+    </div>
+  );
+}
+
 function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, backend, summary, catalog, catalogReady, catalogRetrying = false, reloadCatalog, geminiKey, branches = [] }) {
   const { employeeSessionToken, employee, orgId } = useAuthStore();
   const empName = employee?.name || '';
@@ -972,6 +1121,7 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
   }
 
   const cardTitle = taskKey === 'bills' ? 'บันทึกบิลซื้อของ' : taskKey === 'purchase-list' ? 'ใบสั่งซื้อ' : 'บันทึกข้อมูล';
+  const isBatchCake = taskKey === 'cake-stock' && catalogReady && (catalog?.menus || []).length > 0;
 
   return (
     <div style={cardStyle}>
@@ -990,33 +1140,44 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
 
       {taskKey === 'purchase-list'
         ? <PurchaseListForm draft={draft} setDraft={setDraft} catalog={catalog} catalogReady={catalogReady} catalogRetrying={catalogRetrying} reloadCatalog={reloadCatalog} employeeSessionToken={employeeSessionToken} />
-        : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches, lastRecord, todayProductionTotal, lastCakeRecord, todayProductionBatches, todayCakeLog, catalogReady, reloadCatalog, catalogRetrying)
+        : isBatchCake
+          ? <CakeStockBatchForm
+              catalog={catalog} catalogReady={catalogReady} catalogRetrying={catalogRetrying} reloadCatalog={reloadCatalog}
+              draft={draft} setDraft={setDraft} branches={branches}
+              employeeSessionToken={employeeSessionToken}
+              backend={backend} saveLocalDraft={saveLocalDraft}
+              todayCakeLog={todayCakeLog} setCakeRefreshTick={setCakeRefreshTick}
+            />
+          : renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches, lastRecord, todayProductionTotal, lastCakeRecord, todayProductionBatches, todayCakeLog, catalogReady, reloadCatalog, catalogRetrying)
       }
 
-      <div style={summaryPillStyle}>ร่างล่าสุด: {summary}</div>
-      {uploadMsg && <Notice tone="warning">{uploadMsg}</Notice>}
-      {success && <Notice tone="success">{success}</Notice>}
-      {success && (taskKey === 'inventory' || taskKey === 'supplies-count') && draft.itemName && draft.status && draft.status !== 'ปกติ' && (
-        <div style={{ background: '#fff8e8', border: '1px solid #f4dfab', borderRadius: 16, padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, fontSize: 13 }}>
-          <span style={{ color: '#7a5b2b' }}>⚡ {draft.itemName} {draft.status} — เพิ่มในใบสั่งซื้อ?</span>
-          <button
-            type="button"
-            onClick={() => navigate(`/emp/ops/purchase-list?suggest=${encodeURIComponent(draft.itemName)}&unit=${encodeURIComponent(draft.unit || '')}&urgent=${draft.status === 'ต้องสั่งเพิ่ม' || draft.status === 'มีปัญหา' || draft.status === 'หมดแล้ว' ? '1' : '0'}&cat=${encodeURIComponent(taskKey === 'supplies-count' ? 'ของใช้สิ้นเปลือง' : 'วัตถุดิบ')}`)}
-            style={{ padding: '6px 12px', borderRadius: 10, border: '1.5px solid var(--accent)', background: 'var(--accent-soft)', color: 'var(--accent)', fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
-          >
-            + ใบสั่งซื้อ
-          </button>
-        </div>
+      {!isBatchCake && taskKey !== 'purchase-list' && (
+        <>
+          <div style={summaryPillStyle}>ร่างล่าสุด: {summary}</div>
+          {uploadMsg && <Notice tone="warning">{uploadMsg}</Notice>}
+          {success && <Notice tone="success">{success}</Notice>}
+          {success && (taskKey === 'inventory' || taskKey === 'supplies-count') && draft.itemName && draft.status && draft.status !== 'ปกติ' && (
+            <div style={{ background: '#fff8e8', border: '1px solid #f4dfab', borderRadius: 16, padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, fontSize: 13 }}>
+              <span style={{ color: '#7a5b2b' }}>⚡ {draft.itemName} {draft.status} — เพิ่มในใบสั่งซื้อ?</span>
+              <button
+                type="button"
+                onClick={() => navigate(`/emp/ops/purchase-list?suggest=${encodeURIComponent(draft.itemName)}&unit=${encodeURIComponent(draft.unit || '')}&urgent=${draft.status === 'ต้องสั่งเพิ่ม' || draft.status === 'มีปัญหา' || draft.status === 'หมดแล้ว' ? '1' : '0'}&cat=${encodeURIComponent(taskKey === 'supplies-count' ? 'ของใช้สิ้นเปลือง' : 'วัตถุดิบ')}`)}
+                style={{ padding: '6px 12px', borderRadius: 10, border: '1.5px solid var(--accent)', background: 'var(--accent-soft)', color: 'var(--accent)', fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+              >
+                + ใบสั่งซื้อ
+              </button>
+            </div>
+          )}
+          {errMsg && <Notice tone="danger">{errMsg}</Notice>}
+          <div style={actionRowStyle}>
+            <button className="btn btn-primary" onClick={submitBackend}
+              disabled={!hasAnyInput(taskKey, draft) || saving} style={{ flex: 1 }}>
+              {saving ? 'กำลังบันทึก...' : 'บันทึกเข้า backend'}
+            </button>
+            <button className="btn" onClick={resetDraft} style={{ flex: 1 }}>ล้างฟอร์ม</button>
+          </div>
+        </>
       )}
-      {errMsg  && <Notice tone="danger">{errMsg}</Notice>}
-
-      <div style={actionRowStyle}>
-        <button className="btn btn-primary" onClick={submitBackend}
-          disabled={!hasAnyInput(taskKey, draft) || saving} style={{ flex: 1 }}>
-          {saving ? 'กำลังบันทึก...' : 'บันทึกเข้า backend'}
-        </button>
-        <button className="btn" onClick={resetDraft} style={{ flex: 1 }}>ล้างฟอร์ม</button>
-      </div>
     </div>
   );
 }
