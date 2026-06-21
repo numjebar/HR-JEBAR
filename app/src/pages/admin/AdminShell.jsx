@@ -172,17 +172,18 @@ export default function AdminShell() {
           <Route path="ops-inbox" element={<AdminOpsInbox />} />
           <Route path="settings" element={<AdminSettings />} />
         </Routes>
-        {returnTo && (
-          <a href={returnTo}
-            style={{ position: 'fixed', left: 14, bottom: 12, zIndex: 30, display: 'flex', alignItems: 'center', gap: 6,
-              background: 'var(--accent)', color: '#fff', borderRadius: 999, padding: '7px 14px',
-              fontSize: 13, fontWeight: 700, textDecoration: 'none', boxShadow: '0 4px 16px rgba(0,113,227,.35)',
-              border: 'none', cursor: 'pointer' }}>
-            ← กลับ LUCID Operate
-          </a>
-        )}
-        <div style={{ position: 'fixed', right: 14, bottom: 12, fontSize: 11, color: 'var(--muted)', background: 'rgba(255,255,255,.92)', border: '1px solid var(--line)', borderRadius: 999, padding: '4px 10px', zIndex: 20 }}>
-          {APP_VERSION}
+        <div style={{ position: 'fixed', right: 14, bottom: 12, zIndex: 30, display: 'flex', alignItems: 'center', gap: 8 }}>
+          {returnTo && (
+            <a href={returnTo}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,.92)',
+                color: 'var(--accent)', border: '1px solid var(--line)', borderRadius: 999,
+                padding: '4px 12px', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>
+              ← LUCID Operate
+            </a>
+          )}
+          <div style={{ fontSize: 11, color: 'var(--muted)', background: 'rgba(255,255,255,.92)', border: '1px solid var(--line)', borderRadius: 999, padding: '4px 10px' }}>
+            {APP_VERSION}
+          </div>
         </div>
       </main>
     </div>
