@@ -8,11 +8,12 @@ import AdminLogin from './pages/AdminLogin';
 import EmpLogin from './pages/EmpLogin';
 import AdminShell from './pages/admin/AdminShell';
 import EmpShell from './pages/employee/EmpShell';
+import PosLite from './pages/pos/PosLite';
 
 function App() {
   const { init, loading, isAdmin, employee } = useAuthStore();
 
-  useEffect(() => { init(); }, []);
+  useEffect(() => { init(); }, [init]);
 
   if (loading) {
     return (
@@ -26,6 +27,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<RolePicker />} />
+        <Route path="/pos" element={<PosLite />} />
         <Route path="/admin/login" element={
           isAdmin ? <Navigate to="/admin" replace /> : <AdminLogin />
         } />

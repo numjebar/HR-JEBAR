@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
 import { computePay, rulesFor, rangeFor, rangeForEmployee, THB, ymd, addDays, parseYmd, fmtDateFull, lateMinutesOf, overtimeMinutesOf } from '../../lib/payroll';
@@ -8,6 +8,11 @@ const PERIOD_LABEL = {
   day: 'รายวัน',
   week: 'รายสัปดาห์',
   month: 'รายเดือน',
+};
+const PAY_TYPE_LABEL = {
+  daily: 'รายวัน',
+  weekly: 'รายสัปดาห์',
+  monthly: 'รายเดือน',
 };
 const MANUAL_PAYROLL_NOTE_PREFIX = '[manual-payroll-net]';
 
@@ -33,14 +38,18 @@ export default function AdminPayroll() {
   const [netModal, setNetModal] = useState(null);
   const [dayEditModal, setDayEditModal] = useState(null);
   const [payRange, setPayRange] = useState(rangeFor('month'));
+  const loadSeqRef = useRef(0);
 
-  async function load() {
+  const load = useCallback(async () => {
+    const requestId = loadSeqRef.current + 1;
+    loadSeqRef.current = requestId;
     const calendarRange = rangeFor(period);
     const [{ data: emps }, { data: brs }, { data: settings }] = await Promise.all([
       supabase.from('employees').select('*').eq('org_id', orgId),
       supabase.from('branches').select('*').eq('org_id', orgId),
       supabase.from('org_settings').select('*').eq('org_id', orgId).single(),
     ]);
+    if (requestId !== loadSeqRef.current) return;
     setBranches(brs || []);
     const branchFiltered = branchFilter === 'all' ? (emps || []) : (emps || []).filter((e) => e.branch_id === branchFilter);
     const filtered = payTypeFilter === 'all' ? branchFiltered : branchFiltered.filter((e) => e.pay_type === payTypeFilter);
@@ -57,6 +66,7 @@ export default function AdminPayroll() {
       supabase.from('adjustments').select('*').eq('org_id', orgId).gte('date', minFrom).lte('date', maxTo),
       supabase.from('payroll_payments').select('*').eq('org_id', orgId).gte('cycle_to', minFrom).lte('cycle_from', maxTo),
     ]);
+    if (requestId !== loadSeqRef.current) return;
     const payments = paymentsRes?.data || [];
     let totalNet = 0;
     const result = filtered.map((emp) => {
@@ -74,7 +84,7 @@ export default function AdminPayroll() {
     });
     setRows(result);
     setTotal(totalNet);
-  }
+  }, [branchFilter, orgId, payTypeFilter, period]);
 
   async function togglePaid(row) {
     const { emp, range, effectivePeriod, pay, payment } = row;
@@ -99,7 +109,10 @@ export default function AdminPayroll() {
     load();
   }
 
-  useEffect(() => { load(); }, [period, branchFilter, payTypeFilter]);
+  useEffect(() => {
+    load();
+    return () => { loadSeqRef.current += 1; };
+  }, [load]);
 
   function exportCsv() {
     const headers = ['พนักงาน', 'สาขา', 'วันทำงาน', 'ค่าแรง', 'OT', 'คอมมิชชั่น', 'โบนัส', 'ประกันสังคม', 'เบิก', 'หักรวม', 'สุทธิ'];
@@ -362,6 +375,7 @@ export default function AdminPayroll() {
       <div style={{ display: 'grid', gap: 16 }}>
         {rows.map((row) => {
           const { emp, br, pay, rules, range, effectivePeriod, empAtt, empAdj, payment } = row;
+          const payTypeText = payTypeLabel(emp);
           return (
           <div key={emp.id} className="card" style={{ padding: 18, ...(payment ? { borderColor: '#0E7C66' } : {}) }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
@@ -375,10 +389,7 @@ export default function AdminPayroll() {
                   )}
                 </div>
                 <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>
-                  {br?.label || '—'} · {emp.pay_type === 'daily' ? 'รายวัน' : emp.pay_type === 'weekly' ? 'รายสัปดาห์' : 'รายเดือน'}
-                </div>
-                <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 4 }}>
-                  รอบพนักงาน: <span className="num">{range.from}</span> - <span className="num">{range.to}</span>
+                  {br?.label || '—'} · {payTypeText}
                 </div>
                 {payment && (
                   <div style={{ color: '#0E7C66', fontSize: 12, marginTop: 4 }}>
@@ -389,6 +400,30 @@ export default function AdminPayroll() {
               <div style={{ textAlign: 'right' }}>
                 <div style={{ color: 'var(--muted)', fontSize: 12 }}>สุทธิที่ต้องจ่าย</div>
                 <div className="num" style={{ fontWeight: 800, fontSize: 26, color: 'var(--accent)' }}>{THB(pay.net)}</div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                marginTop: 16,
+                padding: '12px 14px',
+                borderRadius: 14,
+                background: 'var(--accent-soft)',
+                border: '1px solid var(--line)',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: 12,
+              }}
+            >
+              <div>
+                <div style={{ color: 'var(--accent)', fontSize: 12, fontWeight: 700 }}>รอบจ่ายที่ใช้คำนวณ</div>
+                <div className="num" style={{ fontWeight: 800, fontSize: 17, color: 'var(--ink)', marginTop: 3 }}>{range.from} – {range.to}</div>
+                <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 3 }}>{payTypeText} · {cycleStartText(emp)}</div>
+              </div>
+              <div>
+                <div style={{ color: 'var(--accent)', fontSize: 12, fontWeight: 700 }}>สูตรค่าแรงงวดนี้</div>
+                <div className="num" style={{ fontWeight: 800, fontSize: 17, color: 'var(--ink)', marginTop: 3 }}>{wageFormulaText(pay)}</div>
+                <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 3 }}>{cycleWorkText(emp, pay)}</div>
               </div>
             </div>
 
@@ -716,6 +751,27 @@ function DayEditModal({ data, onClose, onSaved }) {
 function weekdayLabel(value) {
   const labels = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัส', 'ศุกร์', 'เสาร์'];
   return labels[Number(value)] || '—';
+}
+
+function payTypeLabel(emp) {
+  return PAY_TYPE_LABEL[emp?.pay_type] || PAY_TYPE_LABEL.monthly;
+}
+
+function cycleStartText(emp) {
+  if (emp?.pay_type === 'weekly') return `เริ่มทุกวัน${weekdayLabel(emp.weekly_cycle_start_day)}`;
+  if (emp?.pay_type === 'monthly') return `เริ่มทุกวันที่ ${emp.monthly_cycle_start_day || '—'}`;
+  return 'คิดเฉพาะวันที่มาทำงานจริง';
+}
+
+function cycleWorkText(emp, pay) {
+  if (emp?.pay_type === 'daily') {
+    return `ทำงาน ${pay.daysWorked} วัน${pay.paidLeaveDays > 0 ? ` · ลาจ่าย ${pay.paidLeaveDays} วัน` : ''}`;
+  }
+  return `รอบ ${pay.cycleDaysTotal || 0} วัน · หยุดประจำ ${pay.offDaysTotal || 0} วัน · วันทำงานตามรอบ ${pay.scheduledDaysInCycle || 0} วัน`;
+}
+
+function wageFormulaText(pay) {
+  return `${THB(pay.effectiveDayRate)}/วัน × ${pay.paidUnits} วัน = ${THB(pay.base)}`;
 }
 
 function SummaryItem({ label, value, hint, danger = false }) {
@@ -1054,8 +1110,3 @@ function NumberInput({ label, value, onChange }) {
     </div>
   );
 }
-
-
-
-
-

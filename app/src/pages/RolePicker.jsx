@@ -25,6 +25,9 @@ export default function RolePicker() {
         <button className="btn" style={{ background: 'var(--ink)', color: '#fff', padding: '16px 20px', fontSize: 16 }} onClick={() => nav('/admin/login')}>
           เข้าสู่ระบบเจ้าของร้าน / แอดมิน
         </button>
+        <button className="btn" style={{ background: '#111827', color: '#fff', padding: '16px 20px', fontSize: 16 }} onClick={() => nav('/pos')}>
+          เปิด POS Lite Offline
+        </button>
       </div>
       <div style={{ fontSize: 12.5, color: 'var(--muted)', textAlign: 'center', maxWidth: 420 }}>
         พนักงานเข้าสู่ระบบแล้วสามารถเข้าเมนูระบบร้าน / OPS ได้จากในแอปพนักงาน

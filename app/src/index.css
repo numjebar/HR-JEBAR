@@ -208,3 +208,28 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 99px; }
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  #pos-receipt-preview,
+  #pos-receipt-preview * {
+    visibility: visible !important;
+  }
+
+  #pos-receipt-preview {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 80mm !important;
+    min-height: auto !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    color: #000 !important;
+    background: #fff !important;
+    font-size: 12px !important;
+    padding: 8mm 6mm !important;
+  }
+}

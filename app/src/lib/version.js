@@ -1,1 +1,1 @@
-export const APP_VERSION = 'Build 2026.06.21-cake-grid-v80';
+export const APP_VERSION = 'Build 2026.06.22-pos-transport-preview-v105';
