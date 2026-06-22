@@ -4,7 +4,7 @@ import { syncPendingPosEvents } from '../../lib/posSync';
 import { startPosBackgroundSync } from '../../lib/posBackgroundSync';
 import { registerPosDevice, renewPosDeviceLicense } from '../../lib/posDevice';
 import { buildEscPosReceiptText, getEscPosCommandPlan } from '../../lib/posEscPosCommands';
-import { getPrinterTransportCapabilities, runPrinterTransportPreview } from '../../lib/posPrinterTransport';
+import { executePrinterTransport, getPrinterTransportCapabilities, runPrinterTransportPreview } from '../../lib/posPrinterTransport';
 import { formatPrinterProfile, getPrinterProfile, POS_PRINTER_PROFILES } from '../../lib/posPrinterProfiles';
 
 const SAMPLE_PRODUCTS = [
@@ -216,12 +216,15 @@ export default function PosLite() {
       .filter((item) => item.qty > 0));
   };
 
-  const printLastReceipt = () => {
+  const printLastReceipt = async () => {
     if (!lastReceipt) {
       setMessage('ยังไม่มีสลิปให้พิมพ์');
       return;
     }
-    window.print();
+    const text = buildEscPosReceiptText({ receipt: lastReceipt, profile: printerProfile });
+    const result = await executePrinterTransport({ profile: printerProfile, escPosText: text });
+    setPrinterTransportStatus(result);
+    setMessage(result.ok ? 'ส่งไป browser print dialog แล้ว' : `ยังพิมพ์จริงไม่ได้: ${result.error || result.capabilities.notes}`);
   };
 
   const buildEscPosPreview = (receipt = lastReceipt, mode = 'receipt') => {

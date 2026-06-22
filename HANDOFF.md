@@ -1,5 +1,42 @@
 # HR JEBAR Handoff
 
+## Update 2026-06-22 (POS browser print transport hook — v106)
+
+### สิ่งที่ทีมbk สร้างต่อจาก v105
+
+**Actual browser print transport hook**
+
+- เพิ่ม `executePrinterTransport()` ใน `app/src/lib/posPrinterTransport.js` เพื่อรองรับการ execute transport เบื้องต้น
+- สำหรับ profile `browser` จะเรียก `window.print()` จริงและคืนผลลัพธ์พร้อม estimated bytes / timestamp
+- สำหรับ USB/Bluetooth/LAN จะคืนผลลัพธ์ว่ายังไม่พร้อมพร้อม capability notes เพื่อกัน operator เข้าใจผิดว่าส่ง bytes จริงแล้ว
+- ปรับปุ่ม “พิมพ์” ใน `PosLite` ให้ผ่าน transport hook แทนเรียก `window.print()` ตรง ๆ
+- อัปเดต build badge เป็น `Build 2026.06.22-pos-browser-print-v106`
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้ส่ง raw ESC/POS bytes ผ่าน USB/Bluetooth/LAN
+- ยังไม่ได้ request WebUSB/WebBluetooth permission จริง
+- ยังไม่ได้ทำ LAN bridge/server
+- ยังไม่ได้เปิด cash drawer จริง
+
+### งานถัดไปที่แนะนำ
+
+1. เพิ่ม WebUSB permission/device selection foundation
+2. เพิ่ม cash drawer command preview/action guard
+3. เพิ่มรายละเอียด error/retry ต่อ sync event
+4. เพิ่ม encryption/rotation policy สำหรับ device token
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/lib/posPrinterTransport.js` — เพิ่ม execute transport hook สำหรับ browser print
+- `app/src/pages/pos/PosLite.jsx` — เปลี่ยนปุ่มพิมพ์ให้ผ่าน transport hook
+- `app/src/lib/version.js` — bump build badge
+- `HANDOFF.md` — บันทึกงาน v106 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
 ## Update 2026-06-22 (POS printer transport preview — v105)
 
 ### สิ่งที่ทีมbk สร้างต่อจาก v104

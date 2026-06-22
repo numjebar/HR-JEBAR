@@ -65,3 +65,36 @@ export async function runPrinterTransportPreview({ profile, escPosText }) {
     simulatedAt: new Date().toISOString(),
   };
 }
+
+
+export async function executePrinterTransport({ profile, escPosText, printWindow = null } = {}) {
+  const capabilities = getPrinterTransportCapabilities(profile?.connection || 'browser');
+  const targetWindow = printWindow || (typeof window !== 'undefined' ? window : null);
+
+  if ((profile?.connection || 'browser') === 'browser') {
+    if (!targetWindow?.print) {
+      return {
+        ok: false,
+        action: 'browser-print',
+        capabilities,
+        error: 'window.print is not available',
+      };
+    }
+    targetWindow.print();
+    return {
+      ok: true,
+      action: 'browser-print',
+      capabilities,
+      bytesEstimated: new Blob([escPosText || '']).size,
+      printedAt: new Date().toISOString(),
+    };
+  }
+
+  return {
+    ok: false,
+    action: 'escpos-transport',
+    capabilities,
+    bytesEstimated: new Blob([escPosText || '']).size,
+    error: capabilities.notes,
+  };
+}
