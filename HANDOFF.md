@@ -1,5 +1,907 @@
 # HR JEBAR Handoff
 
+## Update 2026-06-22 (POS browser print transport hook — v106)
+
+### สิ่งที่ทีมbk สร้างต่อจาก v105
+
+**Actual browser print transport hook**
+
+- เพิ่ม `executePrinterTransport()` ใน `app/src/lib/posPrinterTransport.js` เพื่อรองรับการ execute transport เบื้องต้น
+- สำหรับ profile `browser` จะเรียก `window.print()` จริงและคืนผลลัพธ์พร้อม estimated bytes / timestamp
+- สำหรับ USB/Bluetooth/LAN จะคืนผลลัพธ์ว่ายังไม่พร้อมพร้อม capability notes เพื่อกัน operator เข้าใจผิดว่าส่ง bytes จริงแล้ว
+- ปรับปุ่ม “พิมพ์” ใน `PosLite` ให้ผ่าน transport hook แทนเรียก `window.print()` ตรง ๆ
+- อัปเดต build badge เป็น `Build 2026.06.22-pos-browser-print-v106`
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้ส่ง raw ESC/POS bytes ผ่าน USB/Bluetooth/LAN
+- ยังไม่ได้ request WebUSB/WebBluetooth permission จริง
+- ยังไม่ได้ทำ LAN bridge/server
+- ยังไม่ได้เปิด cash drawer จริง
+
+### งานถัดไปที่แนะนำ
+
+1. เพิ่ม WebUSB permission/device selection foundation
+2. เพิ่ม cash drawer command preview/action guard
+3. เพิ่มรายละเอียด error/retry ต่อ sync event
+4. เพิ่ม encryption/rotation policy สำหรับ device token
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/lib/posPrinterTransport.js` — เพิ่ม execute transport hook สำหรับ browser print
+- `app/src/pages/pos/PosLite.jsx` — เปลี่ยนปุ่มพิมพ์ให้ผ่าน transport hook
+- `app/src/lib/version.js` — bump build badge
+- `HANDOFF.md` — บันทึกงาน v106 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+## Update 2026-06-22 (POS printer transport preview — v105)
+
+### สิ่งที่ทีมbk สร้างต่อจาก v104
+
+**Printer transport adapter foundation**
+
+- เพิ่ม `app/src/lib/posPrinterTransport.js` เพื่อสรุป capability ของ browser print, WebUSB, WebBluetooth และ LAN bridge
+- เพิ่ม `runPrinterTransportPreview()` สำหรับตรวจแบบ simulated ว่า profile/transport พร้อมแค่ไหนและ estimate bytes จาก ESC/POS preview
+- ปรับ `PosLite` ให้แสดง transport capability ในแผง Printer Profile
+- เพิ่มปุ่ม “Transport Check” เพื่อเช็ค transport จาก ESC/POS preview ล่าสุดก่อนต่อ actual adapter จริง
+- อัปเดต build badge เป็น `Build 2026.06.22-pos-transport-preview-v105`
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้ request permission จาก WebUSB/WebBluetooth จริง
+- ยังไม่ได้ส่ง raw ESC/POS bytes จริง
+- ยังไม่ได้ทำ LAN bridge/server
+- ยังไม่ได้เปิด cash drawer จริง
+
+### งานถัดไปที่แนะนำ
+
+1. เพิ่ม actual browser print transport hook สำหรับ profile browser
+2. เพิ่ม WebUSB permission/device selection foundation
+3. เพิ่มรายละเอียด error/retry ต่อ sync event
+4. เพิ่ม encryption/rotation policy สำหรับ device token
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/lib/posPrinterTransport.js` — เพิ่ม transport capability/preview foundation
+- `app/src/pages/pos/PosLite.jsx` — เพิ่ม transport capability UI และ Transport Check
+- `app/src/lib/version.js` — bump build badge
+- `HANDOFF.md` — บันทึกงาน v105 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+## Update 2026-06-22 (POS printer test print preview — v104)
+
+### สิ่งที่ทีมbk สร้างต่อจาก v103
+
+**Printer test print flow แบบ preview**
+
+- เพิ่ม test receipt sample ใน `PosLite` เพื่อใช้ทดสอบ layout เครื่องพิมพ์โดยไม่ต้องสร้างออเดอร์จริง
+- เพิ่มปุ่ม “Test Print Preview” ในแผง Printer Profile เพื่อสร้าง ESC/POS preview จาก profile ที่เลือกทันที
+- ปรับ `buildEscPosPreview()` ให้รับ receipt override และ mode เพื่อใช้ร่วมกันทั้งสลิปล่าสุดและ test print
+- เมื่อกด test print ระบบจะแสดง receipt preview + ESC/POS command/text preview โดยยังไม่ส่ง bytes ไปเครื่องพิมพ์จริง
+- อัปเดต build badge เป็น `Build 2026.06.22-pos-test-print-v104`
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้ส่ง test print ไปเครื่องพิมพ์จริง
+- ยังไม่ได้ทำ transport adapter สำหรับ USB/Bluetooth/LAN
+- ยังไม่ได้เปิด cash drawer จริง
+- ยังไม่ได้บันทึก test print log
+
+### งานถัดไปที่แนะนำ
+
+1. เพิ่ม transport adapter interface สำหรับ browser print / USB / Bluetooth / LAN
+2. เพิ่ม actual test print hook แยกตาม transport
+3. เพิ่มรายละเอียด error/retry ต่อ sync event
+4. เพิ่ม encryption/rotation policy สำหรับ device token
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/pages/pos/PosLite.jsx` — เพิ่ม test print preview flow จาก printer profile ที่เลือก
+- `app/src/lib/version.js` — bump build badge
+- `HANDOFF.md` — บันทึกงาน v104 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+## Update 2026-06-22 (POS ESC/POS command preview — v103)
+
+### สิ่งที่ทีมbk สร้างต่อจาก v102
+
+**ESC/POS command builder foundation**
+
+- เพิ่ม `app/src/lib/posEscPosCommands.js` สำหรับสร้าง receipt text แบบ fixed-width ตาม `charsPerLine` ของ printer profile
+- เพิ่ม command plan ตั้งต้น เช่น init, align, bold, cut และ open cash drawer command placeholder
+- ปรับ `PosLite` เพิ่มปุ่ม “ESC/POS” ในสลิปล่าสุด เพื่อสร้าง preview ของ command/text ก่อนส่งไปเครื่องพิมพ์จริง
+- preview แสดง transport, init, cut, cash drawer และ receipt text เพื่อใช้ตรวจ layout ก่อนต่อ Bluetooth/USB/LAN จริง
+- อัปเดต build badge เป็น `Build 2026.06.22-pos-escpos-preview-v103`
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้ส่ง bytes ไป printer จริง
+- ยังไม่ได้ทำ WebUSB/WebBluetooth/LAN bridge
+- ยังไม่ได้เปิด cash drawer จริง
+- ยังไม่ได้ทำ printer test print flow แยกจากสลิปล่าสุด
+
+### งานถัดไปที่แนะนำ
+
+1. เพิ่ม printer test print flow จาก profile ที่เลือก
+2. เพิ่ม transport adapter interface สำหรับ browser print / USB / Bluetooth / LAN
+3. เพิ่มรายละเอียด error/retry ต่อ sync event
+4. เพิ่ม encryption/rotation policy สำหรับ device token
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/lib/posEscPosCommands.js` — เพิ่ม ESC/POS receipt text และ command plan foundation
+- `app/src/pages/pos/PosLite.jsx` — เพิ่มปุ่ม/preview ESC/POS จากสลิปล่าสุด
+- `app/src/lib/version.js` — bump build badge
+- `HANDOFF.md` — บันทึกงาน v103 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+## Update 2026-06-22 (POS printer profile persistence — v102)
+
+### สิ่งที่ทีมbk สร้างต่อจาก v101
+
+**Persist printer profile ต่อ device session**
+
+- ปรับ `PosLite` ให้โหลด `printerProfileId` / `printerProfile` จาก local device session เมื่อกรอก tenant แล้วพบ session เดิม
+- เพิ่มปุ่ม “บันทึก Profile เครื่องนี้” เพื่อ save printer profile ที่เลือกลง IndexedDB device session
+- แนบ `printerProfile` เข้า `registerPosDevice()` เพื่อให้ RPC ได้รับ profile ตั้งแต่ตอนลงทะเบียนเครื่อง
+- ปรับ `posDevice.js` ให้เก็บ `printerProfileId` และ `printerProfile` กลับลง local session หลังลงทะเบียนเครื่องสำเร็จ
+- อัปเดต build badge เป็น `Build 2026.06.22-pos-printer-session-v102`
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้ส่งคำสั่ง ESC/POS จริง
+- ยังไม่ได้ทำ printer test print / pairing flow
+- ยังไม่ได้เปิด cash drawer จริง
+- ยังไม่ได้ encrypt `deviceToken` ใน IndexedDB
+
+### งานถัดไปที่แนะนำ
+
+1. เพิ่ม ESC/POS command builder สำหรับ receipt text/cut/open drawer
+2. เพิ่ม printer test print flow จาก profile ที่เลือก
+3. เพิ่มรายละเอียด error/retry ต่อ sync event
+4. เพิ่ม encryption/rotation policy สำหรับ device token
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/pages/pos/PosLite.jsx` — persist/load printer profile ต่อ device session และส่ง profile ตอน register device
+- `app/src/lib/posDevice.js` — เก็บ printer profile ลง local session หลัง register
+- `app/src/lib/version.js` — bump build badge
+- `HANDOFF.md` — บันทึกงาน v102 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+## Update 2026-06-22 (POS printer profile foundation — v101)
+
+### สิ่งที่ทีมbk สร้างต่อจาก v100
+
+**Printer profile foundation สำหรับ POS Lite**
+
+- เพิ่ม `app/src/lib/posPrinterProfiles.js` เพื่อเก็บ profile เครื่องพิมพ์ตั้งต้น เช่น Browser 80mm, Epson 80mm, XPrinter 58mm และ Sunmi 58mm
+- เพิ่มข้อมูล connection, paper width, chars per line, cash drawer support และคำอธิบายสำหรับใช้ต่อยอด ESC/POS
+- ปรับ `PosLite` ให้เลือก Printer Profile ได้จากหน้า POS และแสดงรายละเอียดกระดาษ/ลิ้นชักเงิน
+- บันทึก `printerProfileId` ลง metadata ของ order local และแสดงชื่อ printer profile ใน receipt preview
+- อัปเดต build badge เป็น `Build 2026.06.22-pos-printer-profile-v101`
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้ส่งคำสั่ง ESC/POS จริงไปยัง Bluetooth/USB/LAN
+- ยังไม่ได้เปิด cash drawer จริงผ่าน printer command
+- ยังไม่ได้ persist printer profile แยกต่อ device session
+- ยังไม่ได้เพิ่ม printer test print / device pairing flow
+
+### งานถัดไปที่แนะนำ
+
+1. เพิ่ม printer profile persistence ต่อ device session
+2. เพิ่ม ESC/POS command builder สำหรับ receipt text/cut/open drawer
+3. เพิ่มรายละเอียด error/retry ต่อ sync event
+4. เพิ่ม encryption/rotation policy สำหรับ device token
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/lib/posPrinterProfiles.js` — เพิ่ม printer profile constants/helper
+- `app/src/pages/pos/PosLite.jsx` — เพิ่ม UI เลือก printer profile และแนบ profile ใน receipt/order metadata
+- `app/src/lib/version.js` — bump build badge
+- `HANDOFF.md` — บันทึกงาน v101 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+## Update 2026-06-22 (POS receipt print CSS — v100)
+
+### สิ่งที่ทีมbk สร้างต่อจาก v99
+
+**CSS print-only สำหรับ receipt preview**
+
+- เพิ่ม `@media print` ใน `app/src/index.css` เพื่อพิมพ์เฉพาะ `#pos-receipt-preview`
+- ซ่อน element อื่นทั้งหมดระหว่าง print ด้วย `visibility: hidden`
+- ตั้ง receipt preview เป็น layout กว้าง `80mm` สำหรับเครื่องพิมพ์ใบเสร็จทั่วไป
+- ล้าง border/radius/shadow และใช้พื้นขาวตัวหนังสือดำสำหรับงานพิมพ์
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้ต่อ ESC/POS printer / cash drawer จริง
+- ยังไม่ได้เพิ่ม printer profile UI
+- ยังไม่ได้เพิ่มรายละเอียด error/retry ต่อ sync event
+- ยังไม่ได้ encrypt `deviceToken` ใน IndexedDB
+
+### งานถัดไปที่แนะนำ
+
+1. เพิ่ม ESC/POS printer profile foundation
+2. เพิ่มรายละเอียด error/retry ต่อ sync event
+3. เพิ่ม encryption/rotation policy สำหรับ device token
+4. เพิ่ม inventory deduction หลัง order sync
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/index.css` — เพิ่ม print-only CSS สำหรับ POS receipt preview
+- `HANDOFF.md` — บันทึกงาน v100 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+
+## Update 2026-06-22 (POS receipt preview foundation — v99)
+
+### สิ่งที่ทีมbk สร้างต่อจาก v98
+
+**Receipt preview/print foundation สำหรับ POS Lite**
+
+- ปรับ `PosLite` ให้เก็บ `lastReceipt` หลัง checkout สำเร็จ
+- เพิ่ม panel “สลิปล่าสุด” ในตะกร้า แสดงเลขออเดอร์, เวลา, รายการสินค้า, ยอดรวม และวิธีชำระเงิน
+- เพิ่มปุ่ม “พิมพ์” ที่เรียก `window.print()` เป็น foundation ก่อนต่อ ESC/POS จริง
+- receipt preview ใช้ข้อมูลจาก order ที่บันทึกลง IndexedDB ผ่าน `createOrderLocal()`
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้ทำ CSS print-only สำหรับพิมพ์เฉพาะสลิป
+- ยังไม่ได้ต่อ ESC/POS printer / cash drawer จริง
+- ยังไม่ได้เพิ่มรายละเอียด error/retry ต่อ sync event
+- ยังไม่ได้ encrypt `deviceToken` ใน IndexedDB
+
+### งานถัดไปที่แนะนำ
+
+1. เพิ่ม CSS print-only สำหรับ receipt preview
+2. เพิ่มรายละเอียด error/retry ต่อ sync event
+3. เพิ่ม ESC/POS printer profile foundation
+4. เพิ่ม inventory deduction หลัง order sync
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/pages/pos/PosLite.jsx` — เพิ่ม receipt preview/print foundation
+- `HANDOFF.md` — บันทึกงาน v99 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+
+## Update 2026-06-22 (POS renew device license — v98)
+
+### สิ่งที่ทีมbk สร้างต่อจาก v97
+
+**Renew device license สำหรับ POS Lite**
+
+- เพิ่ม `renewPosDeviceLicense({ tenantId, licenseDays })` ใน `app/src/lib/posDevice.js`
+- helper อ่าน local device session จาก IndexedDB ผ่าน `getDeviceSession()` เพื่อใช้ `deviceId` + `deviceToken`
+- เรียก Supabase RPC `lucid_renew_device_license()` แล้ว save `licenseExpiresAt` / `deviceStatus` กลับลง local session
+- ปรับ `PosLite` เพิ่มปุ่ม “ต่ออายุ License” เพื่อ renew license จากหน้า POS
+- เมื่อ renew สำเร็จจะแสดงวันหมดอายุ license ล่าสุดและ set `deviceId` จาก session
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้ encrypt `deviceToken` ใน IndexedDB
+- ยังไม่ได้เพิ่ม detail drawer สำหรับดู error payload ราย sync event
+- ยังไม่ได้เพิ่ม receipt preview/print foundation
+- ยังไม่ได้พิมพ์สลิป / เปิดลิ้นชัก / ESC/POS
+
+### งานถัดไปที่แนะนำ
+
+1. เพิ่ม receipt preview/print foundation
+2. เพิ่มรายละเอียด error/retry ต่อ sync event
+3. เพิ่ม encryption/rotation policy สำหรับ device token
+4. เพิ่ม inventory deduction หลัง order sync
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/lib/posDevice.js` — เพิ่ม renew device license helper
+- `app/src/pages/pos/PosLite.jsx` — เพิ่มปุ่มต่ออายุ License
+- `HANDOFF.md` — บันทึกงาน v98 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+
+## Update 2026-06-22 (POS sync status panel — v97)
+
+### สิ่งที่ทีมbk สร้างต่อจาก v96
+
+**Sync status panel สำหรับ POS Lite**
+
+- เพิ่ม `listSyncEvents(tenantId, limit)` ใน `posLocalStore.js` เพื่ออ่าน local `sync_queue` ล่าสุดตาม tenant
+- เพิ่ม `getSyncQueueStats(tenantId)` เพื่อสรุปจำนวน `pending`, `synced`, `failed`, `processing`, `conflict`, `total`
+- ปรับ `PosLite` ให้มี sync status panel ในตะกร้า แสดงจำนวนรอ sync/สำเร็จ/พลาด/รวม
+- แสดงรายการ sync events ล่าสุด 8 รายการ พร้อม status และท้าย `localEventId`
+- เพิ่มปุ่ม refresh sync status และ refresh หลัง checkout/background sync result
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้เพิ่ม detail drawer สำหรับดู error payload ราย event
+- ยังไม่ได้เพิ่มปุ่ม retry เฉพาะ event
+- ยังไม่ได้ต่ออายุ license ด้วย `lucid_renew_device_license()` จาก UI
+- ยังไม่ได้พิมพ์สลิป / เปิดลิ้นชัก / ESC/POS
+
+### งานถัดไปที่แนะนำ
+
+1. เพิ่ม helper/ปุ่ม renew device license ด้วย `lucid_renew_device_license()`
+2. เพิ่ม receipt preview/print foundation
+3. เพิ่มรายละเอียด error/retry ต่อ sync event
+4. เพิ่ม inventory deduction หลัง order sync
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/lib/posLocalStore.js` — เพิ่ม sync queue list/stats helpers
+- `app/src/pages/pos/PosLite.jsx` — เพิ่ม sync status panel
+- `HANDOFF.md` — บันทึกงาน v97 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+
+## Update 2026-06-22 (POS device registration helper — v96)
+
+### สิ่งที่ทีมbk สร้างต่อจาก v95
+
+**Device registration UI/helper สำหรับ POS Lite**
+
+- เพิ่ม `app/src/lib/posDevice.js` สำหรับเรียก Supabase RPC `lucid_register_device()`
+- helper `registerPosDevice()` รับ `tenantId`, `storeId`, `deviceName`, `platform`, `licenseDays`, `printerProfile` แล้ว save device session ลง IndexedDB อัตโนมัติ
+- ปรับ `app/src/pages/pos/PosLite.jsx` เพิ่มช่อง `Device Name` และปุ่ม “ลงทะเบียนเครื่อง”
+- เมื่อ RPC สำเร็จ จะ set `deviceId`, เก็บ `deviceToken`, `licenseExpiresAt` ลง local `device_session` และแสดงข้อความ license
+- ยังมีปุ่ม “บันทึกเครื่องนี้” สำหรับกรณีมี `deviceId` อยู่แล้วและต้องการ save local session เอง
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้ encrypt `deviceToken` ใน IndexedDB
+- ยังไม่ได้ต่ออายุ license ด้วย `lucid_renew_device_license()` จาก UI
+- ยังไม่ได้เพิ่ม sync status panel รายการ pending/synced/failed แบบละเอียด
+- ยังไม่ได้พิมพ์สลิป / เปิดลิ้นชัก / ESC/POS
+
+### งานถัดไปที่แนะนำ
+
+1. เพิ่ม sync status panel แสดงจำนวน pending/synced/failed จาก local queue
+2. เพิ่ม helper/ปุ่ม renew device license ด้วย `lucid_renew_device_license()`
+3. เพิ่ม receipt preview/print foundation
+4. เพิ่ม inventory deduction หลัง order sync
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/lib/posDevice.js` — NEW device registration helper
+- `app/src/pages/pos/PosLite.jsx` — เพิ่ม device registration UI
+- `HANDOFF.md` — บันทึกงาน v96 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+
+## Update 2026-06-22 (POS Lite device session + background sync — v95)
+
+### สิ่งที่ทีมbk สร้างต่อจาก v94
+
+**ผูก device session และ background sync เข้ากับ POS Lite**
+
+- ปรับ `app/src/pages/pos/PosLite.jsx` ให้โหลด device session จาก IndexedDB ด้วย `getDeviceSession(tenantId)` เมื่อกรอก tenant
+- เพิ่มปุ่ม “บันทึกเครื่องนี้” เพื่อ save `tenantId`, `storeId`, `deviceId` ลง local `device_session` ผ่าน `saveDeviceSession()`
+- ผูก `startPosBackgroundSync()` เข้ากับ POS Lite lifecycle เมื่อมี `tenantId` และ `deviceId`
+- แสดง sync status บนหน้า POS Lite เช่นพร้อมทำงาน, offline/manual mode, synced count หรือ error
+- cleanup background sync ด้วย `controller.stop()` เมื่อ dependency เปลี่ยนหรือออกจากหน้า
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้เรียก `lucid_register_device()` จาก UI เพื่อสร้าง device token จริง
+- ยังไม่ได้ encrypt device token/local session
+- ยังไม่ได้เพิ่มรายการ pending/synced/failed แบบละเอียด
+- ยังไม่ได้พิมพ์สลิป / เปิดลิ้นชัก / ESC/POS
+
+### งานถัดไปที่แนะนำ
+
+1. เพิ่ม device registration UI/helper ที่เรียก `lucid_register_device()` แล้ว save session อัตโนมัติ
+2. เพิ่ม sync status panel แสดงจำนวน pending/synced/failed จาก local queue
+3. เพิ่ม receipt preview/print foundation
+4. เพิ่ม inventory deduction หลัง order sync
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/pages/pos/PosLite.jsx` — ผูก device session + background sync helper
+- `HANDOFF.md` — บันทึกงาน v95 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+
+## Update 2026-06-22 (POS Lite selling screen foundation — v94)
+
+### สิ่งที่ทีมbk สร้างต่อจาก v93
+
+**POS Lite selling screen จาก local catalog/cart/order flow**
+
+- เพิ่มหน้า `app/src/pages/pos/PosLite.jsx` เป็น POS Lite screen รุ่นแรก
+- เพิ่ม route `/pos` ใน `app/src/App.jsx` เพื่อเปิด POS Lite แยกจาก admin/employee auth flow เดิม
+- เพิ่มปุ่ม “เปิด POS Lite Offline” ใน `RolePicker` เพื่อเข้า POS ได้ง่าย
+- POS Lite รองรับกรอก `tenantId`, `storeId`, `deviceId`, โหลดเมนูจาก IndexedDB ผ่าน `getProductsLocal()` และเพิ่มเมนูตัวอย่างผ่าน `saveProductsLocal()`
+- รองรับ cart, เพิ่ม/ลดจำนวน, เลือก payment method (`cash`, `transfer`, `qr`) และ checkout ด้วย `createOrderLocal()`
+- หลัง checkout ถ้า online จะลองเรียก `syncPendingPosEvents()` เพื่อ sync queue ขึ้น cloud ทันที
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้ผูก device session จริงจาก `lucid_register_device()`
+- ยังไม่ได้เริ่ม `startPosBackgroundSync()` ใน POS screen lifecycle
+- ยังไม่ได้ทำ responsive layout เฉพาะ mobile POS อย่างละเอียด
+- ยังไม่ได้พิมพ์สลิป / เปิดลิ้นชัก / ESC/POS
+- ยังไม่ได้เพิ่ม sync status dashboard หรือรายการ pending queue
+
+### งานถัดไปที่แนะนำ
+
+1. ผูก device session/local license เข้ากับ POS Lite แทนการกรอก ID เอง
+2. เรียก `startPosBackgroundSync()` เมื่อ POS Lite mount และ stop เมื่อ unmount
+3. เพิ่ม sync status panel แสดง pending/synced/failed
+4. เพิ่ม receipt preview/print foundation
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/pages/pos/PosLite.jsx` — NEW POS Lite selling screen foundation
+- `app/src/App.jsx` — เพิ่ม route `/pos`
+- `app/src/pages/RolePicker.jsx` — เพิ่มปุ่มเข้า POS Lite
+- `HANDOFF.md` — บันทึกงาน v94 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+
+## Update 2026-06-22 (POS background sync helper — v93)
+
+### สิ่งที่ทีมbk สร้างต่อจาก v92
+
+**Background sync loop สำหรับ POS Offline First**
+
+- เพิ่ม `app/src/lib/posBackgroundSync.js` สำหรับเริ่ม/หยุด background sync loop ฝั่ง POS client
+- เพิ่ม `startPosBackgroundSync({ tenantId, batchSize, intervalMs, runImmediately, onResult, onError })`
+- helper จะเรียก `syncPendingPosEvents()` ตอนเริ่ม, ตาม interval และเมื่อ browser ยิง event `online`
+- มี guard กัน sync ซ้อนด้วยสถานะ `syncing` และคืน reason `already_syncing` ถ้ามีงาน sync ค้างอยู่
+- มี `stop()` สำหรับ clear interval/remove listener และ `syncNow(trigger)` สำหรับ manual sync
+- รองรับ non-browser environment โดยไม่ผูก window listener แต่ยังคืน `syncNow()` ให้เรียก manual ได้
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้ติดตั้ง helper นี้เข้ากับ React app lifecycle หรือ POS screen จริง
+- ยังไม่ได้สร้าง POS selling screen
+- ยังไม่ได้เพิ่ม sync status/toast UI
+- ยังไม่ได้ทำ inventory deduction หลัง order sync
+- ยังไม่ได้รัน SQL migrations บน production Supabase
+
+### งานถัดไปที่แนะนำ
+
+1. เริ่ม POS Lite selling screen จาก local catalog/cart/order flow
+2. ผูก `startPosBackgroundSync()` เข้ากับ POS shell/device session เมื่อมี tenant/device พร้อม
+3. เพิ่ม sync status UI สำหรับ pending/synced/failed
+4. เพิ่ม inventory deduction หลัง order sync
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/lib/posBackgroundSync.js` — NEW background sync loop helper
+- `HANDOFF.md` — บันทึกงาน v93 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+
+## Update 2026-06-22 (POS client sync helper — v92)
+
+### สิ่งที่ทีมbk สร้างต่อจาก v91
+
+**Client helper สำหรับ sync local POS queue → Supabase RPC**
+
+- เพิ่ม `app/src/lib/posSync.js` สำหรับเชื่อม `posLocalStore.js` กับ RPC `lucid_sync_pos_events()`
+- เพิ่ม `syncPendingPosEvents({ tenantId, batchSize })` ที่อ่าน `listPendingSyncEvents()` แล้วส่ง batch เข้า Supabase RPC
+- ถ้า browser offline จะ skip อย่างปลอดภัยและคืน reason `offline` โดยไม่แตะ queue
+- ถ้า RPC error จะ mark local events เป็น failed/pending retry ด้วย `markSyncEventFailed()`
+- ถ้า RPC คืนผล `synced` จะ mark local event เป็น synced ด้วย `markSyncEventSynced()` และเก็บ `cloud_ref`
+- เพิ่ม `createOnlineSyncHandler(options)` สำหรับนำไปผูกกับ event `online` หรือ background sync loop รอบถัดไป
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้ติดตั้ง background sync loop ใน UI/app lifecycle
+- ยังไม่ได้สร้าง POS selling screen
+- ยังไม่ได้เพิ่ม toast/status UI สำหรับ sync result
+- ยังไม่ได้ทำ inventory deduction หลัง order sync
+- ยังไม่ได้รัน SQL migrations บน production Supabase
+
+### งานถัดไปที่แนะนำ
+
+1. เพิ่ม background sync loop/hook ที่เรียก `syncPendingPosEvents()` เมื่อ `navigator.onLine` กลับมา true
+2. เริ่ม POS Lite selling screen จาก local catalog/cart/order flow
+3. เพิ่ม sync status UI สำหรับ pending/synced/failed ใน POS
+4. เพิ่ม inventory deduction หลัง order sync
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/lib/posSync.js` — NEW client helper สำหรับ sync local POS queue ไป Supabase RPC
+- `HANDOFF.md` — บันทึกงาน v92 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+
+## Update 2026-06-22 (POS sync batch RPC — v91)
+
+### สิ่งที่ทีมbk สร้างต่อจาก v90
+
+**Cloud sync endpoint/RPC สำหรับ local POS queue**
+
+- เพิ่ม `supabase/35_lucid_pos_sync_rpc.sql` สำหรับรับ event batch จาก local IndexedDB `sync_queue`
+- เพิ่ม RPC `lucid_sync_pos_events(p_tenant_id, p_events)` เพื่อ sync offline order payload ขึ้น cloud
+- RPC ตรวจ tenant access, active store/device ownership และ required ids (`localEventId`, `deviceId`, `order.localOrderId`)
+- รองรับ idempotency ด้วย unique order/payment key เดิม `(tenant_id, device_id, local_order_id)` และ `(tenant_id, device_id, local_payment_id)`
+- RPC upsert `sync_queue`, upsert `customers`, upsert `orders`, replace `order_items`, upsert `payments`, update `devices.last_seen_at` และบันทึก `business_events`
+- RPC คืนผลต่อ event เป็น `local_event_id`, `status`, `cloud_ref`, `error` เพื่อให้ POS client mark local sync event ได้
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้ต่อ `posLocalStore.js` ให้เรียก RPC นี้จริง
+- ยังไม่ได้สร้าง client helper `syncPendingPosEvents()`
+- ยังไม่ได้สร้าง background sync loop
+- ยังไม่ได้สร้าง POS selling screen
+- ยังไม่ได้รัน SQL นี้บน production Supabase
+- ยังไม่ได้ทำ inventory deduction หลัง order sync
+
+### งานถัดไปที่แนะนำ
+
+1. เพิ่ม client helper `syncPendingPosEvents()` ที่อ่าน `listPendingSyncEvents()` แล้วเรียก `lucid_sync_pos_events()`
+2. เพิ่ม background sync loop เมื่อออนไลน์กลับมา
+3. เริ่มสร้าง POS Lite selling screen จาก local catalog/cart/order flow
+4. เพิ่ม inventory deduction หลัง order sync
+
+### ไฟล์ที่เปลี่ยน
+
+- `supabase/35_lucid_pos_sync_rpc.sql` — NEW cloud sync batch RPC สำหรับ offline POS orders
+- `HANDOFF.md` — บันทึกงาน v91 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+
+## Update 2026-06-22 (Team BK alias — v90)
+
+### สิ่งที่ปรับ
+
+**ตั้งชื่อเรียกรวม agent เป็น `ทีมbk`**
+
+- เพิ่มชื่อเรียกรวม `ทีมbk` ใน `AUTO_AGENT_COMMANDS.md`
+- `ทีมbk` = agent ทั้ง 4 ตัว: ลิซ่า, เจนนี่, จีซู, โรเซ่
+- เพิ่มตัวอย่างคำสั่งรวมทีม: “ทีมbk ทำต่อจาก HANDOFF.md 1 รอบ โดยให้ลิซ่าเป็นตัวหลัก เจนนี่คุม scope จีซูตรวจ checks และโรเซ่อัปเดต handoff”
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- เป็น alias/prompt nickname ในเอกสารเท่านั้น ยังไม่ได้สร้าง background bot จริง
+
+### งานถัดไปที่แนะนำ
+
+1. ใช้ `ทีมbk` เป็นคำสั่งรวมทีม agent
+2. ทำงานถัดไป: เพิ่ม Supabase RPC สำหรับรับ batch จาก local `sync_queue`
+
+### ไฟล์ที่เปลี่ยน
+
+- `AUTO_AGENT_COMMANDS.md` — เพิ่ม Team BK alias
+- `HANDOFF.md` — บันทึกงาน v90
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+
+## Update 2026-06-22 (BLACKPINK agent nicknames — v89)
+
+### สิ่งที่ปรับ
+
+**เปลี่ยนชื่อเรียก agent เป็น BLACKPINK theme**
+
+- อัปเดต `AUTO_AGENT_COMMANDS.md` ตามคำขอ owner: ไม่ใช้ชื่อเดิมแล้ว เปลี่ยนเป็น BLACKPINK names
+- `ลิซ่า` = Main Autonomous Coding Agent ตัวหลัก ลงมือเขียนโค้ด/แก้ไฟล์/test/commit/PR
+- `เจนนี่` = Supervisor Agent ตัวคุม roadmap เลือกงาน และคุม scope ต่อรอบ
+- `จีซู` = QA / Reviewer Agent ตัวช่วยตรวจ Definition of Done, checks, edge cases และความครบของ PR
+- `โรเซ่` = Product / Handoff Agent ตัวช่วยจัด handoff, roadmap, product vision และ next steps
+- เพิ่มตัวอย่างคำสั่ง: “ให้ลิซ่าทำต่อจาก HANDOFF.md 1 รอบ เจนนี่คุม scope จีซูตรวจ checks และโรเซ่อัปเดต handoff/next steps”
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- เป็นการเปลี่ยน nickname/prompt ในเอกสารเท่านั้น ยังไม่ได้สร้าง background bot จริง
+
+### งานถัดไปที่แนะนำ
+
+1. ใช้ `ลิซ่า` เป็นชื่อหลักเวลาสั่ง agent ทำงานต่อ
+2. ใช้ `เจนนี่`, `จีซู`, `โรเซ่` เป็น role เสริมสำหรับคุม scope, ตรวจงาน และจัด handoff
+3. ทำงานถัดไป: เพิ่ม Supabase RPC สำหรับรับ batch จาก local `sync_queue`
+
+### ไฟล์ที่เปลี่ยน
+
+- `AUTO_AGENT_COMMANDS.md` — เปลี่ยน agent nicknames เป็น BLACKPINK theme
+- `HANDOFF.md` — บันทึกงาน v89
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+
+## Update 2026-06-22 (agent nicknames — v88)
+
+### สิ่งที่ปรับ
+
+**ตั้งชื่อเรียก agent ให้จำง่าย**
+
+- เพิ่มชื่อเล่นใน `AUTO_AGENT_COMMANDS.md`
+- ชื่อเดิมใน v88 ถูกยกเลิกและ superseded โดย BLACKPINK agent nicknames ใน v89
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- เป็นการตั้งชื่อ/prompt nickname ในเอกสารเท่านั้น ยังไม่ได้สร้าง background bot จริง
+
+### งานถัดไปที่แนะนำ
+
+1. ใช้ BLACKPINK agent nicknames จาก v89 แทนชื่อเดิม
+2. ทำงานถัดไปจาก v87: เพิ่ม Supabase RPC สำหรับรับ batch จาก local `sync_queue`
+
+### ไฟล์ที่เปลี่ยน
+
+- `AUTO_AGENT_COMMANDS.md` — เพิ่ม agent nicknames
+- `HANDOFF.md` — บันทึกงาน v88
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+
+## Update 2026-06-22 (autonomous agent command guide — v87)
+
+### สิ่งที่สร้างต่อจาก v86
+
+**Autonomous Agent Commands สำหรับลดการกด “ต่อ” ซ้ำ**
+
+- เพิ่ม `AUTO_AGENT_COMMANDS.md` เป็นชุด prompt/คำสั่งสำหรับให้ agent ทำงานต่อจาก `HANDOFF.md` แบบอัตโนมัติเป็นรอบ
+- เพิ่มคำสั่งสั้นที่สุดสำหรับ owner ใช้แทนคำว่า “ต่อ” โดยกำหนดให้ agent เลือกงานถัดไป, run checks, update handoff, commit และสร้าง PR
+- เพิ่ม `Autonomous Coding Agent Prompt` ที่บังคับ workflow อ่าน handoff → เลือก scope เล็ก → แก้ไฟล์ → test/check → update handoff → commit → PR
+- เพิ่ม `Supervisor Agent Prompt` สำหรับ agent ตัวคุม roadmap ที่สั่ง Coding Agent ทีละ milestone
+- เพิ่ม `Current LUCID Auto Roadmap Loop` สำหรับลำดับ POS/SaaS/Pricing ปัจจุบัน
+- เพิ่ม Definition of Done และคำสั่งพร้อมใช้สำหรับงานถัดไปหลัง v86
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้สร้าง background service จริงที่ทำงานเองโดยไม่มีข้อความจากผู้ใช้ เพราะระบบ chat/API ต้องมี trigger จาก user หรือ automation ภายนอกก่อน
+- ยังไม่ได้ต่อ GitHub Actions / scheduler / bot ภายนอกให้เปิดงานเองอัตโนมัติ
+- ยังไม่ได้ทำงาน sync RPC รอบถัดไปใน commit นี้ เพื่อไม่ให้ปนกับงานเอกสาร agent
+
+### งานถัดไปที่แนะนำ
+
+1. ใช้คำสั่งใน `AUTO_AGENT_COMMANDS.md` เพื่อให้ agent ทำงานต่อจาก handoff โดยไม่ต้องพิมพ์ “ต่อ” หลายครั้ง
+2. เพิ่ม Supabase RPC สำหรับรับ batch จาก local `sync_queue` และ upsert `orders`, `order_items`, `payments`
+3. เพิ่ม client helper `syncPendingPosEvents()` ที่อ่าน queue แล้วเรียก RPC
+4. เริ่ม POS Lite selling screen หลัง sync foundation พร้อม
+
+### ไฟล์ที่เปลี่ยน
+
+- `AUTO_AGENT_COMMANDS.md` — NEW prompt/command guide สำหรับ autonomous agent workflow
+- `HANDOFF.md` — บันทึกงาน v87 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+
+## Update 2026-06-22 (offline POS local store foundation — v86)
+
+### สิ่งที่สร้างต่อจาก v85
+
+**IndexedDB foundation สำหรับ POS Offline First**
+
+- เพิ่ม `app/src/lib/posLocalStore.js` เป็น local database layer ฝั่ง browser POS
+- สร้าง IndexedDB database `lucid_pos_local` พร้อม object stores: `products`, `orders`, `payments`, `customers`, `sync_queue`, `device_session`
+- เพิ่ม helper `openPosLocalDb()` สำหรับ initialize database/indexes
+- เพิ่ม `saveDeviceSession()` / `getDeviceSession()` เพื่อเตรียมเก็บ device token/license หลังเรียก `lucid_register_device()`
+- เพิ่ม `saveProductsLocal()` / `getProductsLocal()` สำหรับ cache catalog ลงเครื่อง POS ให้ขายได้ตอน offline
+- เพิ่ม `createOrderLocal()` เพื่อบันทึก order/payment/customer ลง local ก่อน และสร้าง event เข้า `sync_queue` ทันที
+- เพิ่ม `listPendingSyncEvents()`, `markSyncEventSynced()`, `markSyncEventFailed()` สำหรับ lifecycle ของ background sync รอบถัดไป
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้สร้าง POS selling screen ที่เรียก `createOrderLocal()`
+- ยังไม่ได้เชื่อม `sync_queue` กับ Supabase RPC จริง
+- ยังไม่ได้สร้าง background sync worker/loop เมื่อ `navigator.onLine` กลับมา true
+- ยังไม่ได้ encrypt device token ใน local storage/IndexedDB
+- ยังไม่ได้ทำ receipt printer / cash drawer integration
+
+### งานถัดไปที่แนะนำ
+
+1. เพิ่ม Supabase RPC สำหรับรับ batch จาก local `sync_queue` และ upsert `orders`, `order_items`, `payments`
+2. เพิ่ม client helper `syncPendingPosEvents()` ที่อ่าน queue แล้วเรียก RPC
+3. เริ่ม POS Lite selling screen ด้วย local product catalog + cart + cash/transfer/QR payment
+4. เพิ่ม device token encryption/rotation policy สำหรับ production hardening
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/lib/posLocalStore.js` — NEW IndexedDB local POS foundation
+- `HANDOFF.md` — บันทึกงาน v86 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+
+## Update 2026-06-22 (LUCID onboarding and device RPC — v85)
+
+### สิ่งที่สร้างต่อจาก v84
+
+**Onboarding + Device License RPC foundation**
+
+- เพิ่ม `supabase/34_lucid_onboarding_device_rpc.sql` ต่อจาก POS/SaaS schema foundation
+- เพิ่ม RPC `lucid_register_tenant()` สำหรับหลัง OTP/auth สำเร็จ เพื่อสร้าง `orgs`, `admin_roles`, `tenants`, default `stores`, `tenant_users`, `subscriptions`, `credit_wallets` และ `business_events` ใน flow เดียว
+- เพิ่ม RPC `lucid_register_device()` สำหรับสร้าง POS device token, เก็บเฉพาะ SHA-256 hash ใน cloud, bind กับ tenant/store และกำหนด license อายุ 1–30 วัน
+- เพิ่ม RPC `lucid_renew_device_license()` สำหรับต่ออายุ device license เมื่อเครื่อง POS กลับมา online โดยตรวจ device token hash และไม่ต่ออายุ device ที่ถูก block
+- ทุก RPC เป็น `security definer`, ใช้ `auth.uid()` / `lucid_can_access_tenant()` และบันทึก `business_events` เพื่อ audit
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้สร้าง Register/OTP UI ฝั่ง React
+- ยังไม่ได้เชื่อม RPC เหล่านี้เข้ากับ auth flow จริง
+- ยังไม่ได้ persist device token/license ลง IndexedDB/local storage
+- ยังไม่ได้สร้าง POS selling screen
+- ยังไม่ได้ทำ background sync engine
+- ยังไม่ได้รัน SQL นี้บน production Supabase
+
+### งานถัดไปที่แนะนำ
+
+1. เพิ่ม IndexedDB local POS store ใน `app/src/lib/posLocalStore.js` สำหรับ `products`, `orders`, `payments`, `customers`, `sync_queue`
+2. เพิ่ม helper ฝั่ง client สำหรับเรียก `lucid_register_device()` และเก็บ device token ในเครื่อง
+3. เพิ่ม sync RPC สำหรับรับ local `sync_queue` จาก POS ขึ้น cloud
+4. เริ่มหน้า POS Lite selling screen ที่ขายได้โดยไม่ต้องรอ cloud
+
+### ไฟล์ที่เปลี่ยน
+
+- `supabase/34_lucid_onboarding_device_rpc.sql` — NEW onboarding + device license RPC
+- `HANDOFF.md` — บันทึกงาน v85 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+
+## Update 2026-06-22 (LUCID POS + SaaS foundation — v84)
+
+### สิ่งที่สร้างต่อ
+
+**LUCID POS + SaaS Architecture Handoff v1 → เริ่มลงฐานข้อมูลจริง**
+
+- รับผิดชอบงานใหม่ตาม vision: LUCID เป็น Business Operating System สำหรับร้านค้าขนาดเล็กถึงกลาง ไม่ใช่แค่ HR/Cost calculator
+- เพิ่ม schema foundation `supabase/33_lucid_pos_saas_foundation.sql` สำหรับ Multi-Tenant, POS offline sync, subscription, device licensing, catalog/recipe/inventory, orders/payments, AI credits และ audit events
+- เพิ่ม tenant model: `tenants`, `stores`, `tenant_users` โดยทุกข้อมูลธุรกิจใหม่ผูก `tenant_id`
+- เพิ่ม subscription/billing model: `plans`, `subscriptions`, `invoices`, `billing_payments` พร้อม seed plan POS Lite / Business / AI ตาม handoff
+- เพิ่ม offline POS cloud model: `devices`, `orders`, `order_items`, `payments`, `sync_queue` เพื่อรองรับ workflow ขายลงเครื่องก่อน แล้วค่อย sync ขึ้น cloud
+- เพิ่ม recipe/inventory foundation: `categories`, `products`, `ingredients`, `recipes`, `recipe_items`, `inventory`, `inventory_transactions`
+- เพิ่ม AI credit foundation: `credit_wallets`, `credit_transactions`
+- เพิ่ม helper `lucid_can_access_tenant(p_tenant_id)` และ RLS policy pattern สำหรับ tenant member / HR admin mapping
+
+### ขอบเขตที่ยังไม่ทำในรอบนี้
+
+- ยังไม่ได้สร้าง Register/OTP UI
+- ยังไม่ได้สร้าง RPC สำหรับ onboarding tenant/device token
+- ยังไม่ได้สร้าง IndexedDB ฝั่ง POS
+- ยังไม่ได้สร้าง POS selling screen
+- ยังไม่ได้ทำ sync engine ฝั่ง client
+- ยังไม่ได้รัน SQL นี้บน production Supabase
+- ยังไม่ได้ seed ข้อมูลกลาง 150 เมนู / pricing simulation engine ในรอบนี้
+
+### งานถัดไปที่แนะนำ
+
+1. เพิ่ม RPC `lucid_register_tenant()` หลัง OTP เพื่อสร้าง tenant/store/user/subscription/wallet อัตโนมัติ
+2. เพิ่ม RPC `lucid_register_device()` และ `lucid_renew_device_license()` สำหรับ offline POS license 7–30 วัน
+3. เพิ่ม IndexedDB local POS store ใน `app/src/lib/posLocalStore.js`
+4. เพิ่ม sync RPC สำหรับรับ `sync_queue` จากเครื่อง POS ขึ้น cloud
+5. เริ่ม Pricing Simulation Engine หลัง foundation POS/SaaS มี schema รองรับ product/cost/channel แล้ว
+
+### ไฟล์ที่เปลี่ยน
+
+- `supabase/33_lucid_pos_saas_foundation.sql` — NEW foundation schema สำหรับ LUCID POS + SaaS
+- `HANDOFF.md` — บันทึกงาน v84 และ next steps
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+
+## Update 2026-06-22 (payroll loader stale guard — v83)
+
+### สิ่งที่ปรับหลัง review รอบต่อมา
+
+**AdminPayroll — ทำ loader guard ให้ตรงและไม่ hacky**
+
+- เปลี่ยน logic กัน stale async load จาก `Promise.resolve().then(...)` เป็น sequence guard ด้วย `useRef`
+- ถ้า filter/period เปลี่ยนระหว่างกำลังโหลด หรือ component unmount ระหว่าง request เก่า response เก่าจะไม่ set state ทับข้อมูลรอบใหม่
+- ยังรักษา targeted ESLint ของไฟล์ `AdminPayroll.jsx` ให้ผ่าน
+- ไม่เปลี่ยนสูตร payroll และไม่เปลี่ยนข้อมูลที่บันทึกใน backend
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/pages/admin/AdminPayroll.jsx` — stale-load sequence guard
+- `app/src/lib/version.js` — bump เป็น `Build 2026.06.22-payroll-loader-stale-v83`
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+## Update 2026-06-22 (payroll cycle UX review fixes — v82)
+
+### สิ่งที่ปรับหลัง review
+
+**AdminPayroll — เก็บงานจาก v81 ให้สะอาดขึ้น**
+
+- ย้ายข้อความประกอบกล่อง payroll cycle/formula ออกจาก inline ternary ใน JSX ไปเป็น helper functions เพื่ออ่านและดูแลต่อได้ง่ายขึ้น
+- เปลี่ยนกล่องไฮไลต์ให้ใช้ theme tokens (`var(--accent-soft)`, `var(--line)`, `var(--ink)`, `var(--muted)`) แทน hard-coded orange colors เพื่อให้เข้ากับธีมแอป
+- สูตรค่าแรงใช้ `effectiveDayRate` ในข้อความแสดงผล เพื่อให้ตรงกับค่าที่ payroll engine ใช้จริงในการคำนวณ `base`
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/pages/admin/AdminPayroll.jsx` — helper functions + theme-based payroll cycle panel
+- `app/src/lib/version.js` — bump เป็น `Build 2026.06.22-payroll-cycle-ux-v82`
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
+## Update 2026-06-22 (payroll cycle UX clarity — v81)
+
+### สิ่งที่ทำต่อจาก handoff
+
+**AdminPayroll — ทำให้รอบจ่ายและสูตรค่าแรงอ่านชัดขึ้น**
+
+- เพิ่มกล่องไฮไลต์สีอ่อนในการ์ดเงินเดือนแต่ละพนักงาน
+- แสดง **รอบจ่ายที่ใช้คำนวณ** แบบเด่น: วันที่เริ่ม–สิ้นสุด, ประเภทรอบจ่าย, และจุดเริ่มรอบของคนนั้น
+- แสดง **สูตรค่าแรงงวดนี้** แบบอ่านได้ทันที:
+  - `ค่าจ้างต่อวัน × จำนวนวันที่คิดจ่าย = ค่าแรงงวดนี้`
+- เพิ่มคำอธิบายประกอบ:
+  - รายวัน: ทำงานจริงกี่วัน และลาจ่ายกี่วัน (ถ้ามี)
+  - รายสัปดาห์/รายเดือน: จำนวนวันในรอบ, วันหยุดประจำ, และวันทำงานตามรอบ
+- ไม่เปลี่ยนสูตรคำนวณเงินเดือนเดิม — เป็นการปรับ UX/ข้อความเพื่อให้แอดมินตรวจยอดง่ายขึ้น
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/pages/admin/AdminPayroll.jsx` — payroll card cycle/formula highlight
+- `app/src/lib/version.js` — bump เป็น `Build 2026.06.22-payroll-cycle-ux-v81`
+
+### Commit
+
+- (commit hash ใส่หลัง push)
+
 ## Update 2026-06-20 (monthly attendance summary — v60)
 
 ### สิ่งที่เพิ่มใน v60
