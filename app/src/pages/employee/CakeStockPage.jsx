@@ -699,7 +699,7 @@ export default function CakeStockPage({ navigate }) {
             const details = spoiledDetails[item.id] || {};
             const photoInputId = `spoiled-photo-${item.id}`;
             return (
-              <React.Fragment key={item.id}>
+              <div key={item.id} style={{ marginBottom: 8 }}>
               <div
                 data-drag-idx={idx}
                 draggable={canEdit}
@@ -713,7 +713,6 @@ export default function CakeStockPage({ navigate }) {
                 style={{
                   background: dragOverIdx === idx && dragActiveIdx !== idx ? '#EDE8E3' : '#fff',
                   borderRadius: 12,
-                  marginBottom: 8,
                   padding: '12px 14px',
                   display: 'flex',
                   alignItems: 'center',
@@ -903,7 +902,7 @@ export default function CakeStockPage({ navigate }) {
                   )}
                 </div>
               )}
-              </React.Fragment>
+              </div>
             );
           })
         )}

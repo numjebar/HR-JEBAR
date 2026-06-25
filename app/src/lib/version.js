@@ -1,1 +1,1 @@
-export const APP_VERSION = 'Build 2026.06.25-cake-stock-v103';
+export const APP_VERSION = 'Build 2026.06.25-cake-stock-v104';
