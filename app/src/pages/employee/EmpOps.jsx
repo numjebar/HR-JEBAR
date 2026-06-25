@@ -43,7 +43,7 @@ const DEFAULT_DRAFTS = {
     imageName: '', imagePreviewUrl: '', imageBase64: '', imageMimeType: '',
     aiItems: [], date: '', recordedBy: '',
   },
-  production:       { product: '', quantity: '', unit: 'ชิ้น', batch: '', note: '', date: '', recordedBy: '', photos: [] },
+  production:       { product: '', quantity: '', unit: 'ชิ้น', batch: '', note: '', dispatches: [], date: '', recordedBy: '', photos: [] },
   inventory:        { itemName: '', stockLeft: '', unit: 'กก.', status: 'ปกติ', note: '', date: '', recordedBy: '', photos: [] },
   'cake-stock':     { branchName: 'สาขากาดน้ำทอง', cakeName: '', available: '', reserved: '', damaged: '', status: 'พร้อมขาย', note: '', date: '', recordedBy: '', photos: [] },
   'supplies-count': { area: 'หน้าร้าน', itemName: '', count: '', unit: 'ชิ้น', status: 'ปกติ', note: '', date: '', recordedBy: '', photos: [] },
@@ -1531,6 +1531,7 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               <VoiceBtn onResult={v => setDraft({ ...draft, note: (draft.note ? draft.note + ' ' : '') + v })} />
             </div>
           </Field>
+          <DispatchSection draft={draft} setDraft={setDraft} branches={branches} />
           <PhotoSection
             photos={draft.photos || []}
             onChange={photos => setDraft({ ...draft, photos })}
@@ -1789,6 +1790,49 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
 }
 
 // ─── History sections ─────────────────────────────────────────────────────────
+function DispatchSection({ draft, setDraft, branches = [] }) {
+  const rows = Array.isArray(draft.dispatches) ? draft.dispatches : [];
+  const opts = branches.length > 0 ? branches.map(b => b.label) : ['JE BAR'];
+
+  function update(idx, field, val) {
+    setDraft({ ...draft, dispatches: rows.map((r, i) => i === idx ? { ...r, [field]: val } : r) });
+  }
+  function add() { setDraft({ ...draft, dispatches: [...rows, { branchName: '', qty: '' }] }); }
+  function remove(idx) { setDraft({ ...draft, dispatches: rows.filter((_, i) => i !== idx) }); }
+
+  const totalSent = rows.filter(r => r.branchName && Number(r.qty) > 0).reduce((s, r) => s + Number(r.qty), 0);
+
+  return (
+    <Field label="ส่งไปสาขา (ถ้ามี)">
+      <div style={{ display: 'grid', gap: 8 }}>
+        {rows.map((r, idx) => (
+          <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 90px auto', gap: 8, alignItems: 'center' }}>
+            <select value={r.branchName} onChange={e => update(idx, 'branchName', e.target.value)}>
+              <option value="">— เลือกสาขา —</option>
+              {opts.map(b => <option key={b} value={b}>{b}</option>)}
+            </select>
+            <input value={r.qty} inputMode="numeric" placeholder="จำนวน"
+              onChange={e => update(idx, 'qty', e.target.value.replace(/[^0-9.]/g, ''))}
+              style={{ textAlign: 'center' }} />
+            <button type="button" onClick={() => remove(idx)}
+              style={{ color: '#b42318', background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: '0 4px' }}>×</button>
+          </div>
+        ))}
+        <button type="button" onClick={add}
+          style={{ alignSelf: 'flex-start', fontSize: 13, color: 'var(--accent)', background: 'var(--accent-soft)', border: '1px solid var(--accent)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontWeight: 700 }}>
+          + เพิ่มสาขา
+        </button>
+        {totalSent > 0 && (
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+            รวมที่จะส่ง: <b style={{ color: '#2f241f' }}>{totalSent} ชิ้น</b>{' → '}
+            {rows.filter(r => r.branchName && Number(r.qty) > 0).map(r => `${r.branchName} (${r.qty})`).join(', ')}
+          </div>
+        )}
+      </div>
+    </Field>
+  );
+}
+
 function HistorySection({ title, subtitle, items, loading, error, renderItem, renderExtra, isLocal = false, onDelete }) {
   const [deletingId, setDeletingId] = useState('');
 
@@ -2033,6 +2077,7 @@ function renderBackendExtra(taskKey, item) {
       </div>
     );
   }
+  if (taskKey === 'production') return renderDispatchExtra(item.payload);
   if (taskKey !== 'bills') return null;
   const p = item.payload || {};
   return (
@@ -2041,6 +2086,16 @@ function renderBackendExtra(taskKey, item) {
       {p.aiItems?.length > 0 && (
         <div style={{ fontSize: 12, color: '#6d5a3f' }}>AI อ่านได้ {p.aiItems.length} รายการ: {p.aiItems.slice(0,3).map(i=>i.name).join(', ')}{p.aiItems.length>3?'...':''}</div>
       )}
+    </div>
+  );
+}
+
+function renderDispatchExtra(payload) {
+  const ds = (payload?.dispatches || []).filter(d => d.branchName && Number(d.qty) > 0);
+  if (!ds.length) return null;
+  return (
+    <div style={{ fontSize: 12, color: '#0369a1', marginTop: 4 }}>
+      ส่งสาขา: {ds.map(d => `${d.branchName} (${d.qty})`).join(' · ')}
     </div>
   );
 }
@@ -2056,6 +2111,7 @@ function renderLocalExtra(taskKey, payload) {
       </div>
     );
   }
+  if (taskKey === 'production') return renderDispatchExtra(payload);
   if (taskKey !== 'bills') return null;
   const items = payload?.aiItems;
   return (
