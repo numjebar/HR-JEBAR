@@ -8,6 +8,7 @@ import VoiceBtn from '../../components/VoiceBtn';
 import PhotoSection from '../../components/PhotoSection';
 import { fetchOperateCatalog, clearCatalogCache, OPS_CONFIG_KEY, getLastCatalogError } from '../../lib/operateCatalog';
 import { uploadOpsPhotos, uploadSingleBase64 } from '../../lib/opsStorage';
+import CakeStockPage from './CakeStockPage';
 
 const STORAGE_PREFIX = 'hr_emp_ops_';
 const HISTORY_LIMIT = 8;
@@ -551,6 +552,7 @@ export default function EmpOps() {
   const taskKey   = getTaskKeyFromPath(location.pathname);
 
   if (!taskKey) return <OpsHome navigate={navigate} />;
+  if (taskKey === 'cake-stock') return <CakeStockPage navigate={navigate} />;
   return <OpsTaskPage taskKey={taskKey} navigate={navigate} />;
 }
 
