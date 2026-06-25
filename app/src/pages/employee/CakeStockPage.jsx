@@ -527,6 +527,7 @@ export default function CakeStockPage({ navigate }) {
       qty: stockMap[i.id] || 0,
       qty_spoiled: spoiledMap[i.id] || 0,
       spoiled_reason: (spoiledDetails[i.id]?.reason) || '',
+      spoiled_note: (spoiledDetails[i.id]?.note) || '',
       spoiled_photo: (spoiledDetails[i.id]?.photo) || '',
     }));
 
@@ -873,6 +874,21 @@ export default function CakeStockPage({ navigate }) {
                       </button>
                     ))}
                   </div>
+                  {/* Custom note when อื่นๆ selected */}
+                  {details.reason === 'other' && (
+                    <input
+                      type="text"
+                      placeholder="ระบุสาเหตุ..."
+                      value={details.note || ''}
+                      onChange={e => setSpoiledDetails(prev => ({ ...prev, [item.id]: { ...prev[item.id], note: e.target.value } }))}
+                      style={{
+                        width: '100%', boxSizing: 'border-box',
+                        padding: '7px 10px', borderRadius: 8, border: '1.5px solid #FECACA',
+                        fontSize: 13, fontFamily: 'inherit', marginBottom: 8,
+                        outline: 'none', background: '#fff', color: '#1F2937',
+                      }}
+                    />
+                  )}
                   {/* Photo */}
                   <input type="file" accept="image/*" capture="environment" id={photoInputId}
                     style={{ display: 'none' }}
