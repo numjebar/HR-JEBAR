@@ -179,6 +179,8 @@ export default function CakeStockPage({ navigate }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(null);
   const [savingSpoiled, setSavingSpoiled] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [lastSubmitted, setLastSubmitted] = useState(null); // ISO string
 
   // Modals
   const [showHistory, setShowHistory] = useState(false);
@@ -506,6 +508,42 @@ export default function CakeStockPage({ navigate }) {
   const totalQty = items.reduce((s, i) => s + (stockMap[i.id] || 0), 0);
   const openCount = items.filter(i => (stockMap[i.id] || 0) > 0).length;
 
+  // Submit report snapshot to employee_ops_entries (task_key='cake-stock')
+  async function submitReport() {
+    if (!isMyBranch || submitting) return;
+    const activeBranch = branches.find(b => b.id === activeBranchId);
+    const branchName = activeBranch?.label || 'ไม่ระบุสาขา';
+    const openItems = items.filter(i => i.is_open).map(i => ({
+      name: i.name,
+      qty: stockMap[i.id] || 0,
+      qty_spoiled: spoiledMap[i.id] || 0,
+    }));
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.rpc('employee_submit_ops_entry', {
+        p_emp_id: empId,
+        p_task_key: 'cake-stock',
+        p_payload: {
+          submitted_by: empName,
+          branch_id: activeBranchId,
+          branch_name: branchName,
+          submitted_at: new Date().toISOString(),
+          items: openItems,
+          total_qty: openItems.reduce((s, i) => s + i.qty, 0),
+          total_spoiled: openItems.reduce((s, i) => s + i.qty_spoiled, 0),
+        },
+      });
+      if (error) throw error;
+      const now = new Date().toISOString();
+      setLastSubmitted(now);
+      alert(`ส่งรายงานแล้ว ✓\n${branchName} · ${openItems.length} รายการ\n${new Date(now).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}`);
+    } catch (err) {
+      alert('ส่งรายงานไม่สำเร็จ: ' + (err?.message || 'กรุณาลองใหม่'));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', background: '#F9F5F0', fontFamily: '"Sarabun","Noto Sans Thai",sans-serif' }}>
@@ -575,6 +613,36 @@ export default function CakeStockPage({ navigate }) {
           </button>
         )}
       </div>
+
+      {/* Submit report bar — only own branch */}
+      {isMyBranch && (
+        <div style={{ background: lastSubmitted ? '#F0FDF4' : '#FFF7ED', padding: '10px 16px', borderBottom: '1px solid #E5DDD5', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            {lastSubmitted ? (
+              <div style={{ fontSize: 13, color: '#166534', fontWeight: 600 }}>
+                ✓ ส่งรายงานแล้ว · {new Date(lastSubmitted).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: '#92400E' }}>
+                เช็คสต็อคเสร็จแล้ว? กดส่งให้แอดมิน
+              </div>
+            )}
+          </div>
+          <button
+            onClick={submitReport}
+            disabled={submitting}
+            style={{
+              background: lastSubmitted ? '#16A34A' : '#4A2E1A',
+              color: '#fff', border: 'none', borderRadius: 10,
+              padding: '10px 20px', fontSize: 14, fontWeight: 700,
+              cursor: submitting ? 'not-allowed' : 'pointer',
+              opacity: submitting ? 0.7 : 1,
+            }}
+          >
+            {submitting ? '⏳ กำลังส่ง...' : lastSubmitted ? '✓ ส่งอีกครั้ง' : '📨 ส่งรายงาน'}
+          </button>
+        </div>
+      )}
 
       {/* Item list */}
       <div style={{ padding: '12px 12px 80px' }}>
