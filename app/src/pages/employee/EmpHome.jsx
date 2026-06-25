@@ -158,39 +158,31 @@ export default function EmpHome() {
   ];
 
   return (
-    <div style={{ padding: '16px 16px 96px', background: 'linear-gradient(180deg, #f8f3ea 0%, #f6f7fb 18%, #f6f7fb 100%)' }}>
-      <div className="card" style={{
-        padding: 18,
-        borderRadius: 32,
-        background: 'linear-gradient(180deg, rgba(255,249,241,.96) 0%, rgba(255,255,255,.96) 100%)',
-        border: '1px solid rgba(197,162,117,.24)',
-        boxShadow: '0 24px 60px rgba(30,41,59,.08)',
-      }}>
-        <div style={{ width: 92, height: 18, borderRadius: 999, background: '#0d0d0d', margin: '0 auto 18px' }} />
-
-        <div style={{ color: '#c77a45', fontWeight: 800, fontSize: 18 }}>สวัสดี, {currentEmployee?.nickname || currentEmployee?.name || 'ทีมงาน'}</div>
+    <div style={{ padding: '16px 16px 96px', background: 'var(--bg)' }}>
+      <div className="card" style={{ padding: 18, borderRadius: 'var(--r-card-lg)' }}>
+        <div style={{ color: 'var(--ink)', fontWeight: 700, fontSize: 18 }}>สวัสดี, {currentEmployee?.nickname || currentEmployee?.name || 'ทีมงาน'}</div>
         <div style={{ color: 'var(--muted)', fontSize: 14, marginTop: 4 }}>
           {currentShiftLabel()} · {fmtDateFull(new Date().toISOString().slice(0, 10))}
         </div>
 
         {/* Monthly summary card */}
         <div style={{
-          background: 'linear-gradient(135deg, #0f172a 0%, #1B5EA8 100%)',
-          borderRadius: 20, padding: '14px 16px', margin: '14px 0 12px',
+          background: 'var(--bg)', border: '1px solid var(--line)',
+          borderRadius: 'var(--r-card)', padding: '14px 16px', margin: '14px 0 12px',
         }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,.55)', fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 10 }}>
+          <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 10 }}>
             สรุปเดือนนี้
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
             {[
-              { value: monthSummary.worked, label: 'มาแล้ว', unit: 'วัน', color: '#4ade80' },
-              { value: monthSummary.late, label: 'มาสาย', unit: 'ครั้ง', color: '#fbbf24' },
-              { value: monthSummary.leave, label: 'ลา', unit: 'วัน', color: '#94a3b8' },
-              { value: monthSummary.otMin > 0 ? (Math.round(monthSummary.otMin / 6) / 10) : 0, label: 'OT', unit: 'ชม.', color: '#60a5fa' },
+              { value: monthSummary.worked, label: 'มาแล้ว', unit: 'วัน' },
+              { value: monthSummary.late, label: 'มาสาย', unit: 'ครั้ง' },
+              { value: monthSummary.leave, label: 'ลา', unit: 'วัน' },
+              { value: monthSummary.otMin > 0 ? (Math.round(monthSummary.otMin / 6) / 10) : 0, label: 'OT', unit: 'ชม.' },
             ].map((item) => (
               <div key={item.label} style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 24, fontWeight: 800, color: item.color, lineHeight: 1.1 }}>{item.value}</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,.55)', lineHeight: 1.4, marginTop: 2 }}>{item.unit}<br />{item.label}</div>
+                <div className="num" style={{ fontSize: 24, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.1 }}>{item.value}</div>
+                <div style={{ fontSize: 10, color: 'var(--muted)', lineHeight: 1.4, marginTop: 2 }}>{item.unit}<br />{item.label}</div>
               </div>
             ))}
           </div>
@@ -200,38 +192,24 @@ export default function EmpHome() {
         {leaveBalance && (
           <div style={{
             background: 'var(--surface)', border: '1px solid var(--line)',
-            borderRadius: 18, padding: '14px 16px', margin: '0 0 12px',
+            borderRadius: 'var(--r-card)', padding: '14px 16px', margin: '0 0 12px',
           }}>
             <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 10 }}>
               สิทธิ์ลาคงเหลือ ปี {(new Date().getFullYear() + 543).toString()}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
               {[
-                {
-                  label: 'ลาพักร้อน',
-                  used: leaveBalance.used_annual,
-                  total: leaveBalance.annual_leave_days,
-                  color: '#60a5fa',
-                },
-                {
-                  label: 'ลาป่วย',
-                  used: leaveBalance.used_sick,
-                  total: leaveBalance.sick_leave_days,
-                  color: '#f87171',
-                },
-                {
-                  label: 'ลากิจ',
-                  used: leaveBalance.used_personal,
-                  total: null,
-                  color: '#fbbf24',
-                },
+                { label: 'ลาพักร้อน', used: leaveBalance.used_annual, total: leaveBalance.annual_leave_days },
+                { label: 'ลาป่วย', used: leaveBalance.used_sick, total: leaveBalance.sick_leave_days },
+                { label: 'ลากิจ', used: leaveBalance.used_personal, total: null },
               ].map((item) => {
                 const remaining = item.total !== null ? item.total - item.used : null;
                 const pct = item.total ? Math.min(1, item.used / item.total) : 0;
+                const out = remaining === 0;
                 return (
                   <div key={item.label} style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>{item.label}</div>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: remaining === 0 ? '#f87171' : item.color, lineHeight: 1 }}>
+                    <div className="num" style={{ fontSize: 20, fontWeight: 700, color: out ? 'var(--danger-fg)' : 'var(--ink)', lineHeight: 1 }}>
                       {remaining !== null ? remaining : item.used}
                     </div>
                     <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
@@ -239,7 +217,7 @@ export default function EmpHome() {
                     </div>
                     {item.total && (
                       <div style={{ height: 3, background: 'var(--line)', borderRadius: 99, marginTop: 6, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${pct * 100}%`, background: pct >= 1 ? '#f87171' : item.color, borderRadius: 99, transition: 'width .4s' }} />
+                        <div style={{ height: '100%', width: `${pct * 100}%`, background: pct >= 1 ? 'var(--danger-fg)' : 'var(--accent)', borderRadius: 99, transition: 'width .4s' }} />
                       </div>
                     )}
                   </div>
@@ -250,34 +228,26 @@ export default function EmpHome() {
         )}
 
         <div style={{
-          background: '#f6efe3',
-          border: '1px solid #eadcc6',
-          borderRadius: 18,
-          padding: '14px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          marginBottom: 14,
+          background: 'var(--bg)', border: '1px solid var(--line)',
+          borderRadius: 'var(--r-card)', padding: '12px 14px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 12, marginBottom: 14,
         }}>
-          <div style={{ fontSize: 14, color: '#8a613e', fontWeight: 700 }}>
-            🏷️ {branch?.label || 'ยังไม่ตั้งสาขา'} · {todayAtt?.status ? todayStatusLabel(todayAtt.status) : 'ยังไม่ระบุ'}
+          <div style={{ fontSize: 14, color: 'var(--ink)', fontWeight: 600 }}>
+            {branch?.label || 'ยังไม่ตั้งสาขา'} · <span style={{ color: 'var(--muted)', fontWeight: 400 }}>{todayAtt?.status ? todayStatusLabel(todayAtt.status) : 'ยังไม่ระบุ'}</span>
           </div>
-          <button className="btn" style={{ padding: 0, background: 'transparent', border: 'none', color: '#8a613e' }} onClick={() => setShowRules(true)}>
-            ⚙️
+          <button className="btn" style={{ padding: 0, background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 18 }} onClick={() => setShowRules(true)}>
+            ⚙
           </button>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
           {quickStats.map((item) => (
             <div key={item.label} style={{
-              background: '#fff',
-              border: '1px solid #eadcc6',
-              borderRadius: 22,
-              padding: '16px 10px',
-              textAlign: 'center',
+              background: 'var(--surface)', border: '1px solid var(--line)',
+              borderRadius: 'var(--r-card)', padding: '16px 10px', textAlign: 'center',
             }}>
-              <div className="num" style={{ fontSize: 34, fontWeight: 800, color: '#bf6c2a', marginBottom: 2 }}>{item.value}</div>
+              <div className="num" style={{ fontSize: 32, fontWeight: 700, color: 'var(--ink)', marginBottom: 2 }}>{item.value}</div>
               <div style={{ fontSize: 13, color: 'var(--muted)' }}>{item.label}</div>
             </div>
           ))}
@@ -291,18 +261,18 @@ export default function EmpHome() {
             <div
               onClick={() => navigate('/emp/messages')}
               style={{
-                marginBottom: 12, padding: '12px 14px', borderRadius: 18,
-                background: '#fff8e8', border: '1.5px solid #f4dfab',
+                marginBottom: 12, padding: '12px 14px', borderRadius: 'var(--r-card)',
+                background: 'var(--accent-soft)', border: '1px solid var(--line)',
                 cursor: 'pointer', display: 'grid', gap: 4,
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: '#7a5b2b' }}>
-                  💬 ข้อความจากแอดมิน{unreadCount > 1 ? ` (${unreadCount})` : ''}
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>
+                  ข้อความจากแอดมิน{unreadCount > 1 ? ` (${unreadCount})` : ''}
                 </span>
-                <span style={{ fontSize: 11, color: '#9b7a5a' }}>ดูทั้งหมด ›</span>
+                <span style={{ fontSize: 11, color: 'var(--muted)' }}>ดูทั้งหมด ›</span>
               </div>
-              <div style={{ fontSize: 13, color: '#5a4024', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: 13, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {firstUnread.text || '…'}
               </div>
             </div>
@@ -314,10 +284,10 @@ export default function EmpHome() {
           {(() => {
             const todayOpsTotal = Object.values(todayOpsCounts).reduce((s, v) => s + v, 0);
             return (
-              <div style={{ fontSize: 12, color: '#9b7a5a', fontWeight: 700, marginBottom: 8, paddingLeft: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700, marginBottom: 8, paddingLeft: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>งานร้านวันนี้</span>
                 {todayOpsTotal > 0 && (
-                  <span style={{ background: '#ecfdf3', color: '#0d7a46', borderRadius: 999, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>✓ {todayOpsTotal} รายการ</span>
+                  <span className="badge badge-green">✓ {todayOpsTotal} รายการ</span>
                 )}
               </div>
             );
@@ -338,16 +308,16 @@ export default function EmpHome() {
                   onClick={() => navigate(item.path)}
                   style={{
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    gap: 6, padding: '14px 8px', borderRadius: 18,
-                    border: `1px solid ${count > 0 ? '#bbe7cf' : '#eadcc6'}`,
-                    background: count > 0 ? '#f0fdf4' : '#fff',
-                    cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#2f241f',
+                    gap: 6, padding: '14px 8px', borderRadius: 'var(--r-card)',
+                    border: `1px solid ${count > 0 ? 'var(--accent)' : 'var(--line)'}`,
+                    background: count > 0 ? 'var(--accent-soft)' : 'var(--surface)',
+                    cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--ink)',
                   }}
                 >
-                  <span style={{ fontSize: 26 }}>{item.icon}</span>
+                  <span style={{ fontSize: 22, opacity: .85 }}>{item.icon}</span>
                   {item.label}
                   {count > 0 && (
-                    <span style={{ background: '#ecfdf3', color: '#0d7a46', borderRadius: 999, padding: '1px 6px', fontSize: 11, fontWeight: 800, lineHeight: 1.4 }}>
+                    <span style={{ color: 'var(--accent)', fontSize: 11, fontWeight: 700, lineHeight: 1.4 }}>
                       ✓{count}
                     </span>
                   )}
@@ -358,9 +328,9 @@ export default function EmpHome() {
           <button
             onClick={() => navigate('/emp/ops')}
             style={{
-              marginTop: 8, width: '100%', padding: '11px 14px', borderRadius: 16,
-              border: '1px solid #eadcc6', background: 'none',
-              fontSize: 13, color: '#9b7a5a', fontWeight: 600, cursor: 'pointer',
+              marginTop: 8, width: '100%', padding: '11px 14px', borderRadius: 'var(--r-input)',
+              border: '1px solid var(--line)', background: 'none',
+              fontSize: 13, color: 'var(--muted)', fontWeight: 600, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}
           >
@@ -369,7 +339,7 @@ export default function EmpHome() {
 
           {upcomingTasks.length > 0 && (
             <div style={{ marginTop: 10 }}>
-              <div style={{ fontSize: 12, color: '#9b7a5a', fontWeight: 700, marginBottom: 8, paddingLeft: 2 }}>📋 งานที่ต้องทำ</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700, marginBottom: 8, paddingLeft: 2 }}>งานที่ต้องทำ</div>
               {upcomingTasks.map(task => {
                 const todayStr = new Date().toISOString().slice(0, 10);
                 const diffDays = Math.round((new Date(task.due + 'T00:00:00') - new Date(todayStr + 'T00:00:00')) / 86400000);
@@ -378,14 +348,14 @@ export default function EmpHome() {
                 return (
                   <div key={task.id} onClick={() => navigate('/emp/messages')} style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10,
-                    padding: '10px 12px', borderRadius: 14, marginBottom: 6, cursor: 'pointer',
-                    background: isUrgent ? '#fff1f1' : '#fff',
-                    border: `1px solid ${isUrgent ? '#fca5a5' : isSoon ? '#fde68a' : '#eadcc6'}`,
+                    padding: '10px 12px', borderRadius: 'var(--r-input)', marginBottom: 6, cursor: 'pointer',
+                    background: isUrgent ? 'var(--danger-bg)' : 'var(--surface)',
+                    border: `1px solid ${isUrgent ? 'var(--danger-fg)' : 'var(--line)'}`,
                   }}>
                     <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                       {task.text}
                     </div>
-                    <span style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, color: isUrgent ? '#b42318' : isSoon ? '#b45309' : '#0d7a46' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, color: isUrgent ? 'var(--danger-fg)' : isSoon ? 'var(--late-fg)' : 'var(--accent)' }}>
                       {diffDays === 0 ? 'วันนี้!' : `${diffDays}วัน`}
                     </span>
                   </div>
@@ -397,18 +367,18 @@ export default function EmpHome() {
       </div>
 
       <div style={{ marginTop: 14, display: 'grid', gap: 12 }}>
-        <div style={{ background: '#14191f', color: '#fff', borderRadius: 24, padding: 20 }}>
-          <div style={{ fontSize: 14, opacity: 0.84, marginBottom: 10 }}>
+        <div style={{ background: 'var(--ink)', color: '#fff', borderRadius: 'var(--r-card-lg)', padding: 20 }}>
+          <div style={{ fontSize: 14, opacity: 0.7, marginBottom: 10 }}>
             {branch?.label || 'ยังไม่ได้ตั้งสาขา'} · {fmtDateFull(new Date().toISOString().slice(0, 10))}
           </div>
-          <div style={{ fontSize: 52, lineHeight: 1, fontWeight: 800, marginBottom: 16 }}>{clockText}</div>
-          <div style={{ display: 'flex', gap: 24, fontSize: 14, opacity: 0.88, marginBottom: 18 }}>
+          <div className="num" style={{ fontSize: 52, lineHeight: 1, fontWeight: 700, marginBottom: 16 }}>{clockText}</div>
+          <div style={{ display: 'flex', gap: 24, fontSize: 14, opacity: 0.8, marginBottom: 18 }}>
             <span>เข้า {lastCheckIn}</span>
             <span>ออก {lastCheckOut}</span>
           </div>
           <button
             className="btn btn-primary"
-            style={{ width: '100%', fontSize: 22, fontWeight: 800, padding: '14px 18px', borderRadius: 18 }}
+            style={{ width: '100%', fontSize: 20, fontWeight: 700, padding: '14px 18px', borderRadius: 'var(--r-card)' }}
             onClick={() => setShowCheckin(true)}
           >
             {actionLabel}
