@@ -306,10 +306,9 @@ export default function CakeStockPage({ navigate }) {
     const prev = stockMap[item.id] || 0;
     const next = Math.max(0, prev + delta);
     setSaving(item.id);
-    const newMap = { ...stockMap, [item.id]: next };
-    setStockMap(newMap);
+    setStockMap(old => ({ ...old, [item.id]: next }));
     try {
-      await supabase.from('cake_stock').upsert({
+      const { error } = await supabase.from('cake_stock').upsert({
         org_id: orgId,
         branch_id: activeBranchId,
         item_id: item.id,
@@ -317,9 +316,11 @@ export default function CakeStockPage({ navigate }) {
         updated_by: empId,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'branch_id,item_id' });
+      if (error) throw error;
       await writeLog(item.id, item.name, 'adjust', delta, next, null);
-    } catch {
-      setStockMap(prev => ({ ...prev, [item.id]: prev }));
+    } catch (err) {
+      setStockMap(old => ({ ...old, [item.id]: prev }));
+      alert('บันทึกไม่สำเร็จ: ' + (err?.message || 'กรุณาลองใหม่'));
     } finally {
       setSaving(null);
     }
@@ -452,7 +453,7 @@ export default function CakeStockPage({ navigate }) {
   async function handleExport() {
     const activeBranch = branches.find(b => b.id === activeBranchId);
     const branchName = activeBranchId === 'all' ? 'รวมทุกสาขา' : (activeBranch?.label || 'ไม่ระบุสาขา');
-    const blob = await exportToImage({ items, stockMap, branchName, empName });
+    const blob = await exportToImage({ items: items.filter(i => i.is_open), stockMap, branchName, empName });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
