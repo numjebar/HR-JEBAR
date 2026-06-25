@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase, supabaseUrl } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 
 // ─── Icon mapping ─────────────────────────────────────────────────────────────
@@ -230,6 +230,7 @@ export default function CakeStockPage({ navigate }) {
       const probeRows = probeAll.data || [];
       const sample = probeRows[0];
       setDebugInfo(
+        `URL=${supabaseUrl}\n` +
         `myOrg=[${orgId}]\n` +
         `branch=${activeBranchId}\n` +
         `filtered items=${itemData ? itemData.length : 'null'}${itemErr ? ` ERR:${itemErr.code || ''} ${itemErr.message}` : ''}\n` +
