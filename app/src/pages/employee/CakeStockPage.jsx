@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { supabase, supabaseUrl } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 
 // ─── Icon mapping ─────────────────────────────────────────────────────────────
@@ -167,8 +167,7 @@ export default function CakeStockPage({ navigate }) {
   const [items, setItems] = useState([]);       // cake_items (active)
   const [stockMap, setStockMap] = useState({}); // { item_id: qty }
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(null);   // item_id being saved
-  const [debugInfo, setDebugInfo] = useState(null); // TEMP: surface load errors
+  const [saving, setSaving] = useState(null);
 
   // Modals
   const [showHistory, setShowHistory] = useState(false);
@@ -200,13 +199,10 @@ export default function CakeStockPage({ navigate }) {
 
   // Load items + stock for active branch
   const load = useCallback(async () => {
-    if (!orgId || !activeBranchId) {
-      setDebugInfo(`guard: orgId=${orgId || 'NULL'} branchId=${activeBranchId || 'NULL'}`);
-      return;
-    }
+    if (!orgId || !activeBranchId) return;
     setLoading(true);
     try {
-      const [itemRes, stockRes] = await Promise.all([
+      const [{ data: itemData }, { data: stockData }] = await Promise.all([
         supabase.from('cake_items')
           .select('id,name,sort_order,is_open,status')
           .eq('org_id', orgId)
@@ -217,29 +213,12 @@ export default function CakeStockPage({ navigate }) {
           .eq('org_id', orgId)
           .eq('branch_id', activeBranchId),
       ]);
-      const { data: itemData, error: itemErr } = itemRes;
-      const { data: stockData, error: stockErr } = stockRes;
       if (itemData) setItems(itemData);
       if (stockData) {
         const m = {};
         stockData.forEach(r => { m[r.item_id] = r.qty; });
         setStockMap(m);
       }
-      // PROBE: cake_items with NO filter, and org-only filter, to isolate
-      const probeAll = await supabase.from('cake_items').select('id,org_id,name,status');
-      const probeRows = probeAll.data || [];
-      const sample = probeRows[0];
-      setDebugInfo(
-        `URL=${supabaseUrl}\n` +
-        `myOrg=[${orgId}]\n` +
-        `branch=${activeBranchId}\n` +
-        `filtered items=${itemData ? itemData.length : 'null'}${itemErr ? ` ERR:${itemErr.code || ''} ${itemErr.message}` : ''}\n` +
-        `ALL cake_items (no filter)=${probeAll.data ? probeAll.data.length : 'null'}${probeAll.error ? ` ERR:${probeAll.error.code || ''} ${probeAll.error.message}` : ''}\n` +
-        (sample ? `sampleOrg=[${sample.org_id}] name=${sample.name} status=${sample.status}\n` : 'no sample row\n') +
-        `orgMatch=${sample ? String(sample.org_id === orgId) : 'n/a'}`
-      );
-    } catch (e) {
-      setDebugInfo(`exception: ${e?.message || String(e)}`);
     } finally {
       setLoading(false);
     }
@@ -469,11 +448,6 @@ export default function CakeStockPage({ navigate }) {
           <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>
             <div style={{ fontSize: 40 }}>🍞</div>
             <div style={{ marginTop: 8 }}>ยังไม่มีรายการขนม</div>
-            {debugInfo && (
-              <div style={{ marginTop: 16, fontSize: 11, color: '#B45309', background: '#FEF3C7', padding: 10, borderRadius: 8, textAlign: 'left', wordBreak: 'break-all', fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
-                🐞 {debugInfo}
-              </div>
-            )}
           </div>
         ) : (
           items.map((item, idx) => {
