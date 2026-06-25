@@ -667,9 +667,14 @@ export default function CakeStockPage({ navigate }) {
         </div>
         <div style={{ flex: 1 }} />
         {isMyBranch && (
-          <button onClick={autoSort} style={{ background: '#F9F5F0', border: '1px solid #D6C5B5', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer', color: '#4A2E1A' }}>
-            ↕ จัดลำดับ
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button onClick={autoSort} style={{ background: '#F9F5F0', border: '1px solid #D6C5B5', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer', color: '#4A2E1A' }}>
+              ↕ จัดลำดับ
+            </button>
+            <button onClick={() => setShowRequestAdd(true)} style={{ background: '#4A2E1A', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer', color: '#E8C89E' }}>
+              + เพิ่มรายการ
+            </button>
+          </div>
         )}
       </div>
 
@@ -704,7 +709,7 @@ export default function CakeStockPage({ navigate }) {
       )}
 
       {/* Item list */}
-      <div style={{ padding: '12px 12px 80px' }}>
+      <div style={{ padding: '12px 12px 24px' }}>
         {loading ? (
           <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>กำลังโหลด...</div>
         ) : items.length === 0 ? (
@@ -944,20 +949,6 @@ export default function CakeStockPage({ navigate }) {
             );
           })
         )}
-      </div>
-
-      {/* Floating "Request add item" button — always visible */}
-      <div style={{ position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)', zIndex: 40 }}>
-        <button
-          onClick={() => setShowRequestAdd(true)}
-          style={{
-            background: '#4A2E1A', color: '#E8C89E', border: 'none', borderRadius: 24, padding: '13px 24px',
-            fontSize: 15, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 16px rgba(74,46,26,0.4)',
-            display: 'flex', alignItems: 'center', gap: 8,
-          }}
-        >
-          + ขอเพิ่มรายการ
-        </button>
       </div>
 
       {/* Request Delete Confirm Modal */}
