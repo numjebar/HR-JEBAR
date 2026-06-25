@@ -95,7 +95,8 @@ export default function EmpProfile() {
       {/* financial (locked) */}
       <div className="card" style={{ padding: '16px 20px', marginBottom: 14, background: 'var(--bg)' }}>
         <div style={{ fontWeight: 600, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-          🔒 ข้อมูลการเงิน (แอดมินเท่านั้น)
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          ข้อมูลการเงิน (แอดมินเท่านั้น)
         </div>
         {[
           { label: 'สาขา', value: branch?.label },
@@ -139,7 +140,7 @@ function AISettingsCard() {
   return (
     <div className="card" style={{ padding: '16px 20px', marginBottom: 14 }}>
       <div style={{ fontWeight: 600, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-        🤖 ตั้งค่า AI (Gemini)
+        ตั้งค่า AI (Gemini)
         {saved && <span style={{ fontSize: 11, background: 'var(--accent-soft)', color: 'var(--accent)', borderRadius: 99, padding: '2px 8px' }}>พร้อมใช้</span>}
       </div>
       <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>

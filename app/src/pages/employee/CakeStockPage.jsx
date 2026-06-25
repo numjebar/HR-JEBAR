@@ -677,40 +677,40 @@ export default function CakeStockPage({ navigate }) {
 
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: '100vh', background: '#F9F5F0', fontFamily: '"Sarabun","Noto Sans Thai",sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       {/* Top bar */}
-      <div style={{ background: '#4A2E1A', color: '#fff', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, position: 'sticky', top: 0, zIndex: 50 }}>
-        <button onClick={() => navigate('/emp/ops')} style={{ background: 'none', border: 'none', color: '#E8C89E', fontSize: 22, cursor: 'pointer', padding: '0 4px' }}>←</button>
+      <div style={{ background: 'var(--ink)', color: '#fff', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10, position: 'sticky', top: 0, zIndex: 50 }}>
+        <button onClick={() => navigate('/emp/ops')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.7)', fontSize: 22, cursor: 'pointer', padding: '0 4px' }}>←</button>
         <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, fontSize: 17 }}>🍰 เช็คสต็อคขนม</div>
-          <div style={{ fontSize: 12, opacity: 0.75 }}>{isMyBranch ? 'สาขาของคุณ — แก้ไขได้' : 'ดูข้อมูลเท่านั้น'}</div>
+          <div style={{ fontWeight: 700, fontSize: 17 }}>สต็อกขนม</div>
+          <div style={{ fontSize: 12, opacity: 0.65 }}>{isMyBranch ? 'สาขาของคุณ — แก้ไขได้' : 'ดูข้อมูลเท่านั้น'}</div>
         </div>
-        <button onClick={openHistory} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer' }}>📋 ประวัติ</button>
-        <button onClick={handleExport} style={{ background: '#E8C89E', border: 'none', color: '#4A2E1A', borderRadius: 8, padding: '6px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>📤 Export</button>
+        <button onClick={openHistory} style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,.2)', color: '#fff', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer' }}>ประวัติ</button>
+        <button onClick={handleExport} style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,.2)', color: '#fff', borderRadius: 8, padding: '6px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Export</button>
       </div>
 
       {/* Operate sync message */}
       {operateSyncMsg && (
-        <div style={{ background: '#EFF6FF', borderBottom: '1px solid #BFDBFE', padding: '8px 16px', fontSize: 13, color: '#1D4ED8', display: 'flex', alignItems: 'center', gap: 8 }}>
-          🔄 {operateSyncMsg}
+        <div style={{ background: 'var(--accent-soft)', borderBottom: '1px solid var(--line)', padding: '8px 16px', fontSize: 13, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          {operateSyncMsg}
         </div>
       )}
 
       {/* Branch tabs */}
       {branches.length > 0 && (
-        <div style={{ background: '#fff', borderBottom: '1px solid #E5DDD5', overflowX: 'auto', display: 'flex', padding: '0 8px' }}>
+        <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--line)', overflowX: 'auto', display: 'flex', padding: '0 8px' }}>
           {/* All-branches tab */}
           <button
             onClick={() => setActiveBranchId('all')}
             style={{
               whiteSpace: 'nowrap', padding: '12px 16px', border: 'none', cursor: 'pointer', fontSize: 14,
               fontWeight: activeBranchId === 'all' ? 700 : 400,
-              color: activeBranchId === 'all' ? '#4A2E1A' : '#6B7280',
+              color: activeBranchId === 'all' ? 'var(--ink)' : 'var(--muted)',
               background: 'none',
-              borderBottom: activeBranchId === 'all' ? '2px solid #4A2E1A' : '2px solid transparent',
+              borderBottom: activeBranchId === 'all' ? '2px solid var(--accent)' : '2px solid transparent',
             }}
           >
-            🏪 รวมทุกสาขา
+            รวมทุกสาขา
           </button>
           {branches.map(b => (
             <button
@@ -719,43 +719,43 @@ export default function CakeStockPage({ navigate }) {
               style={{
                 whiteSpace: 'nowrap', padding: '12px 16px', border: 'none', cursor: 'pointer', fontSize: 14,
                 fontWeight: b.id === activeBranchId ? 700 : 400,
-                color: b.id === activeBranchId ? '#4A2E1A' : '#6B7280',
+                color: b.id === activeBranchId ? 'var(--ink)' : 'var(--muted)',
                 background: 'none',
-                borderBottom: b.id === activeBranchId ? '2px solid #4A2E1A' : '2px solid transparent',
+                borderBottom: b.id === activeBranchId ? '2px solid var(--accent)' : '2px solid transparent',
               }}
             >
-              {b.id === myBranchId ? '⭐ ' : ''}{b.label}
+              {b.id === myBranchId ? '★ ' : ''}{b.label}
             </button>
           ))}
         </div>
       )}
 
       {/* Summary bar */}
-      <div style={{ background: '#fff', padding: '12px 16px', display: 'flex', gap: 16, borderBottom: '1px solid #E5DDD5' }}>
+      <div style={{ background: 'var(--surface)', padding: '12px 16px', display: 'flex', gap: 16, borderBottom: '1px solid var(--line)' }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#4A2E1A' }}>{totalQty}</div>
-          <div style={{ fontSize: 11, color: '#9CA3AF' }}>รวมทั้งหมด</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--ink)' }}>{totalQty}</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)' }}>รวมทั้งหมด</div>
         </div>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#16A34A' }}>{openCount}</div>
-          <div style={{ fontSize: 11, color: '#9CA3AF' }}>รายการมีสินค้า</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--accent)' }}>{openCount}</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)' }}>รายการมีสินค้า</div>
         </div>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#9CA3AF' }}>{items.length - openCount}</div>
-          <div style={{ fontSize: 11, color: '#9CA3AF' }}>รายการว่าง</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--muted)' }}>{items.length - openCount}</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)' }}>รายการว่าง</div>
         </div>
         <div style={{ flex: 1 }} />
         {isMyBranch && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button onClick={syncFromOperate} disabled={operateSyncing}
-              style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer', color: '#1D4ED8', opacity: operateSyncing ? 0.6 : 1 }}>
-              {operateSyncing ? '⏳' : '🔄'} Operate
+              style={{ background: 'var(--accent-soft)', border: '1px solid var(--accent)', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer', color: 'var(--accent)', opacity: operateSyncing ? 0.6 : 1 }}>
+              {operateSyncing ? '...' : '↻'} Operate
             </button>
-            <button onClick={autoSort} style={{ background: '#F9F5F0', border: '1px solid #D6C5B5', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer', color: '#4A2E1A' }}>
+            <button onClick={autoSort} style={{ background: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer', color: 'var(--ink)' }}>
               ↕ จัดลำดับ
             </button>
-            <button onClick={() => setShowRequestAdd(true)} style={{ background: '#4A2E1A', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer', color: '#E8C89E' }}>
-              + เพิ่มรายการ
+            <button onClick={() => setShowRequestAdd(true)} style={{ background: 'var(--ink)', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer', color: '#fff' }}>
+              + เพิ่ม
             </button>
           </div>
         )}
@@ -763,14 +763,14 @@ export default function CakeStockPage({ navigate }) {
 
       {/* Submit report bar — only own branch */}
       {isMyBranch && (
-        <div style={{ background: lastSubmitted ? '#F0FDF4' : '#FFF7ED', padding: '10px 16px', borderBottom: '1px solid #E5DDD5', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ background: lastSubmitted ? 'var(--accent-soft)' : 'var(--bg)', padding: '10px 16px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ flex: 1 }}>
             {lastSubmitted ? (
-              <div style={{ fontSize: 13, color: '#166534', fontWeight: 600 }}>
+              <div style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 600 }}>
                 ✓ ส่งรายงานแล้ว · {new Date(lastSubmitted).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
               </div>
             ) : (
-              <div style={{ fontSize: 13, color: '#92400E' }}>
+              <div style={{ fontSize: 13, color: 'var(--muted)' }}>
                 เช็คสต็อคเสร็จแล้ว? กดส่งให้แอดมิน
               </div>
             )}
@@ -779,14 +779,14 @@ export default function CakeStockPage({ navigate }) {
             onClick={submitReport}
             disabled={submitting}
             style={{
-              background: lastSubmitted ? '#16A34A' : '#4A2E1A',
+              background: lastSubmitted ? 'var(--accent)' : 'var(--ink)',
               color: '#fff', border: 'none', borderRadius: 10,
               padding: '10px 20px', fontSize: 14, fontWeight: 700,
               cursor: submitting ? 'not-allowed' : 'pointer',
               opacity: submitting ? 0.7 : 1,
             }}
           >
-            {submitting ? '⏳ กำลังส่ง...' : lastSubmitted ? '✓ ส่งอีกครั้ง' : '📨 ส่งรายงาน'}
+            {submitting ? 'กำลังส่ง...' : lastSubmitted ? '✓ ส่งอีกครั้ง' : 'ส่งรายงาน'}
           </button>
         </div>
       )}
@@ -794,9 +794,9 @@ export default function CakeStockPage({ navigate }) {
       {/* Item list */}
       <div style={{ padding: '12px 12px 24px' }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>กำลังโหลด...</div>
+          <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>กำลังโหลด...</div>
         ) : items.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>
+          <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>
             <div style={{ fontSize: 40 }}>🍞</div>
             <div style={{ marginTop: 8 }}>ยังไม่มีรายการขนม</div>
           </div>
@@ -822,19 +822,19 @@ export default function CakeStockPage({ navigate }) {
                 onTouchMove={canEdit ? onTouchMove : undefined}
                 onTouchEnd={canEdit ? e => onTouchEnd(e, idx) : undefined}
                 style={{
-                  background: dragOverIdx === idx && dragActiveIdx !== idx ? '#EDE8E3' : '#fff',
+                  background: dragOverIdx === idx && dragActiveIdx !== idx ? 'var(--hover)' : 'var(--surface)',
                   borderRadius: 12,
                   padding: '12px 14px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 12,
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                  boxShadow: 'var(--shadow-sm)',
                   opacity: dragActiveIdx === idx ? 0.35 : item.is_open ? 1 : 0.55,
                   cursor: canEdit ? 'grab' : 'default',
                   userSelect: 'none',
                   WebkitUserSelect: 'none',
                   transition: 'background 0.1s, opacity 0.1s',
-                  borderTop: dragOverIdx === idx && dragActiveIdx !== idx ? '2px solid #4A2E1A' : '2px solid transparent',
+                  borderTop: dragOverIdx === idx && dragActiveIdx !== idx ? '2px solid var(--accent)' : '2px solid transparent',
                 }}
               >
                 {/* Move up/down buttons */}
@@ -857,7 +857,7 @@ export default function CakeStockPage({ navigate }) {
 
                 {/* Name + open/close badge */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: '#1F2937', lineHeight: 1.3 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--ink)', lineHeight: 1.3 }}>
                     {item.name}
                   </div>
                   <div style={{ marginTop: 4 }}>
@@ -1074,9 +1074,9 @@ export default function CakeStockPage({ navigate }) {
                       <button key={name} onClick={() => setRequestName(name)}
                         style={{
                           padding: '6px 12px', borderRadius: 20,
-                          border: `1.5px solid ${requestName === name ? '#4A2E1A' : '#D6C5B5'}`,
-                          background: requestName === name ? '#4A2E1A' : '#FFF7ED',
-                          color: requestName === name ? '#E8C89E' : '#4A2E1A',
+                          border: `1.5px solid ${requestName === name ? 'var(--accent)' : 'var(--line)'}`,
+                          background: requestName === name ? 'var(--accent)' : 'var(--bg)',
+                          color: requestName === name ? '#fff' : 'var(--ink)',
                           fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
                         }}
                       >
@@ -1095,21 +1095,21 @@ export default function CakeStockPage({ navigate }) {
               onKeyDown={e => e.key === 'Enter' && submitRequestAdd()}
               placeholder="ชื่อรายการขนม เช่น เลมอนทาร์ต"
               style={{
-                width: '100%', padding: '12px 14px', borderRadius: 10, border: '1.5px solid #D6C5B5',
+                width: '100%', padding: '12px 14px', borderRadius: 10, border: '1.5px solid var(--line)',
                 fontSize: 16, boxSizing: 'border-box', fontFamily: 'inherit',
               }}
             />
-            <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 8 }}>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
               คำขอจะส่งให้แอดมินอนุมัติก่อนแสดงในระบบ
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-              <button onClick={() => setShowRequestAdd(false)} style={{ flex: 1, padding: 12, borderRadius: 10, border: '1.5px solid #E5E7EB', background: '#F9FAFB', cursor: 'pointer', fontSize: 15 }}>
+              <button onClick={() => setShowRequestAdd(false)} style={{ flex: 1, padding: 12, borderRadius: 10, border: '1.5px solid var(--line)', background: 'var(--bg)', cursor: 'pointer', fontSize: 15 }}>
                 ยกเลิก
               </button>
               <button
                 onClick={submitRequestAdd}
                 disabled={!requestName.trim() || requestSending}
-                style={{ flex: 2, padding: 12, borderRadius: 10, border: 'none', background: '#4A2E1A', color: '#E8C89E', cursor: 'pointer', fontSize: 15, fontWeight: 700, opacity: requestName.trim() ? 1 : 0.5 }}
+                style={{ flex: 2, padding: 12, borderRadius: 10, border: 'none', background: 'var(--ink)', color: '#fff', cursor: 'pointer', fontSize: 15, fontWeight: 700, opacity: requestName.trim() ? 1 : 0.5 }}
               >
                 {requestSending ? 'กำลังส่ง...' : 'ส่งคำขอ'}
               </button>
@@ -1121,22 +1121,22 @@ export default function CakeStockPage({ navigate }) {
       {/* History Modal */}
       {showHistory && (
         <ModalOverlay onClose={() => setShowHistory(false)}>
-          <div style={{ padding: '16px 16px 8px', borderBottom: '1px solid #F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontWeight: 700, fontSize: 16 }}>📋 ประวัติ 30 วัน</span>
-            <button onClick={() => setShowHistory(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#6B7280' }}>✕</button>
+          <div style={{ padding: '16px 16px 8px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontWeight: 700, fontSize: 16 }}>ประวัติ 30 วัน</span>
+            <button onClick={() => setShowHistory(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: 'var(--muted)' }}>✕</button>
           </div>
           <div style={{ overflowY: 'auto', maxHeight: '65vh', padding: '8px 0' }}>
             {logsLoading ? (
-              <div style={{ textAlign: 'center', padding: 32, color: '#9CA3AF' }}>กำลังโหลด...</div>
+              <div style={{ textAlign: 'center', padding: 32, color: 'var(--muted)' }}>กำลังโหลด...</div>
             ) : logs.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 32, color: '#9CA3AF' }}>ยังไม่มีประวัติ</div>
+              <div style={{ textAlign: 'center', padding: 32, color: 'var(--muted)' }}>ยังไม่มีประวัติ</div>
             ) : (
               logs.map(log => (
-                <div key={log.id} style={{ padding: '10px 16px', borderBottom: '1px solid #F9F5F0', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <div key={log.id} style={{ padding: '10px 16px', borderBottom: '1px solid var(--line-2)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                   <div style={{ fontSize: 18, flexShrink: 0 }}>{getIcon(log.item_name)}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#1F2937' }}>{log.item_name}</div>
-                    <div style={{ fontSize: 13, color: '#6B7280' }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{log.item_name}</div>
+                    <div style={{ fontSize: 13, color: 'var(--muted)' }}>
                       {ACTION_LABELS[log.action] || log.action}
                       {log.action === 'adjust' && log.delta != null && (
                         <span style={{ marginLeft: 6, color: log.delta > 0 ? '#16A34A' : '#DC2626', fontWeight: 700 }}>
@@ -1144,7 +1144,7 @@ export default function CakeStockPage({ navigate }) {
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
                       {log.emp_name} · {fmtTime(log.created_at)}
                     </div>
                   </div>
@@ -1167,7 +1167,7 @@ function ModalOverlay({ children, onClose }) {
     >
       <div
         onClick={e => e.stopPropagation()}
-        style={{ background: '#fff', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 520, animation: 'slideUp 0.2s ease' }}
+        style={{ background: 'var(--surface)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 520, animation: 'slideUp 0.2s ease' }}
       >
         {children}
       </div>

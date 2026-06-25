@@ -281,10 +281,10 @@ export default function EmpPay() {
       </div>
 
       {payment && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#e7f4ef', border: '1px solid #0E7C66', borderRadius: 16, padding: '14px 16px', marginBottom: 16 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 999, background: '#0E7C66', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>✓</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--accent-soft)', border: '1px solid var(--accent)', borderRadius: 16, padding: '14px 16px', marginBottom: 16 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 999, background: 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>✓</div>
           <div>
-            <div style={{ fontWeight: 700, color: '#0E7C66', fontSize: 15 }}>จ่ายเงินงวดนี้แล้ว</div>
+            <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 15 }}>จ่ายเงินงวดนี้แล้ว</div>
             <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 2 }}>
               จ่ายเมื่อ {new Date(payment.paid_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}
               {payment.net_amount > 0 ? ` · ยอด ${THB(payment.net_amount)}` : ''}

@@ -87,7 +87,7 @@ export default function EmpMessages() {
         background: 'var(--surface)',
         display: 'flex', alignItems: 'center', gap: 10,
       }}>
-        <span style={{ fontSize: 20 }}>💬</span>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         ข้อความ
         <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--muted)', fontWeight: 400 }}>
           แอดมิน ↔ พนักงาน
@@ -98,7 +98,7 @@ export default function EmpMessages() {
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 2 }}>
         {grouped.length === 0 && (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', flexDirection: 'column', gap: 8 }}>
-            <span style={{ fontSize: 40 }}>💬</span>
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             <span style={{ fontSize: 14 }}>ยังไม่มีข้อความ</span>
           </div>
         )}
@@ -140,7 +140,7 @@ export default function EmpMessages() {
               }}>
                 {isTask && (
                   <div style={{ fontSize: 11, fontWeight: 800, marginBottom: 5, opacity: .8, display: 'flex', gap: 4, alignItems: 'center' }}>
-                    📋 งานที่มอบหมาย
+                    งานที่มอบหมาย
                     {m.status === 'done' && <span style={{ background: 'rgba(0,0,0,.12)', borderRadius: 99, padding: '1px 6px' }}>✓ เสร็จแล้ว</span>}
                   </div>
                 )}
