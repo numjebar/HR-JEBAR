@@ -318,11 +318,11 @@ export default function EmpHome() {
                 path: '/emp/ops/production', taskKey: 'production', label: 'ผลิตขนม',
                 icon: (
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="11" width="20" height="11" rx="2"/>
-                    <path d="M7 11c0-5 2-7 5-7s5 2 5 7"/>
-                    <line x1="2" y1="16" x2="22" y2="16"/>
-                    <line x1="9" y1="19" x2="9" y2="22"/>
-                    <line x1="15" y1="19" x2="15" y2="22"/>
+                    <rect x="3" y="5" width="18" height="16" rx="2"/>
+                    <rect x="6" y="9" width="12" height="8" rx="1"/>
+                    <line x1="3" y1="8" x2="21" y2="8"/>
+                    <circle cx="8.5" cy="6.5" r="0.8" fill="currentColor" stroke="none"/>
+                    <circle cx="15.5" cy="6.5" r="0.8" fill="currentColor" stroke="none"/>
                   </svg>
                 ),
               },
@@ -351,11 +351,11 @@ export default function EmpHome() {
                 path: '/emp/ops/cake-stock', taskKey: 'cake-stock', label: 'สต๊อกเค้ก',
                 icon: (
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="15" width="20" height="7" rx="2"/>
-                    <rect x="5" y="9" width="14" height="6" rx="1.5"/>
-                    <path d="M9 9c0-3 1.5-4.5 3-4.5S15 6 15 9"/>
-                    <line x1="12" y1="4.5" x2="12" y2="2.5"/>
-                    <circle cx="12" cy="2" r="1" fill="currentColor" stroke="none"/>
+                    <rect x="2" y="15" width="20" height="6" rx="2"/>
+                    <rect x="5" y="11" width="14" height="4"/>
+                    <line x1="5" y1="11" x2="19" y2="11"/>
+                    <line x1="12" y1="6" x2="12" y2="11"/>
+                    <path d="M12 6 Q10 3.5 12 2 Q14 3.5 12 6z" fill="currentColor" stroke="none"/>
                   </svg>
                 ),
               },

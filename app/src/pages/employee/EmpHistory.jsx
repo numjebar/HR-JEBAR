@@ -20,10 +20,10 @@ function OpsIcon({ taskKey }) {
   const paths = {
     bills: <><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></>,
     'purchase-list': <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></>,
-    production: <><rect x="2" y="11" width="20" height="11" rx="2"/><path d="M7 11c0-5 2-7 5-7s5 2 5 7"/><line x1="2" y1="16" x2="22" y2="16"/></>,
+    production: <><rect x="3" y="5" width="18" height="16" rx="2"/><rect x="6" y="9" width="12" height="8" rx="1"/><line x1="3" y1="8" x2="21" y2="8"/><circle cx="8.5" cy="6.5" r="0.8" fill="currentColor" stroke="none"/><circle cx="15.5" cy="6.5" r="0.8" fill="currentColor" stroke="none"/></>,
     inventory: <><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></>,
     'supplies-count': <><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="13" y2="15"/></>,
-    'cake-stock': <><rect x="2" y="15" width="20" height="7" rx="2"/><rect x="5" y="9" width="14" height="6" rx="1.5"/><path d="M9 9c0-3 1.5-4.5 3-4.5S15 6 15 9"/></>,
+    'cake-stock': <><rect x="2" y="15" width="20" height="6" rx="2"/><rect x="5" y="11" width="14" height="4"/><line x1="5" y1="11" x2="19" y2="11"/><line x1="12" y1="6" x2="12" y2="11"/><path d="M12 6 Q10 3.5 12 2 Q14 3.5 12 6z" fill="currentColor" stroke="none"/></>,
   };
   return (
     <div style={{ width: 34, height: 34, borderRadius: 8, background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', flexShrink: 0 }}>
