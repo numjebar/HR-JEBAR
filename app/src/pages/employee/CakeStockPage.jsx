@@ -145,6 +145,14 @@ async function exportToImage({ items, stockMap, spoiledMap, branchName, empName 
   return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
 }
 
+// ─── Spoiled reasons ──────────────────────────────────────────────────────────
+const SPOILED_REASONS = [
+  { value: 'expired',  label: '🗓 หมดอายุ' },
+  { value: 'damaged',  label: '💥 เสียหาย/แตก' },
+  { value: 'quality',  label: '❌ คุณภาพไม่ผ่าน' },
+  { value: 'other',    label: '📝 อื่นๆ' },
+];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtTime(ts) {
   const d = new Date(ts);
@@ -176,6 +184,7 @@ export default function CakeStockPage({ navigate }) {
   const [items, setItems] = useState([]);         // cake_items (active)
   const [stockMap, setStockMap] = useState({});   // { item_id: qty }
   const [spoiledMap, setSpoiledMap] = useState({}); // { item_id: qty_spoiled }
+  const [spoiledDetails, setSpoiledDetails] = useState({}); // { item_id: { reason, photo } }
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(null);
   const [savingSpoiled, setSavingSpoiled] = useState(null);
@@ -517,6 +526,8 @@ export default function CakeStockPage({ navigate }) {
       name: i.name,
       qty: stockMap[i.id] || 0,
       qty_spoiled: spoiledMap[i.id] || 0,
+      spoiled_reason: (spoiledDetails[i.id]?.reason) || '',
+      spoiled_photo: (spoiledDetails[i.id]?.photo) || '',
     }));
 
     // Check if someone from same branch already submitted today
@@ -685,9 +696,11 @@ export default function CakeStockPage({ navigate }) {
             const isSaving = saving === item.id;
             const isSavingSpoiled = savingSpoiled === item.id;
             const canEdit = isMyBranch;
+            const details = spoiledDetails[item.id] || {};
+            const photoInputId = `spoiled-photo-${item.id}`;
             return (
+              <React.Fragment key={item.id}>
               <div
-                key={item.id}
                 data-drag-idx={idx}
                 draggable={canEdit}
                 onDragStart={() => onDragStart(idx)}
@@ -837,6 +850,60 @@ export default function CakeStockPage({ navigate }) {
                     title="ขอลบรายการ">🗑</button>
                 )}
               </div>
+
+              {/* Spoiled details panel — shown when qty_spoiled > 0 */}
+              {canEdit && spoiled > 0 && (
+                <div style={{ marginTop: 6, padding: '10px 12px', background: '#FFF5F5', borderRadius: 10, border: '1px solid #FECACA' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#B91C1C', marginBottom: 8 }}>
+                    📋 ระบุสาเหตุขนมเสีย ({spoiled} ชิ้น)
+                  </div>
+                  {/* Reason chips */}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                    {SPOILED_REASONS.map(r => (
+                      <button key={r.value}
+                        onClick={() => setSpoiledDetails(prev => ({ ...prev, [item.id]: { ...prev[item.id], reason: r.value } }))}
+                        style={{
+                          padding: '5px 11px', borderRadius: 16, border: '1.5px solid',
+                          borderColor: details.reason === r.value ? '#DC2626' : '#FECACA',
+                          background: details.reason === r.value ? '#FEE2E2' : '#fff',
+                          color: details.reason === r.value ? '#B91C1C' : '#9CA3AF',
+                          fontSize: 12, fontWeight: details.reason === r.value ? 700 : 400,
+                          cursor: 'pointer',
+                        }}>
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Photo */}
+                  <input type="file" accept="image/*" capture="environment" id={photoInputId}
+                    style={{ display: 'none' }}
+                    onChange={e => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = ev => setSpoiledDetails(prev => ({ ...prev, [item.id]: { ...prev[item.id], photo: ev.target.result } }));
+                      reader.readAsDataURL(file);
+                    }} />
+                  {details.photo ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <img src={details.photo} alt="waste" style={{ height: 52, width: 52, objectFit: 'cover', borderRadius: 8, border: '1px solid #FECACA' }} />
+                      <button onClick={() => setSpoiledDetails(prev => ({ ...prev, [item.id]: { ...prev[item.id], photo: '' } }))}
+                        style={{ fontSize: 12, color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                        ✕ ลบรูป
+                      </button>
+                    </div>
+                  ) : (
+                    <label htmlFor={photoInputId} style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '6px 12px', borderRadius: 8, border: '1.5px dashed #FECACA',
+                      background: '#fff', color: '#DC2626', fontSize: 12, cursor: 'pointer', fontWeight: 600,
+                    }}>
+                      📷 ถ่ายรูปของเสีย
+                    </label>
+                  )}
+                </div>
+              )}
+              </React.Fragment>
             );
           })
         )}
