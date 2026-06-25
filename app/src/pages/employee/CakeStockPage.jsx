@@ -522,13 +522,35 @@ export default function CakeStockPage({ navigate }) {
     if (!isMyBranch || submitting) return;
     const activeBranch = branches.find(b => b.id === activeBranchId);
     const branchName = activeBranch?.label || 'ไม่ระบุสาขา';
+    // Upload spoiled photos to Storage, replace base64 with URLs
+    const photoUrls = {};
+    const spoiledItemsWithPhoto = items.filter(i => i.is_open && spoiledDetails[i.id]?.photo?.startsWith('data:'));
+    for (const item of spoiledItemsWithPhoto) {
+      try {
+        const b64 = spoiledDetails[item.id].photo;
+        const [meta, data] = b64.split(',');
+        const mime = (meta.match(/:(.*?);/) || [])[1] || 'image/jpeg';
+        const bytes = atob(data);
+        const arr = new Uint8Array(bytes.length);
+        for (let k = 0; k < bytes.length; k++) arr[k] = bytes.charCodeAt(k);
+        const blob = new Blob([arr], { type: mime });
+        const ext = mime.split('/')[1] || 'jpg';
+        const path = `waste/${orgId}/${activeBranchId}/${Date.now()}-${item.id}.${ext}`;
+        const { data: up, error: upErr } = await supabase.storage.from('jebar-images').upload(path, blob, { contentType: mime, upsert: true });
+        if (!upErr && up) {
+          const { data: pub } = supabase.storage.from('jebar-images').getPublicUrl(up.path);
+          photoUrls[item.id] = pub?.publicUrl || '';
+        }
+      } catch { /* ถ้า upload ไม่สำเร็จ ข้ามไป */ }
+    }
+
     const openItems = items.filter(i => i.is_open).map(i => ({
       name: i.name,
       qty: stockMap[i.id] || 0,
       qty_spoiled: spoiledMap[i.id] || 0,
       spoiled_reason: (spoiledDetails[i.id]?.reason) || '',
       spoiled_note: (spoiledDetails[i.id]?.note) || '',
-      spoiled_photo: (spoiledDetails[i.id]?.photo) || '',
+      spoiled_photo: photoUrls[i.id] || '',
     }));
 
     // Check if someone from same branch already submitted today
