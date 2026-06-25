@@ -1437,19 +1437,24 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
         </div>
       );
 
-    case 'production':
+    case 'production': {
+      const BEV_CATS = ['beverage', 'drink', 'coffee', 'tea', 'เครื่องดื่ม', 'กาแฟ', 'ชา'];
+      const bakeryMenus = (catalog?.menus || []).filter(m => {
+        const cat = (m.category || '').toLowerCase();
+        return !BEV_CATS.some(c => cat.includes(c));
+      });
       return (
         <div style={fieldGridStyle}>
           <Field label="เมนูที่ผลิต">
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <SearchSelect
-                options={catalog?.menus || []}
+                options={bakeryMenus}
                 value={draft.product}
                 onChange={v => {
-                  const item = (catalog?.menus || []).find(i => i.name === v);
+                  const item = bakeryMenus.find(i => i.name === v);
                   setDraft({ ...draft, product: v, ...(item?.unit ? { unit: item.unit } : {}) });
                 }}
-                placeholder={!catalogReady ? 'กำลังโหลด...' : (!catalog ? 'พิมพ์ชื่อเมนู...' : (catalog.menus || []).length === 0 ? 'พิมพ์ชื่อเมนู...' : 'พิมพ์หรือเลือกเมนู...')}
+                placeholder={!catalogReady ? 'กำลังโหลด...' : (!catalog ? 'พิมพ์ชื่อเมนู...' : bakeryMenus.length === 0 ? 'พิมพ์ชื่อเมนู...' : 'พิมพ์หรือเลือกเมนู...')}
               />
               <VoiceBtn onResult={v => setDraft({ ...draft, product: v })} />
             </div>
@@ -1532,6 +1537,7 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
           />
         </div>
       );
+    }
 
     case 'inventory':
       return (
