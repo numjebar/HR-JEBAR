@@ -769,6 +769,7 @@ function OpsTaskPage({ taskKey, navigate }) {
         items={backend.items} loading={backend.loading} error={backend.error}
         renderItem={(item) => renderHistoryLine(taskKey, item.payload || {})}
         renderExtra={(item) => renderBackendExtra(taskKey, item)}
+        onDelete={backend.remove}
       />
 
       <HistorySection
@@ -1788,7 +1789,22 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
 }
 
 // ─── History sections ─────────────────────────────────────────────────────────
-function HistorySection({ title, subtitle, items, loading, error, renderItem, renderExtra, isLocal = false }) {
+function HistorySection({ title, subtitle, items, loading, error, renderItem, renderExtra, isLocal = false, onDelete }) {
+  const [deletingId, setDeletingId] = useState('');
+
+  async function handleDelete(item) {
+    if (!onDelete) return;
+    if (!window.confirm(`ลบรายการนี้?\n\n${renderItem(item)}\n\nการลบนี้ลบเฉพาะที่ backend (Supabase) — ถ้ารายการถูกดึงเข้า Operate แล้ว ต้องไปลบที่ Operate แยก`)) return;
+    setDeletingId(item.id);
+    try {
+      await onDelete(item.id);
+    } catch (err) {
+      window.alert('ลบไม่สำเร็จ: ' + (err?.message || 'เกิดข้อผิดพลาด') + '\n(ถ้าขึ้นว่าไม่พบฟังก์ชัน ให้รันไฟล์ 28_delete_ops_entry.sql ใน Supabase ก่อน)');
+    } finally {
+      setDeletingId('');
+    }
+  }
+
   return (
     <div style={cardStyle}>
       <div style={{ fontWeight: 800, fontSize: 18, color: '#2f241f', marginBottom: 4 }}>{title}</div>
@@ -1802,10 +1818,20 @@ function HistorySection({ title, subtitle, items, loading, error, renderItem, re
         <div style={{ display: 'grid', gap: 10 }}>
           {items.map((item) => (
             <div key={item.id} style={historyCardStyle}>
-              <div style={{ fontWeight: 700, color: '#2f241f' }}>{renderItem(item)}</div>
-              {renderExtra ? renderExtra(item) : null}
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
-                บันทึกเมื่อ {formatDateTime(isLocal ? item.savedAt : item.created_at)}
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, color: '#2f241f' }}>{renderItem(item)}</div>
+                  {renderExtra ? renderExtra(item) : null}
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
+                    บันทึกเมื่อ {formatDateTime(isLocal ? item.savedAt : item.created_at)}
+                  </div>
+                </div>
+                {onDelete && (
+                  <button type="button" onClick={() => handleDelete(item)} disabled={deletingId === item.id}
+                    style={{ flexShrink: 0, background: '#fff1f1', border: '1px solid #f3c3c3', color: '#b42318', borderRadius: 10, padding: '6px 12px', fontSize: 13, fontWeight: 700, cursor: deletingId === item.id ? 'default' : 'pointer', opacity: deletingId === item.id ? 0.6 : 1, fontFamily: 'inherit' }}>
+                    {deletingId === item.id ? '⏳' : '🗑 ลบ'}
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -1924,9 +1950,18 @@ function useTaskBackend(taskKey) {
     } finally { setLoading(false); }
   }
 
+  async function remove(entryId) {
+    const { error } = await supabase.rpc('employee_delete_ops_entry_v2', {
+      p_session_token: employeeSessionToken,
+      p_entry_id: entryId,
+    });
+    if (error) throw error;
+    setItems(prev => prev.filter(it => it.id !== entryId));
+  }
+
   useEffect(() => { reload(); }, [employeeSessionToken, taskKey]);
 
-  return { items, loading, error, reload };
+  return { items, loading, error, reload, remove };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
