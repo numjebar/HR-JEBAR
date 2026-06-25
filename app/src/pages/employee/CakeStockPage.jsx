@@ -797,8 +797,10 @@ export default function CakeStockPage({ navigate }) {
           <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>กำลังโหลด...</div>
         ) : items.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>
-            <div style={{ fontSize: 40 }}>🍞</div>
-            <div style={{ marginTop: 8 }}>ยังไม่มีรายการขนม</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="15" width="20" height="6" rx="2"/><rect x="5" y="11" width="14" height="4"/><line x1="5" y1="11" x2="19" y2="11"/><line x1="12" y1="6" x2="12" y2="11"/><path d="M12 6 Q10 3.5 12 2 Q14 3.5 12 6z" fill="currentColor" stroke="none"/></svg>
+            </div>
+            <div>ยังไม่มีรายการขนม</div>
           </div>
         ) : (
           items.map((item, idx) => {
