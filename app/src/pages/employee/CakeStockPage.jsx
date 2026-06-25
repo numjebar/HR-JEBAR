@@ -734,7 +734,7 @@ export default function CakeStockPage({ navigate }) {
 
                 {/* Name + open/close badge */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: '#1F2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: '#1F2937', lineHeight: 1.3 }}>
                     {item.name}
                   </div>
                   <div style={{ marginTop: 4 }}>
