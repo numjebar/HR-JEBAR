@@ -602,7 +602,7 @@ export default function CakeStockPage({ navigate }) {
       </div>
 
       {/* Floating "Request add item" button — always visible */}
-      <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 40 }}>
+      <div style={{ position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)', zIndex: 40 }}>
         <button
           onClick={() => setShowRequestAdd(true)}
           style={{
