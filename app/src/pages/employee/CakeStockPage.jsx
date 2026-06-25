@@ -176,6 +176,7 @@ export default function CakeStockPage({ navigate }) {
   const [showRequestAdd, setShowRequestAdd] = useState(false);
   const [requestName, setRequestName] = useState('');
   const [requestSending, setRequestSending] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null); // item to request delete
 
   // Drag-to-reorder
   const dragItem = useRef(null);
@@ -368,6 +369,15 @@ export default function CakeStockPage({ navigate }) {
     } finally {
       setRequestSending(false);
     }
+  }
+
+  // Request to delete item
+  async function submitRequestDelete(item) {
+    await supabase.from('cake_items').update({ status: 'pending_delete', requested_by: empId }).eq('id', item.id);
+    await writeLog(item.id, item.name, 'request_delete', null, null, `ขอลบโดย ${empName}`);
+    setPendingDelete(null);
+    alert(`ส่งคำขอลบ "${item.name}" แล้ว รอแอดมินอนุมัติ`);
+    load();
   }
 
   // Load history log
@@ -579,6 +589,12 @@ export default function CakeStockPage({ navigate }) {
                     {qty || '—'}
                   </div>
                 )}
+                {/* Request delete */}
+                {canEdit && (
+                  <button onClick={() => setPendingDelete(item)}
+                    style={{ background: 'none', border: 'none', fontSize: 16, color: '#D1C4B5', cursor: 'pointer', padding: '4px 2px', flexShrink: 0 }}
+                    title="ขอลบรายการ">🗑</button>
+                )}
               </div>
             );
           })
@@ -598,6 +614,28 @@ export default function CakeStockPage({ navigate }) {
           + ขอเพิ่มรายการ
         </button>
       </div>
+
+      {/* Request Delete Confirm Modal */}
+      {pendingDelete && (
+        <ModalOverlay onClose={() => setPendingDelete(null)}>
+          <div style={{ padding: '20px 20px 16px' }}>
+            <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 8 }}>ขอลบรายการ</div>
+            <div style={{ color: '#6B7280', fontSize: 14, marginBottom: 20 }}>
+              ส่งคำขอลบ <strong>"{pendingDelete.name}"</strong> ให้แอดมินอนุมัติ?
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setPendingDelete(null)}
+                style={{ flex: 1, padding: 12, borderRadius: 10, border: '1.5px solid #E5E7EB', background: '#F9FAFB', cursor: 'pointer', fontSize: 15 }}>
+                ยกเลิก
+              </button>
+              <button onClick={() => submitRequestDelete(pendingDelete)}
+                style={{ flex: 1, padding: 12, borderRadius: 10, border: 'none', background: '#DC2626', color: '#fff', cursor: 'pointer', fontSize: 15, fontWeight: 700 }}>
+                ขอลบ
+              </button>
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
 
       {/* Request Add Modal */}
       {showRequestAdd && (
