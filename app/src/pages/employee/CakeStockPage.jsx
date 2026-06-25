@@ -226,7 +226,8 @@ export default function CakeStockPage({ navigate }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const isMyBranch = activeBranchId === myBranchId;
+  // isMyBranch: true if on own branch, OR if employee has no branch_id set (can edit any)
+  const isMyBranch = !myBranchId || activeBranchId === myBranchId;
 
   // Write a log event
   async function writeLog(itemId, itemName, action, delta, qtyAfter, note) {
@@ -556,21 +557,19 @@ export default function CakeStockPage({ navigate }) {
         )}
       </div>
 
-      {/* Floating "Request add item" button */}
-      {isMyBranch && (
-        <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 40 }}>
-          <button
-            onClick={() => setShowRequestAdd(true)}
-            style={{
-              background: '#4A2E1A', color: '#E8C89E', border: 'none', borderRadius: 24, padding: '13px 24px',
-              fontSize: 15, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 16px rgba(74,46,26,0.4)',
-              display: 'flex', alignItems: 'center', gap: 8,
-            }}
-          >
-            + ขอเพิ่มรายการ
-          </button>
-        </div>
-      )}
+      {/* Floating "Request add item" button — always visible */}
+      <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 40 }}>
+        <button
+          onClick={() => setShowRequestAdd(true)}
+          style={{
+            background: '#4A2E1A', color: '#E8C89E', border: 'none', borderRadius: 24, padding: '13px 24px',
+            fontSize: 15, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 16px rgba(74,46,26,0.4)',
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}
+        >
+          + ขอเพิ่มรายการ
+        </button>
+      </div>
 
       {/* Request Add Modal */}
       {showRequestAdd && (
