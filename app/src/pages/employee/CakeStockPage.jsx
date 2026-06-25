@@ -184,7 +184,17 @@ export default function CakeStockPage({ navigate }) {
   const [dragActiveIdx, setDragActiveIdx] = useState(null);   // which item is being dragged
   const [dragOverIdx, setDragOverIdx] = useState(null);       // which slot it's hovering
 
-  // Auto-sync Cake-category menus from jebar_app_state → cake_items
+  // Menu suggestions for the "request add" modal
+  const [menuSuggestions, setMenuSuggestions] = useState([]);
+
+  // Category keywords that identify bakery/pastry items (EN + TH)
+  const BAKERY_CATS = ['cake', 'pastry', 'bakery', 'dessert', 'เค้ก', 'ขนม', 'เบเกอรี'];
+  function isBakeryMenu(m) {
+    const cat = (m.category || '').toLowerCase();
+    return BAKERY_CATS.some(c => cat.includes(c));
+  }
+
+  // Auto-sync Cake/Pastry/Bakery menus from jebar_app_state → cake_items
   useEffect(() => {
     if (!orgId) return;
     supabase.from('jebar_app_state')
@@ -192,22 +202,23 @@ export default function CakeStockPage({ navigate }) {
       .eq('shop_code', 'jebar')
       .limit(1)
       .single()
-      .then(async ({ data }) => {
-        const menus = data?.db?.menus;
-        if (!menus) return;
-        const cakeMenus = menus.filter(m =>
-          (m.category || '').toLowerCase().includes('cake') && m.status !== 'หยุดขาย'
-        );
-        if (!cakeMenus.length) return;
+      .then(async ({ data, error }) => {
+        if (error || !data?.db?.menus) return;
+        const menus = data.db.menus;
+        const bakeryMenus = menus.filter(m => isBakeryMenu(m) && m.status !== 'หยุดขาย');
+
+        // Store suggestions for the modal (all bakery items)
+        setMenuSuggestions(bakeryMenus.map(m => m.name));
+
+        if (!bakeryMenus.length) return;
         const { data: existing } = await supabase
           .from('cake_items').select('name').eq('org_id', orgId);
         const existingNames = new Set((existing || []).map(e => e.name));
-        const toInsert = cakeMenus
+        const toInsert = bakeryMenus
           .filter(m => !existingNames.has(m.name))
           .map((m, i) => ({ org_id: orgId, name: m.name, sort_order: 9000 + i }));
         if (toInsert.length) {
           await supabase.from('cake_items').insert(toInsert);
-          // reload items after sync
           load();
         }
       });
@@ -671,6 +682,33 @@ export default function CakeStockPage({ navigate }) {
         <ModalOverlay onClose={() => setShowRequestAdd(false)}>
           <div style={{ padding: '20px 20px 16px' }}>
             <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 16 }}>ขอเพิ่มรายการขนม</div>
+
+            {/* Suggestions from JE BAR menu */}
+            {menuSuggestions.length > 0 && (() => {
+              const existingNames = new Set(items.map(i => i.name));
+              const suggestions = menuSuggestions.filter(n => !existingNames.has(n));
+              return suggestions.length > 0 ? (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 8 }}>จากเมนู JE BAR — แตะเพื่อเลือก</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {suggestions.map(name => (
+                      <button key={name} onClick={() => setRequestName(name)}
+                        style={{
+                          padding: '6px 12px', borderRadius: 20,
+                          border: `1.5px solid ${requestName === name ? '#4A2E1A' : '#D6C5B5'}`,
+                          background: requestName === name ? '#4A2E1A' : '#FFF7ED',
+                          color: requestName === name ? '#E8C89E' : '#4A2E1A',
+                          fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+                        }}
+                      >
+                        {getIcon(name)} {name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null;
+            })()}
+
             <input
               autoFocus
               value={requestName}
