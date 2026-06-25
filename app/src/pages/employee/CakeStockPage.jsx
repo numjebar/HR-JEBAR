@@ -194,7 +194,7 @@ export default function CakeStockPage({ navigate }) {
     return !BEVERAGE_CATS.some(c => cat.includes(c));
   }
 
-  // Auto-sync all non-beverage menu items from jebar_app_state → cake_items
+  // Auto-sync ALL non-beverage menu items (รวม หยุดขาย) from jebar_app_state → cake_items
   useEffect(() => {
     if (!orgId) return;
     supabase.from('jebar_app_state')
@@ -205,10 +205,11 @@ export default function CakeStockPage({ navigate }) {
       .then(async ({ data, error }) => {
         if (error || !data?.db?.menus) return;
         const menus = data.db.menus;
-        const bakeryMenus = menus.filter(m => isNonBeverage(m) && m.status !== 'หยุดขาย');
+        // รวมทุก non-beverage ไม่กรอง status
+        const bakeryMenus = menus.filter(m => isNonBeverage(m));
 
-        // Store suggestions for the modal
-        setMenuSuggestions(bakeryMenus.map(m => m.name));
+        // Modal suggestions = เฉพาะที่ยังขายอยู่
+        setMenuSuggestions(bakeryMenus.filter(m => m.status !== 'หยุดขาย').map(m => m.name));
 
         if (!bakeryMenus.length) return;
         const { data: existing } = await supabase
@@ -216,7 +217,12 @@ export default function CakeStockPage({ navigate }) {
         const existingNames = new Set((existing || []).map(e => e.name));
         const toInsert = bakeryMenus
           .filter(m => !existingNames.has(m.name))
-          .map((m, i) => ({ org_id: orgId, name: m.name, sort_order: 9000 + i }));
+          .map((m, i) => ({
+            org_id: orgId,
+            name: m.name,
+            sort_order: 9000 + i,
+            is_open: m.status !== 'หยุดขาย',
+          }));
         if (toInsert.length) {
           await supabase.from('cake_items').insert(toInsert);
           load();
