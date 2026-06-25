@@ -168,6 +168,7 @@ export default function CakeStockPage({ navigate }) {
   const [stockMap, setStockMap] = useState({}); // { item_id: qty }
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(null);   // item_id being saved
+  const [debugInfo, setDebugInfo] = useState(null); // TEMP: surface load errors
 
   // Modals
   const [showHistory, setShowHistory] = useState(false);
@@ -199,10 +200,13 @@ export default function CakeStockPage({ navigate }) {
 
   // Load items + stock for active branch
   const load = useCallback(async () => {
-    if (!orgId || !activeBranchId) return;
+    if (!orgId || !activeBranchId) {
+      setDebugInfo(`guard: orgId=${orgId || 'NULL'} branchId=${activeBranchId || 'NULL'}`);
+      return;
+    }
     setLoading(true);
     try {
-      const [{ data: itemData }, { data: stockData }] = await Promise.all([
+      const [itemRes, stockRes] = await Promise.all([
         supabase.from('cake_items')
           .select('id,name,sort_order,is_open,status')
           .eq('org_id', orgId)
@@ -213,12 +217,21 @@ export default function CakeStockPage({ navigate }) {
           .eq('org_id', orgId)
           .eq('branch_id', activeBranchId),
       ]);
+      const { data: itemData, error: itemErr } = itemRes;
+      const { data: stockData, error: stockErr } = stockRes;
       if (itemData) setItems(itemData);
       if (stockData) {
         const m = {};
         stockData.forEach(r => { m[r.item_id] = r.qty; });
         setStockMap(m);
       }
+      setDebugInfo(
+        `org=${String(orgId).slice(0, 8)} branch=${String(activeBranchId).slice(0, 8)} | ` +
+        `items=${itemData ? itemData.length : 'null'}${itemErr ? ` ERR:${itemErr.code || ''} ${itemErr.message}` : ''} | ` +
+        `stock=${stockData ? stockData.length : 'null'}${stockErr ? ` ERR:${stockErr.code || ''} ${stockErr.message}` : ''}`
+      );
+    } catch (e) {
+      setDebugInfo(`exception: ${e?.message || String(e)}`);
     } finally {
       setLoading(false);
     }
@@ -448,6 +461,11 @@ export default function CakeStockPage({ navigate }) {
           <div style={{ textAlign: 'center', padding: 40, color: '#9CA3AF' }}>
             <div style={{ fontSize: 40 }}>🍞</div>
             <div style={{ marginTop: 8 }}>ยังไม่มีรายการขนม</div>
+            {debugInfo && (
+              <div style={{ marginTop: 16, fontSize: 11, color: '#B45309', background: '#FEF3C7', padding: 10, borderRadius: 8, textAlign: 'left', wordBreak: 'break-all', fontFamily: 'monospace' }}>
+                🐞 {debugInfo}
+              </div>
+            )}
           </div>
         ) : (
           items.map((item, idx) => {
