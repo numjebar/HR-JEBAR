@@ -246,14 +246,19 @@ export default function CakeStockPage({ navigate }) {
     }
   }, [branches, myBranchId, activeBranchId]);
 
-  // Load items + stock for active branch
+  // Load items + stock for active branch (or all branches)
   const load = useCallback(async () => {
     if (!orgId) return;
     setLoading(true);
     try {
-      const stockPromise = activeBranchId
-        ? supabase.from('cake_stock').select('item_id,qty').eq('org_id', orgId).eq('branch_id', activeBranchId)
-        : Promise.resolve({ data: [] });
+      let stockPromise;
+      if (activeBranchId === 'all') {
+        stockPromise = supabase.from('cake_stock').select('item_id,qty').eq('org_id', orgId);
+      } else if (activeBranchId) {
+        stockPromise = supabase.from('cake_stock').select('item_id,qty').eq('org_id', orgId).eq('branch_id', activeBranchId);
+      } else {
+        stockPromise = Promise.resolve({ data: [] });
+      }
       const [{ data: itemData }, { data: stockData }] = await Promise.all([
         supabase.from('cake_items')
           .select('id,name,sort_order,is_open,status')
@@ -265,7 +270,8 @@ export default function CakeStockPage({ navigate }) {
       if (itemData) setItems(itemData);
       if (stockData) {
         const m = {};
-        stockData.forEach(r => { m[r.item_id] = r.qty; });
+        // sum across all branches when in 'all' mode
+        stockData.forEach(r => { m[r.item_id] = (m[r.item_id] || 0) + r.qty; });
         setStockMap(m);
       }
     } finally {
@@ -275,8 +281,8 @@ export default function CakeStockPage({ navigate }) {
 
   useEffect(() => { load(); }, [load]);
 
-  // isMyBranch: true if on own branch, OR if employee has no branch_id set (can edit any)
-  const isMyBranch = !myBranchId || activeBranchId === myBranchId;
+  // isMyBranch: false in 'all' mode (read-only), true on own branch or if no branch assigned
+  const isMyBranch = activeBranchId !== 'all' && (!myBranchId || activeBranchId === myBranchId);
 
   // Write a log event
   async function writeLog(itemId, itemName, action, delta, qtyAfter, note) {
@@ -445,7 +451,7 @@ export default function CakeStockPage({ navigate }) {
   // Export image
   async function handleExport() {
     const activeBranch = branches.find(b => b.id === activeBranchId);
-    const branchName = activeBranch?.label || 'ไม่ระบุสาขา';
+    const branchName = activeBranchId === 'all' ? 'รวมทุกสาขา' : (activeBranch?.label || 'ไม่ระบุสาขา');
     const blob = await exportToImage({ items, stockMap, branchName, empName });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -473,14 +479,28 @@ export default function CakeStockPage({ navigate }) {
       </div>
 
       {/* Branch tabs */}
-      {branches.length > 1 && (
+      {branches.length > 0 && (
         <div style={{ background: '#fff', borderBottom: '1px solid #E5DDD5', overflowX: 'auto', display: 'flex', padding: '0 8px' }}>
+          {/* All-branches tab */}
+          <button
+            onClick={() => setActiveBranchId('all')}
+            style={{
+              whiteSpace: 'nowrap', padding: '12px 16px', border: 'none', cursor: 'pointer', fontSize: 14,
+              fontWeight: activeBranchId === 'all' ? 700 : 400,
+              color: activeBranchId === 'all' ? '#4A2E1A' : '#6B7280',
+              background: 'none',
+              borderBottom: activeBranchId === 'all' ? '2px solid #4A2E1A' : '2px solid transparent',
+            }}
+          >
+            🏪 รวมทุกสาขา
+          </button>
           {branches.map(b => (
             <button
               key={b.id}
               onClick={() => setActiveBranchId(b.id)}
               style={{
-                whiteSpace: 'nowrap', padding: '12px 16px', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: b.id === activeBranchId ? 700 : 400,
+                whiteSpace: 'nowrap', padding: '12px 16px', border: 'none', cursor: 'pointer', fontSize: 14,
+                fontWeight: b.id === activeBranchId ? 700 : 400,
                 color: b.id === activeBranchId ? '#4A2E1A' : '#6B7280',
                 background: 'none',
                 borderBottom: b.id === activeBranchId ? '2px solid #4A2E1A' : '2px solid transparent',
