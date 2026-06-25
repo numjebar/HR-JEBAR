@@ -518,6 +518,31 @@ export default function CakeStockPage({ navigate }) {
       qty: stockMap[i.id] || 0,
       qty_spoiled: spoiledMap[i.id] || 0,
     }));
+
+    // Check if someone from same branch already submitted today
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const { data: existing } = await supabase
+      .from('employee_ops_entries')
+      .select('payload,created_at')
+      .eq('task_key', 'cake-stock')
+      .eq('org_id', orgId)
+      .gte('created_at', todayStart.toISOString())
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    // Filter to same branch only (payload.branch_id)
+    const sameBranch = (existing || []).filter(r => r.payload?.branch_id === activeBranchId);
+    if (sameBranch.length > 0) {
+      const prev = sameBranch[0];
+      const prevName = prev.payload?.submitted_by || 'ไม่ระบุ';
+      const prevTime = new Date(prev.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+      const isSelf = prevName === empName;
+      const msg = isSelf
+        ? `คุณส่งรายงานไปแล้วเมื่อ ${prevTime}\nต้องการส่งอัปเดตข้อมูลใหม่ไหม?`
+        : `${prevName} ส่งรายงานสาขานี้แล้วเมื่อ ${prevTime}\nต้องการส่งเพิ่มเติมไหม?`;
+      if (!window.confirm(msg)) return;
+    }
+
     setSubmitting(true);
     try {
       const { error } = await supabase.rpc('employee_submit_ops_entry', {
