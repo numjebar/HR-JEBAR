@@ -292,34 +292,112 @@ export default function EmpHome() {
               </div>
             );
           })()}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
             {[
-              { path: '/emp/ops/bills',          icon: '📷', label: 'ถ่ายบิล',    taskKey: 'bills' },
-              { path: '/emp/ops/purchase-list',  icon: '🛒', label: 'ใบสั่งซื้อ', taskKey: 'purchase-list' },
-              { path: '/emp/ops/production',     icon: '🏭', label: 'ผลิตขนม',    taskKey: 'production' },
-              { path: '/emp/ops/inventory',      icon: '📦', label: 'เช็กของ',    taskKey: 'inventory' },
-              { path: '/emp/ops/supplies-count', icon: '🧴', label: 'ของใช้',     taskKey: 'supplies-count' },
-              { path: '/emp/ops/cake-stock',     icon: '🍰', label: 'สต๊อกเค้ก', taskKey: 'cake-stock' },
+              {
+                path: '/emp/ops/bills', taskKey: 'bills', label: 'ถ่ายบิล',
+                icon: (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                    <circle cx="12" cy="13" r="4"/>
+                  </svg>
+                ),
+              },
+              {
+                path: '/emp/ops/purchase-list', taskKey: 'purchase-list', label: 'ใบสั่งซื้อ',
+                icon: (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="8" y1="13" x2="16" y2="13"/>
+                    <line x1="8" y1="17" x2="12" y2="17"/>
+                  </svg>
+                ),
+              },
+              {
+                path: '/emp/ops/production', taskKey: 'production', label: 'ผลิตขนม',
+                icon: (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="11" width="20" height="11" rx="2"/>
+                    <path d="M7 11c0-5 2-7 5-7s5 2 5 7"/>
+                    <line x1="2" y1="16" x2="22" y2="16"/>
+                    <line x1="9" y1="19" x2="9" y2="22"/>
+                    <line x1="15" y1="19" x2="15" y2="22"/>
+                  </svg>
+                ),
+              },
+              {
+                path: '/emp/ops/inventory', taskKey: 'inventory', label: 'เช็กของ',
+                icon: (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                    <line x1="12" y1="22.08" x2="12" y2="12"/>
+                  </svg>
+                ),
+              },
+              {
+                path: '/emp/ops/supplies-count', taskKey: 'supplies-count', label: 'ของใช้',
+                icon: (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="5" y="2" width="14" height="20" rx="2"/>
+                    <path d="M9 2v4M15 2v4"/>
+                    <line x1="8" y1="11" x2="16" y2="11"/>
+                    <line x1="8" y1="15" x2="13" y2="15"/>
+                  </svg>
+                ),
+              },
+              {
+                path: '/emp/ops/cake-stock', taskKey: 'cake-stock', label: 'สต๊อกเค้ก',
+                icon: (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="15" width="20" height="7" rx="2"/>
+                    <rect x="5" y="9" width="14" height="6" rx="1.5"/>
+                    <path d="M9 9c0-3 1.5-4.5 3-4.5S15 6 15 9"/>
+                    <line x1="12" y1="4.5" x2="12" y2="2.5"/>
+                    <circle cx="12" cy="2" r="1" fill="currentColor" stroke="none"/>
+                  </svg>
+                ),
+              },
             ].map(item => {
               const count = todayOpsCounts[item.taskKey] || 0;
+              const done = count > 0;
               return (
                 <button
                   key={item.path}
                   onClick={() => navigate(item.path)}
                   style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    gap: 6, padding: '14px 8px', borderRadius: 'var(--r-card)',
-                    border: `1px solid ${count > 0 ? 'var(--accent)' : 'var(--line)'}`,
-                    background: count > 0 ? 'var(--accent-soft)' : 'var(--surface)',
-                    cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--ink)',
+                    position: 'relative',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center',
+                    gap: 8, padding: '14px 6px 12px',
+                    borderRadius: 'var(--r-card)',
+                    border: `1px solid ${done ? 'var(--accent)' : 'var(--line)'}`,
+                    background: done ? 'var(--accent-soft)' : 'var(--surface)',
+                    cursor: 'pointer',
                   }}
                 >
-                  <span style={{ fontSize: 22, opacity: .85 }}>{item.icon}</span>
-                  {item.label}
-                  {count > 0 && (
-                    <span style={{ color: 'var(--accent)', fontSize: 11, fontWeight: 700, lineHeight: 1.4 }}>
-                      ✓{count}
-                    </span>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 12,
+                    background: done ? 'var(--accent)' : 'var(--bg)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: done ? '#fff' : 'var(--accent)',
+                    flexShrink: 0,
+                  }}>
+                    {item.icon}
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink)', textAlign: 'center', lineHeight: 1.3 }}>
+                    {item.label}
+                  </div>
+                  {done && (
+                    <div style={{
+                      position: 'absolute', top: 6, right: 6,
+                      minWidth: 18, height: 18, borderRadius: 99,
+                      background: 'var(--accent)', color: '#fff',
+                      fontSize: 10, fontWeight: 800, padding: '0 4px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {count}
+                    </div>
                   )}
                 </button>
               );
