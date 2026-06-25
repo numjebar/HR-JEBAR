@@ -242,19 +242,19 @@ export default function CakeStockPage({ navigate }) {
 
   // Load items + stock for active branch
   const load = useCallback(async () => {
-    if (!orgId || !activeBranchId) return;
+    if (!orgId) return;
     setLoading(true);
     try {
+      const stockPromise = activeBranchId
+        ? supabase.from('cake_stock').select('item_id,qty').eq('org_id', orgId).eq('branch_id', activeBranchId)
+        : Promise.resolve({ data: [] });
       const [{ data: itemData }, { data: stockData }] = await Promise.all([
         supabase.from('cake_items')
           .select('id,name,sort_order,is_open,status')
           .eq('org_id', orgId)
           .in('status', ['active'])
           .order('sort_order'),
-        supabase.from('cake_stock')
-          .select('item_id,qty')
-          .eq('org_id', orgId)
-          .eq('branch_id', activeBranchId),
+        stockPromise,
       ]);
       if (itemData) setItems(itemData);
       if (stockData) {
