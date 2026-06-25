@@ -225,10 +225,17 @@ export default function CakeStockPage({ navigate }) {
         stockData.forEach(r => { m[r.item_id] = r.qty; });
         setStockMap(m);
       }
+      // PROBE: cake_items with NO filter, and org-only filter, to isolate
+      const probeAll = await supabase.from('cake_items').select('id,org_id,name,status');
+      const probeRows = probeAll.data || [];
+      const sample = probeRows[0];
       setDebugInfo(
-        `org=${String(orgId).slice(0, 8)} branch=${String(activeBranchId).slice(0, 8)} | ` +
-        `items=${itemData ? itemData.length : 'null'}${itemErr ? ` ERR:${itemErr.code || ''} ${itemErr.message}` : ''} | ` +
-        `stock=${stockData ? stockData.length : 'null'}${stockErr ? ` ERR:${stockErr.code || ''} ${stockErr.message}` : ''}`
+        `myOrg=[${orgId}]\n` +
+        `branch=${activeBranchId}\n` +
+        `filtered items=${itemData ? itemData.length : 'null'}${itemErr ? ` ERR:${itemErr.code || ''} ${itemErr.message}` : ''}\n` +
+        `ALL cake_items (no filter)=${probeAll.data ? probeAll.data.length : 'null'}${probeAll.error ? ` ERR:${probeAll.error.code || ''} ${probeAll.error.message}` : ''}\n` +
+        (sample ? `sampleOrg=[${sample.org_id}] name=${sample.name} status=${sample.status}\n` : 'no sample row\n') +
+        `orgMatch=${sample ? String(sample.org_id === orgId) : 'n/a'}`
       );
     } catch (e) {
       setDebugInfo(`exception: ${e?.message || String(e)}`);
@@ -462,7 +469,7 @@ export default function CakeStockPage({ navigate }) {
             <div style={{ fontSize: 40 }}>🍞</div>
             <div style={{ marginTop: 8 }}>ยังไม่มีรายการขนม</div>
             {debugInfo && (
-              <div style={{ marginTop: 16, fontSize: 11, color: '#B45309', background: '#FEF3C7', padding: 10, borderRadius: 8, textAlign: 'left', wordBreak: 'break-all', fontFamily: 'monospace' }}>
+              <div style={{ marginTop: 16, fontSize: 11, color: '#B45309', background: '#FEF3C7', padding: 10, borderRadius: 8, textAlign: 'left', wordBreak: 'break-all', fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
                 🐞 {debugInfo}
               </div>
             )}
