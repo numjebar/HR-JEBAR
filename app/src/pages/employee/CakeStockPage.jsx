@@ -180,6 +180,8 @@ export default function CakeStockPage({ navigate }) {
   // Drag-to-reorder
   const dragItem = useRef(null);
   const dragOver = useRef(null);
+  const [dragActiveIdx, setDragActiveIdx] = useState(null);   // which item is being dragged
+  const [dragOverIdx, setDragOverIdx] = useState(null);       // which slot it's hovering
 
   // Load branches
   useEffect(() => {
@@ -294,9 +296,11 @@ export default function CakeStockPage({ navigate }) {
   }
 
   // Drag handlers
-  function onDragStart(idx) { dragItem.current = idx; }
-  function onDragEnter(idx) { dragOver.current = idx; }
+  function onDragStart(idx) { dragItem.current = idx; setDragActiveIdx(idx); setDragOverIdx(idx); }
+  function onDragEnter(idx) { dragOver.current = idx; setDragOverIdx(idx); }
   function onDragEnd() {
+    setDragActiveIdx(null);
+    setDragOverIdx(null);
     if (dragItem.current === null || dragOver.current === null) return;
     const newItems = [...items];
     const [moved] = newItems.splice(dragItem.current, 1);
@@ -462,12 +466,13 @@ export default function CakeStockPage({ navigate }) {
                 draggable={canEdit}
                 onDragStart={() => onDragStart(idx)}
                 onDragEnter={() => onDragEnter(idx)}
+                onDragOver={canEdit ? e => e.preventDefault() : undefined}
                 onDragEnd={onDragEnd}
                 onTouchStart={canEdit ? e => onTouchStart(e, idx) : undefined}
                 onTouchMove={canEdit ? onTouchMove : undefined}
                 onTouchEnd={canEdit ? e => onTouchEnd(e, idx) : undefined}
                 style={{
-                  background: '#fff',
+                  background: dragOverIdx === idx && dragActiveIdx !== idx ? '#EDE8E3' : '#fff',
                   borderRadius: 12,
                   marginBottom: 8,
                   padding: '12px 14px',
@@ -475,9 +480,12 @@ export default function CakeStockPage({ navigate }) {
                   alignItems: 'center',
                   gap: 12,
                   boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                  opacity: item.is_open ? 1 : 0.55,
+                  opacity: dragActiveIdx === idx ? 0.35 : item.is_open ? 1 : 0.55,
                   cursor: canEdit ? 'grab' : 'default',
                   userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  transition: 'background 0.1s, opacity 0.1s',
+                  borderTop: dragOverIdx === idx && dragActiveIdx !== idx ? '2px solid #4A2E1A' : '2px solid transparent',
                 }}
               >
                 {/* Drag handle */}
