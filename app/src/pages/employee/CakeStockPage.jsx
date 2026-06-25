@@ -187,14 +187,14 @@ export default function CakeStockPage({ navigate }) {
   // Menu suggestions for the "request add" modal
   const [menuSuggestions, setMenuSuggestions] = useState([]);
 
-  // Category keywords that identify bakery/pastry items (EN + TH)
-  const BAKERY_CATS = ['cake', 'pastry', 'bakery', 'dessert', 'เค้ก', 'ขนม', 'เบเกอรี'];
-  function isBakeryMenu(m) {
+  // Non-beverage categories to exclude from sync (case-insensitive)
+  const BEVERAGE_CATS = ['beverage', 'drink', 'coffee', 'tea', 'เครื่องดื่ม', 'กาแฟ', 'ชา'];
+  function isNonBeverage(m) {
     const cat = (m.category || '').toLowerCase();
-    return BAKERY_CATS.some(c => cat.includes(c));
+    return !BEVERAGE_CATS.some(c => cat.includes(c));
   }
 
-  // Auto-sync Cake/Pastry/Bakery menus from jebar_app_state → cake_items
+  // Auto-sync all non-beverage menu items from jebar_app_state → cake_items
   useEffect(() => {
     if (!orgId) return;
     supabase.from('jebar_app_state')
@@ -205,9 +205,9 @@ export default function CakeStockPage({ navigate }) {
       .then(async ({ data, error }) => {
         if (error || !data?.db?.menus) return;
         const menus = data.db.menus;
-        const bakeryMenus = menus.filter(m => isBakeryMenu(m) && m.status !== 'หยุดขาย');
+        const bakeryMenus = menus.filter(m => isNonBeverage(m) && m.status !== 'หยุดขาย');
 
-        // Store suggestions for the modal (all bakery items)
+        // Store suggestions for the modal
         setMenuSuggestions(bakeryMenus.map(m => m.name));
 
         if (!bakeryMenus.length) return;
