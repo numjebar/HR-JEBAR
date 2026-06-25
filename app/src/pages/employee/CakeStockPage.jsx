@@ -187,6 +187,8 @@ export default function CakeStockPage({ navigate }) {
   const [spoiledDetails, setSpoiledDetails] = useState({}); // { item_id: { reason, photo } }
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(null);
+  const [operateSyncing, setOperateSyncing] = useState(false);
+  const [operateSyncMsg, setOperateSyncMsg] = useState('');
   const [savingSpoiled, setSavingSpoiled] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [lastSubmitted, setLastSubmitted] = useState(null); // ISO string
@@ -485,6 +487,76 @@ export default function CakeStockPage({ navigate }) {
     load();
   }
 
+  // ดึงยอดจาก Operate (jebar_app_state → shopStock)
+  async function syncFromOperate() {
+    if (!isMyBranch || operateSyncing) return;
+    setOperateSyncing(true);
+    setOperateSyncMsg('');
+    try {
+      const { data, error } = await supabase
+        .from('jebar_app_state')
+        .select('db')
+        .eq('shop_code', 'jebar')
+        .limit(1)
+        .single();
+      if (error || !data?.db) { setOperateSyncMsg('ดึงข้อมูล Operate ไม่สำเร็จ'); return; }
+
+      const menus = data.db.menus || [];
+      const shopStock = data.db.shopStock || [];
+
+      // หา label ของ branch ที่ active อยู่
+      const activeBranch = branches.find(b => b.id === activeBranchId);
+      const branchLabel = activeBranch?.label || '';
+
+      // normalize สำหรับ fuzzy match
+      const norm = s => (s || '').trim().toLowerCase().replace(/\s+/g, '');
+
+      // map menuId → onHand โดยกรอง branchId ตรงกับ branchLabel
+      const onHandByMenuId = {};
+      shopStock.forEach(s => {
+        if (norm(s.branchId) === norm(branchLabel) || !branchLabel) {
+          onHandByMenuId[s.menuId] = Number(s.onHand) || 0;
+        }
+      });
+
+      // map ชื่อ (normalized) → onHand
+      const onHandByName = {};
+      menus.forEach(m => {
+        if (onHandByMenuId[m.id] !== undefined) {
+          onHandByName[norm(m.name)] = onHandByMenuId[m.id];
+        }
+      });
+
+      // อัปเดต cake_stock และ stockMap
+      let updated = 0;
+      const newStockMap = { ...stockMap };
+      for (const item of items) {
+        const key = norm(item.name);
+        if (onHandByName[key] === undefined) continue;
+        const newQty = onHandByName[key];
+        const { error: upsertErr } = await supabase.from('cake_stock').upsert({
+          org_id: orgId,
+          branch_id: activeBranchId,
+          item_id: item.id,
+          qty: newQty,
+          updated_by: empId,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'branch_id,item_id' });
+        if (!upsertErr) {
+          newStockMap[item.id] = newQty;
+          updated++;
+        }
+      }
+      setStockMap(newStockMap);
+      setOperateSyncMsg(updated > 0 ? `ดึงยอดจาก Operate แล้ว ${updated} รายการ` : 'ไม่พบข้อมูลสต็อกจาก Operate');
+    } catch {
+      setOperateSyncMsg('เกิดข้อผิดพลาด ลองใหม่อีกครั้ง');
+    } finally {
+      setOperateSyncing(false);
+      setTimeout(() => setOperateSyncMsg(''), 4000);
+    }
+  }
+
   // Load history log
   async function openHistory() {
     setShowHistory(true);
@@ -617,6 +689,13 @@ export default function CakeStockPage({ navigate }) {
         <button onClick={handleExport} style={{ background: '#E8C89E', border: 'none', color: '#4A2E1A', borderRadius: 8, padding: '6px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>📤 Export</button>
       </div>
 
+      {/* Operate sync message */}
+      {operateSyncMsg && (
+        <div style={{ background: '#EFF6FF', borderBottom: '1px solid #BFDBFE', padding: '8px 16px', fontSize: 13, color: '#1D4ED8', display: 'flex', alignItems: 'center', gap: 8 }}>
+          🔄 {operateSyncMsg}
+        </div>
+      )}
+
       {/* Branch tabs */}
       {branches.length > 0 && (
         <div style={{ background: '#fff', borderBottom: '1px solid #E5DDD5', overflowX: 'auto', display: 'flex', padding: '0 8px' }}>
@@ -668,6 +747,10 @@ export default function CakeStockPage({ navigate }) {
         <div style={{ flex: 1 }} />
         {isMyBranch && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button onClick={syncFromOperate} disabled={operateSyncing}
+              style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer', color: '#1D4ED8', opacity: operateSyncing ? 0.6 : 1 }}>
+              {operateSyncing ? '⏳' : '🔄'} Operate
+            </button>
             <button onClick={autoSort} style={{ background: '#F9F5F0', border: '1px solid #D6C5B5', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer', color: '#4A2E1A' }}>
               ↕ จัดลำดับ
             </button>
