@@ -314,6 +314,19 @@ export default function CakeStockPage({ navigate }) {
     ).then(() => writeLog(null, 'ทั้งหมด', 'reorder', null, null, 'drag'));
   }
 
+  // Move item up or down (mobile-friendly alternative to drag)
+  function moveItem(idx, dir) {
+    const newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= items.length) return;
+    const newItems = [...items];
+    [newItems[idx], newItems[newIdx]] = [newItems[newIdx], newItems[idx]];
+    const updated = newItems.map((item, i) => ({ ...item, sort_order: i }));
+    setItems(updated);
+    Promise.all(
+      updated.map(item => supabase.from('cake_items').update({ sort_order: item.sort_order }).eq('id', item.id))
+    ).then(() => writeLog(null, 'ทั้งหมด', 'reorder', null, null, 'move'));
+  }
+
   // Touch drag state
   const touchDragIdx = useRef(null);
 
@@ -488,8 +501,15 @@ export default function CakeStockPage({ navigate }) {
                   borderTop: dragOverIdx === idx && dragActiveIdx !== idx ? '2px solid #4A2E1A' : '2px solid transparent',
                 }}
               >
-                {/* Drag handle */}
-                {canEdit && <span style={{ color: '#D1C4B5', fontSize: 18, flexShrink: 0 }}>⠿</span>}
+                {/* Move up/down buttons */}
+                {canEdit && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }}>
+                    <button onClick={() => moveItem(idx, -1)} disabled={idx === 0}
+                      style={{ background: 'none', border: 'none', padding: '1px 4px', fontSize: 13, color: idx === 0 ? '#E5E7EB' : '#9CA3AF', cursor: idx === 0 ? 'default' : 'pointer', lineHeight: 1 }}>▲</button>
+                    <button onClick={() => moveItem(idx, 1)} disabled={idx === items.length - 1}
+                      style={{ background: 'none', border: 'none', padding: '1px 4px', fontSize: 13, color: idx === items.length - 1 ? '#E5E7EB' : '#9CA3AF', cursor: idx === items.length - 1 ? 'default' : 'pointer', lineHeight: 1 }}>▼</button>
+                  </div>
+                )}
 
                 {/* Icon */}
                 <div style={{
