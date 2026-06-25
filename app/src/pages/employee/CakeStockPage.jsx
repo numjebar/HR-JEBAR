@@ -796,7 +796,9 @@ export default function CakeStockPage({ navigate }) {
                   )}
                   {/* Spoiled counter */}
                   {canEdit ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: '#FEF2F2', borderRadius: 8, padding: '2px 4px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                      <div style={{ fontSize: 10, color: '#DC2626', fontWeight: 600, paddingRight: 2 }}>ของเสีย</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: '#FEF2F2', borderRadius: 8, padding: '2px 4px' }}>
                       <button
                         onClick={() => adjustSpoiled(item, -1)}
                         disabled={spoiled === 0 || isSavingSpoiled}
@@ -820,6 +822,7 @@ export default function CakeStockPage({ navigate }) {
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }}
                       >+</button>
+                    </div>
                     </div>
                   ) : (
                     spoiled > 0 && (
