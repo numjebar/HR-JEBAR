@@ -184,6 +184,35 @@ export default function CakeStockPage({ navigate }) {
   const [dragActiveIdx, setDragActiveIdx] = useState(null);   // which item is being dragged
   const [dragOverIdx, setDragOverIdx] = useState(null);       // which slot it's hovering
 
+  // Auto-sync Cake-category menus from jebar_app_state → cake_items
+  useEffect(() => {
+    if (!orgId) return;
+    supabase.from('jebar_app_state')
+      .select('db')
+      .eq('shop_code', 'jebar')
+      .limit(1)
+      .single()
+      .then(async ({ data }) => {
+        const menus = data?.db?.menus;
+        if (!menus) return;
+        const cakeMenus = menus.filter(m =>
+          (m.category || '').toLowerCase().includes('cake') && m.status !== 'หยุดขาย'
+        );
+        if (!cakeMenus.length) return;
+        const { data: existing } = await supabase
+          .from('cake_items').select('name').eq('org_id', orgId);
+        const existingNames = new Set((existing || []).map(e => e.name));
+        const toInsert = cakeMenus
+          .filter(m => !existingNames.has(m.name))
+          .map((m, i) => ({ org_id: orgId, name: m.name, sort_order: 9000 + i }));
+        if (toInsert.length) {
+          await supabase.from('cake_items').insert(toInsert);
+          // reload items after sync
+          load();
+        }
+      });
+  }, [orgId]);
+
   // Load branches
   useEffect(() => {
     if (!orgId) return;
