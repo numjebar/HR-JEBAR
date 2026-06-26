@@ -8,6 +8,7 @@ import AdminLogin from './pages/AdminLogin';
 import EmpLogin from './pages/EmpLogin';
 import AdminShell from './pages/admin/AdminShell';
 import EmpShell from './pages/employee/EmpShell';
+import CatalogPage from './pages/CatalogPage';
 
 function App() {
   const { init, loading, isAdmin, employee } = useAuthStore();
@@ -32,6 +33,9 @@ function App() {
         <Route path="/emp/login" element={
           employee ? <Navigate to="/emp" replace /> : <EmpLogin />
         } />
+        {/* Public catalog page — no auth required */}
+        <Route path="/catalog/:token" element={<CatalogPage />} />
+
         <Route path="/admin/*" element={
           isAdmin ? <AdminShell /> : <Navigate to="/admin/login" replace />
         } />
