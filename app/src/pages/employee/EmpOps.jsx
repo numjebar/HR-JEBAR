@@ -171,7 +171,7 @@ function BillImageSection({ draft, setDraft, geminiKey }) {
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFile} />
       <input ref={albumRef}  type="file" accept="image/*"                        style={{ display: 'none' }} onChange={handleFile} />
       {aiError && <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 4 }}>{aiError}</div>}
-      {!geminiKey && <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4 }}>ตั้งค่า AI Key ในหน้าโปรไฟล์ → ตั้งค่า AI (Gemini) เพื่อใช้ฟีเจอร์นี้</div>}
+      {!geminiKey && <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4 }}>AI ยังไม่พร้อม — แจ้งแอดมินเพื่อเปิดใช้งาน</div>}
       {draft.imagePreviewUrl && (
         <div style={{ marginTop: 8, position: 'relative', display: 'inline-block' }}>
           <img
@@ -681,8 +681,11 @@ function OpsTaskPage({ taskKey, navigate }) {
   const backend = useTaskBackend(taskKey);
   const { orgId, employeeSessionToken: taskPageToken } = useAuthStore();
 
-  // Gemini key: env var first, then localStorage fallback
-  const geminiKey = import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('hr_gemini_key') || '';
+  // Gemini key priority: build env → org_settings (sessionStorage) → localStorage (legacy)
+  const geminiKey = import.meta.env.VITE_GEMINI_API_KEY
+    || sessionStorage.getItem('hr_org_gemini_key')
+    || localStorage.getItem('hr_gemini_key')
+    || '';
 
   async function reloadCatalog() {
     clearCatalogCache();
