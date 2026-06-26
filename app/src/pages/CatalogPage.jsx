@@ -26,29 +26,6 @@ function getIcon(name) {
   return '🍞';
 }
 
-// ─── JE BAR Logo (SVG) ───────────────────────────────────────────────────────
-function JeBarLogo({ size = 48 }) {
-  return (
-    <svg width={size * 3.2} height={size} viewBox="0 0 192 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* JE */}
-      <text x="0" y="46" fontFamily="Georgia, 'Times New Roman', serif" fontSize="52" fontWeight="700" fill="#2d2d2d" letterSpacing="-1">JE</text>
-      {/* Golden triangle (A shape) — replaces A in BAR */}
-      <g transform="translate(92,4)">
-        {/* Triangle outline */}
-        <polygon points="20,0 38,44 2,44" fill="none" stroke="#b8932a" strokeWidth="3.5" strokeLinejoin="round"/>
-        {/* Bottom arc */}
-        <path d="M6,44 Q20,52 34,44" fill="none" stroke="#b8932a" strokeWidth="3.5" strokeLinecap="round"/>
-        {/* Coffee drop inside */}
-        <ellipse cx="20" cy="28" rx="4" ry="5.5" fill="#b8932a"/>
-        <path d="M20,22 Q23,19 20,16 Q17,19 20,22" fill="#b8932a"/>
-      </g>
-      {/* R */}
-      <text x="132" y="46" fontFamily="Georgia, 'Times New Roman', serif" fontSize="52" fontWeight="700" fill="#2d2d2d" letterSpacing="-1">R</text>
-      {/* Subtitle */}
-      <text x="96" y="58" fontFamily="Georgia, 'Times New Roman', serif" fontSize="10" fill="#9a7a3a" textAnchor="middle" letterSpacing="2">Coffee &amp; Pastry</text>
-    </svg>
-  );
-}
 
 export default function CatalogPage() {
   const { token } = useParams();
@@ -130,7 +107,7 @@ export default function CatalogPage() {
       {/* ── Header ── */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e8e0d4', padding: '18px 20px 14px' }}>
         <div style={{ maxWidth: 560, margin: '0 auto' }}>
-          <JeBarLogo size={40} />
+          <img src="/jebar-logo.jpeg" alt="JE BAR" style={{ height: 48, display: 'block', margin: '0 auto' }} />
           <div style={{ marginTop: 14, textAlign: 'center' }}>
             <div style={{ fontSize: 22, fontWeight: 800, color: '#2d2d2d', fontFamily: "Georgia, 'Times New Roman', serif" }}>
               ขนมในตู้วันนี้
