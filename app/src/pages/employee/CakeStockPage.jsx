@@ -222,6 +222,12 @@ export default function CakeStockPage({ navigate }) {
   // Menu suggestions for the "request add" modal
   const [menuSuggestions, setMenuSuggestions] = useState([]);
 
+  // Catalog
+  const [creatingCatalog, setCreatingCatalog] = useState(false);
+  const [catalogLink, setCatalogLink] = useState('');
+  const [catalogCopied, setCatalogCopied] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(null); // item_id being uploaded
+
   // Non-beverage categories to exclude from sync (case-insensitive)
   const BEVERAGE_CATS = ['beverage', 'drink', 'coffee', 'tea', 'เครื่องดื่ม', 'กาแฟ', 'ชา'];
   function isNonBeverage(m) {
@@ -257,6 +263,7 @@ export default function CakeStockPage({ navigate }) {
             name: m.name,
             sort_order: 9000 + i,
             is_open: m.status !== 'หยุดขาย',
+            price: m.price ?? m.selling_price ?? null,
           }));
         if (toInsert.length) {
           await supabase.from('cake_items').insert(toInsert);
@@ -308,7 +315,7 @@ export default function CakeStockPage({ navigate }) {
       }
       const [{ data: itemData }, { data: stockData }] = await Promise.all([
         supabase.from('cake_items')
-          .select('id,name,sort_order,is_open,status')
+          .select('id,name,sort_order,is_open,status,photo_url,price')
           .eq('org_id', orgId)
           .in('status', ['active'])
           .order('sort_order'),
@@ -508,6 +515,51 @@ export default function CakeStockPage({ navigate }) {
     setItems(prev => prev.map(i => i.id === item.id ? { ...i, is_open: newOpen } : i));
     await supabase.from('cake_items').update({ is_open: newOpen, updated_at: new Date().toISOString() }).eq('id', item.id);
     await writeLog(item.id, item.name, newOpen ? 'open' : 'close', null, null, null);
+  }
+
+  // Upload product photo to Supabase Storage, save URL to cake_items
+  async function uploadItemPhoto(item, file) {
+    if (!file) return;
+    setPhotoUploading(item.id);
+    try {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const path = `cake-items/${item.id}_${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('ops-photos').upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from('ops-photos').getPublicUrl(path);
+      await supabase.from('cake_items').update({ photo_url: publicUrl }).eq('id', item.id);
+      setItems(prev => prev.map(i => i.id === item.id ? { ...i, photo_url: publicUrl } : i));
+      if (detailItem?.id === item.id) setDetailItem(prev => ({ ...prev, photo_url: publicUrl }));
+    } finally {
+      setPhotoUploading(null);
+    }
+  }
+
+  // Create a shareable catalog session link
+  async function createCatalog() {
+    if (!orgId) return;
+    setCreatingCatalog(true);
+    setCatalogLink('');
+    try {
+      const { data, error } = await supabase.from('catalog_sessions').insert({
+        org_id: orgId,
+        branch_id: activeBranchId === 'all' ? null : (activeBranchId || null),
+        created_by: empName,
+      }).select('id').single();
+      if (error || !data) throw error || new Error('ไม่สามารถสร้างลิงก์ได้');
+      const link = `${window.location.origin}/catalog/${data.id}`;
+      setCatalogLink(link);
+    } finally {
+      setCreatingCatalog(false);
+    }
+  }
+
+  function copyCatalogLink() {
+    if (!catalogLink) return;
+    navigator.clipboard.writeText(catalogLink).then(() => {
+      setCatalogCopied(true);
+      setTimeout(() => setCatalogCopied(false), 2500);
+    });
   }
 
   // Auto-sort: open items first
@@ -880,6 +932,14 @@ export default function CakeStockPage({ navigate }) {
             </button>
           </div>
         )}
+        {/* Catalog button — always visible */}
+        <button
+          onClick={createCatalog}
+          disabled={creatingCatalog}
+          style={{ background: '#7c3aed', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer', color: '#fff', flexShrink: 0, opacity: creatingCatalog ? 0.7 : 1 }}
+        >
+          {creatingCatalog ? '...' : '🔗 แคตตาล็อก'}
+        </button>
       </div>
 
       {/* Submit report bar — only own branch */}
@@ -909,6 +969,21 @@ export default function CakeStockPage({ navigate }) {
           >
             {submitting ? 'กำลังส่ง...' : lastSubmitted ? '✓ ส่งอีกครั้ง' : 'ส่งรายงาน'}
           </button>
+        </div>
+      )}
+
+      {/* Catalog link banner */}
+      {catalogLink && (
+        <div style={{ margin: '8px 12px 0', background: '#f5f3ff', border: '1.5px solid #7c3aed', borderRadius: 14, padding: '12px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#7c3aed' }}>🔗 ลิงก์แคตตาล็อกพร้อมแล้ว</div>
+            <button onClick={() => setCatalogLink('')} style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', color: '#a78bfa', padding: 0, lineHeight: 1 }}>✕</button>
+          </div>
+          <div style={{ fontSize: 12, color: '#6d28d9', background: '#ede9fe', borderRadius: 8, padding: '6px 10px', wordBreak: 'break-all', marginBottom: 8 }}>{catalogLink}</div>
+          <button onClick={copyCatalogLink} style={{ width: '100%', padding: '9px', borderRadius: 10, border: 'none', background: catalogCopied ? '#16a34a' : '#7c3aed', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+            {catalogCopied ? '✓ คัดลอกแล้ว!' : '📋 คัดลอกลิงก์'}
+          </button>
+          <div style={{ fontSize: 11, color: '#8b5cf6', marginTop: 6, textAlign: 'center' }}>ส่งให้ลูกค้าผ่าน LINE หรือ Messenger ได้เลย</div>
         </div>
       )}
 
@@ -996,8 +1071,11 @@ export default function CakeStockPage({ navigate }) {
                         style={{ background: 'none', border: 'none', padding: '1px 4px', fontSize: 12, color: idx === items.length - 1 ? '#E5E7EB' : '#C4B8AC', cursor: idx === items.length - 1 ? 'default' : 'pointer', lineHeight: 1 }}>▼</button>
                     </div>
                   )}
-                  <div style={{ width: 38, height: 38, borderRadius: 10, background: getBg(item.name), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
-                    {getIcon(item.name)}
+                  <div style={{ width: 38, height: 38, borderRadius: 10, background: getBg(item.name), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0, overflow: 'hidden' }}>
+                    {item.photo_url
+                      ? <img src={item.photo_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : getIcon(item.name)
+                    }
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--ink)', lineHeight: 1.3 }}>{item.name}</div>
@@ -1223,7 +1301,9 @@ export default function CakeStockPage({ navigate }) {
             <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 430, maxHeight: '88vh', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.2s ease' }}>
               {/* Header */}
               <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 42, height: 42, borderRadius: 12, background: getBg(di.name), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>{getIcon(di.name)}</div>
+                <div style={{ width: 42, height: 42, borderRadius: 12, background: getBg(di.name), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0, overflow: 'hidden' }}>
+                  {di.photo_url ? <img src={di.photo_url} alt={di.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getIcon(di.name)}
+                </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--ink)' }}>{di.name}</div>
                   <div style={{ fontSize: 11, color: di.is_open ? '#16A34A' : '#9CA3AF', fontWeight: 600, marginTop: 2 }}>{di.is_open ? '● เปิดขาย' : '○ ปิดขาย'}</div>
@@ -1331,6 +1411,38 @@ export default function CakeStockPage({ navigate }) {
                     )}
                   </div>
                 )}
+
+                {/* Product photo for catalog */}
+                <div style={{ background: 'var(--surface)', borderRadius: 14, padding: '14px 16px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 10 }}>รูปสินค้า (สำหรับแคตตาล็อก)</div>
+                  {di.photo_url ? (
+                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                      <img src={di.photo_url} alt={di.name} style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 12, border: '1.5px solid var(--line)' }} />
+                      <label style={{ position: 'absolute', bottom: 4, right: 4, background: 'rgba(0,0,0,0.6)', borderRadius: 8, padding: '3px 7px', cursor: 'pointer' }}>
+                        <span style={{ fontSize: 12, color: '#fff' }}>✏️</span>
+                        <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+                          onChange={e => { if (e.target.files[0]) uploadItemPhoto(di, e.target.files[0]); e.target.value = ''; }} />
+                      </label>
+                    </div>
+                  ) : (
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 10, border: '1.5px dashed var(--line)', background: 'var(--bg)', cursor: photoUploading === di.id ? 'wait' : 'pointer' }}>
+                      {photoUploading === di.id ? (
+                        <span style={{ fontSize: 13, color: 'var(--muted)' }}>กำลังอัปโหลด...</span>
+                      ) : (
+                        <>
+                          <span style={{ fontSize: 20 }}>📷</span>
+                          <span style={{ fontSize: 13, color: 'var(--ink)', fontWeight: 600 }}>เพิ่มรูปขนม</span>
+                        </>
+                      )}
+                      <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+                        disabled={!!photoUploading}
+                        onChange={e => { if (e.target.files[0]) uploadItemPhoto(di, e.target.files[0]); e.target.value = ''; }} />
+                    </label>
+                  )}
+                  {di.price && (
+                    <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>ราคา <strong style={{ color: 'var(--ink)' }}>฿{di.price}</strong></div>
+                  )}
+                </div>
 
                 {/* Status + Delete */}
                 {isMyBranch && (
