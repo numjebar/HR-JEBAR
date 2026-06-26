@@ -59,7 +59,7 @@ const DEFAULT_DRAFTS = {
     imageName: '', imagePreviewUrl: '', imageBase64: '', imageMimeType: '',
     aiItems: [], date: '', recordedBy: '',
   },
-  production:       { product: '', quantity: '', unit: 'ชิ้น', batch: '', note: '', dispatches: [], date: '', recordedBy: '', photos: [] },
+  production:       { product: '', quantity: '', unit: 'ชิ้น', batch: '', jobNo: '', note: '', dispatches: [], date: '', recordedBy: '', photos: [] },
   inventory:        { itemName: '', stockLeft: '', unit: 'กก.', status: 'ปกติ', note: '', date: '', recordedBy: '', photos: [] },
   'cake-stock':     { branchName: 'สาขากาดน้ำทอง', cakeName: '', available: '', reserved: '', damaged: '', status: 'พร้อมขาย', note: '', date: '', recordedBy: '', photos: [] },
   'supplies-count': { area: 'หน้าร้าน', itemName: '', count: '', unit: 'ชิ้น', status: 'ปกติ', note: '', date: '', recordedBy: '', photos: [] },
@@ -1209,7 +1209,7 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
         let total = 0;
         matching.forEach(e => { total += parseFloat(e.payload?.quantity || 0) || 0; });
         setTodayProductionTotal({ total, unit: matching[0]?.payload?.unit || '', count: matching.length });
-        setTodayProductionBatches(matching.map(e => ({ batch: e.payload?.batch || '', quantity: e.payload?.quantity || '0', unit: e.payload?.unit || '', note: e.payload?.note || '', time: (e.created_at || '').slice(11, 16) })));
+        setTodayProductionBatches(matching.map(e => ({ batch: e.payload?.batch || '', quantity: e.payload?.quantity || '0', unit: e.payload?.unit || '', note: e.payload?.note || '', jobNo: e.payload?.jobNo || '', time: (e.created_at || '').slice(11, 16) })));
       });
     return () => { cancelled = true; };
   }, [draft.product, taskKey, orgId, prodRefreshTick]);
@@ -1282,6 +1282,14 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
           photoUploadFailed = true;
         }
         setUploadMsg('');
+      }
+
+      // Upsert by jobNo: ถ้าเลขใบงานซ้ำ → ลบรายการเดิมก่อน แล้วค่อย insert ใหม่
+      if (taskKey === 'production' && draft.jobNo) {
+        const existing = backend.items.find(item => item.payload?.jobNo === draft.jobNo);
+        if (existing) {
+          try { await backend.remove(existing.id); } catch (_) {}
+        }
       }
 
       const { error } = await supabase.rpc('employee_submit_ops_entry_v2', {
@@ -1494,13 +1502,21 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                   {todayProductionBatches.map((b, i) => (
                     <span key={i} style={{ background: '#fff', border: '1px solid #bbe7cf', borderRadius: 8, padding: '2px 8px', fontSize: 11, color: '#1a5e3a' }}>
-                      {b.batch ? `${b.batch} · ` : ''}{b.quantity} {b.unit}{b.note ? ` (${b.note})` : ''} @{b.time}
+                      {b.jobNo ? <strong>[{b.jobNo}]</strong> : ''}{b.jobNo ? ' ' : ''}{b.batch ? `${b.batch} · ` : ''}{b.quantity} {b.unit}{b.note ? ` (${b.note})` : ''} @{b.time}
                     </span>
                   ))}
                 </div>
               )}
             </div>
           )}
+          <Field label="เลขใบงาน">
+            <input value={draft.jobNo}
+              onChange={e => setDraft({ ...draft, jobNo: e.target.value })}
+              placeholder="เช่น JB-001 (ไม่บังคับ)" />
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
+              ใส่เลขเดิมเพื่อ<strong>ทับรายการนั้น</strong> · ไม่ใส่ก็ได้
+            </div>
+          </Field>
           <TwoColRow>
             <Field label="จำนวน">
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -2063,7 +2079,7 @@ function hasAnyInput(taskKey, draft) {
 function summarizeDraft(taskKey, draft) {
   switch (taskKey) {
     case 'bills':         return `${draft.vendor||'-'} / ${draft.amount||'-'} บาท / ${draft.category||'วัตถุดิบ'}${draft.aiItems?.length ? ` / AI ${draft.aiItems.length} รายการ` : ''}`;
-    case 'production':    return `${draft.product||'-'} / ${draft.quantity||'0'} ${draft.unit||''} / ${draft.batch||'-'}`;
+    case 'production':    return `${draft.jobNo ? `[${draft.jobNo}] ` : ''}${draft.product||'-'} / ${draft.quantity||'0'} ${draft.unit||''} / ${draft.batch||'-'}`;
     case 'inventory':     return `${draft.itemName||'-'} / ${draft.stockLeft||'0'} ${draft.unit||''} / ${draft.status||'-'}`;
     case 'cake-stock':    return `${draft.branchName||'-'} / ${draft.cakeName||'-'} / พร้อมขาย ${draft.available||'0'} จอง ${draft.reserved||'0'} เสีย ${draft.damaged||'0'}`;
     case 'supplies-count':return `${draft.area||'-'} / ${draft.itemName||'-'} / ${draft.count||'0'} ${draft.unit||''} / ${draft.status||'ปกติ'}`;
@@ -2075,7 +2091,7 @@ function summarizeDraft(taskKey, draft) {
 function renderHistoryLine(taskKey, payload) {
   switch (taskKey) {
     case 'bills':         return `${payload.vendor||'-'} / ${payload.amount||'-'} บาท / ${payload.category||'วัตถุดิบ'}`;
-    case 'production':    return `${payload.product||'-'} / ${payload.quantity||'0'} ${payload.unit||''} / ${payload.batch||'-'}`;
+    case 'production':    return `${payload.jobNo ? `[${payload.jobNo}] ` : ''}${payload.product||'-'} / ${payload.quantity||'0'} ${payload.unit||''} / ${payload.batch||'-'}`;
     case 'inventory':     return `${payload.itemName||'-'} / ${payload.stockLeft||'0'} ${payload.unit||''} / ${payload.status||'-'}`;
     case 'cake-stock':    return `${payload.branchName||'-'} / ${payload.cakeName||'-'} / พร้อมขาย ${payload.available||'0'} จอง ${payload.reserved||'0'} เสีย ${payload.damaged||'0'} / ${payload.status||'-'}`;
     case 'supplies-count':return `${payload.area||'-'} / ${payload.itemName||'-'} / ${payload.count||'0'} ${payload.unit||''} / ${payload.status||'ปกติ'}`;
