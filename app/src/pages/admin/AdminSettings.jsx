@@ -92,10 +92,13 @@ export default function AdminSettings() {
     const key = opsKey.trim();
     if (!url || !key) return;
     setConnStatus('testing');
+    const base = url.replace(/\/+$/, '');
+    const hdrs = { apikey: key, Authorization: `Bearer ${key}` };
     try {
+      // Step 1: lightweight connectivity check (no db column)
       const res = await fetch(
-        `${url.replace(/\/+$/, '')}/rest/v1/jebar_app_state?select=db,updated_at&limit=1`,
-        { headers: { apikey: key, Authorization: `Bearer ${key}` } }
+        `${base}/rest/v1/jebar_app_state?select=shop_code,updated_at&limit=1`,
+        { headers: hdrs }
       );
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
@@ -110,17 +113,30 @@ export default function AdminSettings() {
       if (!Array.isArray(rows) || rows.length === 0) {
         setConnStatus({ ok: true, menus: 0, ingredients: 0, materials: 0, noRow: true }); return;
       }
-      const db = rows[0]?.db || {};
       const updatedAt = rows[0]?.updated_at;
-      const INACTIVE = new Set(['inactive', 'ไม่ใช้']);
-      const isAct = (x) => x.name && !INACTIVE.has(x.status);
-      const menus = (db.menus || []).filter(isAct).length;
-      const ingredients = (db.ingredients || []).filter(isAct).length;
-      const suppliesCategories = new Set(['ของใช้สิ้นเปลือง', 'supplies', 'ของใช้']);
-      const suppliesList = (db.ingredients || []).filter(x => isAct(x) && suppliesCategories.has(x.category));
-      const materials = suppliesList.length > 0 ? suppliesList.length : (db.stockItems || []).filter(isAct).length;
       const syncAge = updatedAt ? Math.round((Date.now() - new Date(updatedAt)) / 60000) : null;
-      setConnStatus({ ok: true, menus, ingredients, materials, syncAge });
+
+      // Step 2: try to get stats from db column (may be large — ignore if fails)
+      try {
+        const res2 = await fetch(
+          `${base}/rest/v1/jebar_app_state?select=db&limit=1`,
+          { headers: hdrs }
+        );
+        if (res2.ok) {
+          const rows2 = await res2.json();
+          const db = rows2[0]?.db || {};
+          const INACTIVE = new Set(['inactive', 'ไม่ใช้']);
+          const isAct = (x) => x.name && !INACTIVE.has(x.status);
+          const menus = (db.menus || []).filter(isAct).length;
+          const ingredients = (db.ingredients || []).filter(isAct).length;
+          const suppliesCategories = new Set(['ของใช้สิ้นเปลือง', 'supplies', 'ของใช้']);
+          const suppliesList = (db.ingredients || []).filter(x => isAct(x) && suppliesCategories.has(x.category));
+          const materials = suppliesList.length > 0 ? suppliesList.length : (db.stockItems || []).filter(isAct).length;
+          setConnStatus({ ok: true, menus, ingredients, materials, syncAge }); return;
+        }
+      } catch (_) { /* stats fetch failed — still connected */ }
+
+      setConnStatus({ ok: true, menus: null, ingredients: null, materials: null, syncAge });
     } catch (err) {
       setConnStatus({ ok: false, error: err.message || 'ไม่สามารถเชื่อมต่อได้' });
     }
@@ -346,9 +362,9 @@ export default function AdminSettings() {
             connStatus.ok ? (
               <div style={{ background: '#ecfdf3', border: '1px solid #bbe7cf', borderRadius: 12, padding: '10px 14px', fontSize: 13, color: '#0d7a46', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                 <span style={{ fontWeight: 700 }}>✓ เชื่อมต่อสำเร็จ</span>
-                <span>🍽️ เมนู {connStatus.menus} รายการ</span>
-                <span>📦 วัตถุดิบ {connStatus.ingredients} รายการ</span>
-                <span>🧴 วัสดุ {connStatus.materials} รายการ</span>
+                {connStatus.menus !== null && <span>🍽️ เมนู {connStatus.menus} รายการ</span>}
+                {connStatus.ingredients !== null && <span>📦 วัตถุดิบ {connStatus.ingredients} รายการ</span>}
+                {connStatus.materials !== null && <span>🧴 วัสดุ {connStatus.materials} รายการ</span>}
                 {connStatus.syncAge !== null && (
                   <span style={{ color: connStatus.syncAge > 60 ? '#b45309' : '#0d7a46' }}>
                     🔄 ซิงก์ล่าสุด {connStatus.syncAge < 2 ? 'เมื่อกี้' : connStatus.syncAge < 60 ? `${connStatus.syncAge} นาทีที่แล้ว` : `${Math.floor(connStatus.syncAge / 60)} ชม.ที่แล้ว`}
