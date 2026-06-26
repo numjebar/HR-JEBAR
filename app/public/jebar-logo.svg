@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 580 110" fill="none">
+  <!-- JE -->
+  <text x="0" y="92"
+    font-family="'Palatino Linotype', 'Book Antiqua', Palatino, 'Times New Roman', Georgia, serif"
+    font-size="100" font-weight="700" fill="#2e2e2e" letter-spacing="-3">JE</text>
+  <!-- B -->
+  <text x="195" y="92"
+    font-family="'Palatino Linotype', 'Book Antiqua', Palatino, 'Times New Roman', Georgia, serif"
+    font-size="100" font-weight="700" fill="#2e2e2e">B</text>
+  <!-- Golden triangle / A mark -->
+  <g transform="translate(272, 4)">
+    <!-- Triangle outline -->
+    <polygon points="40,0 78,90 2,90"
+      fill="none" stroke="#b0882a" stroke-width="5.5" stroke-linejoin="miter"/>
+    <!-- Curved arc at base -->
+    <path d="M4,90 Q40,108 76,90"
+      fill="none" stroke="#b0882a" stroke-width="5.5" stroke-linecap="round"/>
+    <!-- Teardrop / oil drop inside — pointed top, round bottom -->
+    <path d="M40,28 Q48,44 48,58 A8,8 0 1 1 32,58 Q32,44 40,28 Z"
+      fill="#b0882a"/>
+  </g>
+  <!-- R -->
+  <text x="358" y="92"
+    font-family="'Palatino Linotype', 'Book Antiqua', Palatino, 'Times New Roman', Georgia, serif"
+    font-size="100" font-weight="700" fill="#2e2e2e">R</text>
+</svg>

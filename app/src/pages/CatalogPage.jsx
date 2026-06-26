@@ -107,7 +107,7 @@ export default function CatalogPage() {
       {/* ── Header ── */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e8e0d4', padding: '18px 20px 14px' }}>
         <div style={{ maxWidth: 560, margin: '0 auto' }}>
-          <img src="/jebar-logo.jpeg" alt="JE BAR" style={{ maxWidth: 220, width: '60%', height: 'auto', display: 'block', margin: '0 auto' }} />
+          <img src="/jebar-logo.svg" alt="JE BAR" style={{ maxWidth: 260, width: '70%', height: 'auto', display: 'block', margin: '0 auto' }} />
           <div style={{ marginTop: 14, textAlign: 'center' }}>
             <div style={{ fontSize: 22, fontWeight: 800, color: '#2d2d2d', fontFamily: "Georgia, 'Times New Roman', serif" }}>
               ขนมในตู้วันนี้
