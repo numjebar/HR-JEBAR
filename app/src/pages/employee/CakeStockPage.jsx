@@ -202,6 +202,11 @@ export default function CakeStockPage({ navigate }) {
   const [requestSending, setRequestSending] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null); // item to request delete
 
+  // Detail drawer
+  const [detailItem, setDetailItem] = useState(null);
+  // Inline qty input buffer { item_id: string }
+  const [qtyInput, setQtyInput] = useState({});
+
   // Drag-to-reorder
   const dragItem = useRef(null);
   const dragOver = useRef(null);
@@ -346,6 +351,29 @@ export default function CakeStockPage({ navigate }) {
       }, { onConflict: 'branch_id,item_id' });
       if (error) throw error;
       await writeLog(item.id, item.name, 'adjust', delta, next, null);
+    } catch (err) {
+      setStockMap(old => ({ ...old, [item.id]: prev }));
+      alert('บันทึกไม่สำเร็จ: ' + (err?.message || 'กรุณาลองใหม่'));
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  // Set qty to absolute value (called from editable input)
+  async function setQtyAbsolute(item, newQty) {
+    if (!isMyBranch) return;
+    const prev = stockMap[item.id] || 0;
+    const next = Math.max(0, Math.round(Number(newQty) || 0));
+    if (next === prev) return;
+    setSaving(item.id);
+    setStockMap(old => ({ ...old, [item.id]: next }));
+    try {
+      const { error } = await supabase.from('cake_stock').upsert({
+        org_id: orgId, branch_id: activeBranchId, item_id: item.id,
+        qty: next, updated_by: empId, updated_at: new Date().toISOString(),
+      }, { onConflict: 'branch_id,item_id' });
+      if (error) throw error;
+      await writeLog(item.id, item.name, 'adjust', next - prev, next, null);
     } catch (err) {
       setStockMap(old => ({ ...old, [item.id]: prev }));
       alert('บันทึกไม่สำเร็จ: ' + (err?.message || 'กรุณาลองใหม่'));
@@ -811,6 +839,7 @@ export default function CakeStockPage({ navigate }) {
             const canEdit = isMyBranch;
             const details = spoiledDetails[item.id] || {};
             const photoInputId = `spoiled-photo-${item.id}`;
+            const qtyVal = qtyInput[item.id] !== undefined ? qtyInput[item.id] : String(qty);
             return (
               <div key={item.id} style={{ marginBottom: 8 }}>
               <div
@@ -825,211 +854,86 @@ export default function CakeStockPage({ navigate }) {
                 onTouchEnd={canEdit ? e => onTouchEnd(e, idx) : undefined}
                 style={{
                   background: dragOverIdx === idx && dragActiveIdx !== idx ? 'var(--hover)' : 'var(--surface)',
-                  borderRadius: 12,
+                  borderRadius: 14,
                   padding: '12px 14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
                   boxShadow: 'var(--shadow-sm)',
-                  opacity: dragActiveIdx === idx ? 0.35 : item.is_open ? 1 : 0.55,
-                  cursor: canEdit ? 'grab' : 'default',
-                  userSelect: 'none',
-                  WebkitUserSelect: 'none',
+                  opacity: dragActiveIdx === idx ? 0.35 : item.is_open ? 1 : 0.65,
+                  userSelect: 'none', WebkitUserSelect: 'none',
                   transition: 'background 0.1s, opacity 0.1s',
                   borderTop: dragOverIdx === idx && dragActiveIdx !== idx ? '2px solid var(--accent)' : '2px solid transparent',
                 }}
               >
-                {/* Move up/down buttons */}
-                {canEdit && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }}>
-                    <button onClick={() => moveItem(idx, -1)} disabled={idx === 0}
-                      style={{ background: 'none', border: 'none', padding: '1px 4px', fontSize: 13, color: idx === 0 ? '#E5E7EB' : '#9CA3AF', cursor: idx === 0 ? 'default' : 'pointer', lineHeight: 1 }}>▲</button>
-                    <button onClick={() => moveItem(idx, 1)} disabled={idx === items.length - 1}
-                      style={{ background: 'none', border: 'none', padding: '1px 4px', fontSize: 13, color: idx === items.length - 1 ? '#E5E7EB' : '#9CA3AF', cursor: idx === items.length - 1 ? 'default' : 'pointer', lineHeight: 1 }}>▼</button>
+                {/* ── Top row: icon + name + status + chevron ── */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {canEdit && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0, cursor: 'grab' }}>
+                      <button onClick={() => moveItem(idx, -1)} disabled={idx === 0}
+                        style={{ background: 'none', border: 'none', padding: '1px 4px', fontSize: 12, color: idx === 0 ? '#E5E7EB' : '#C4B8AC', cursor: idx === 0 ? 'default' : 'pointer', lineHeight: 1 }}>▲</button>
+                      <button onClick={() => moveItem(idx, 1)} disabled={idx === items.length - 1}
+                        style={{ background: 'none', border: 'none', padding: '1px 4px', fontSize: 12, color: idx === items.length - 1 ? '#E5E7EB' : '#C4B8AC', cursor: idx === items.length - 1 ? 'default' : 'pointer', lineHeight: 1 }}>▼</button>
+                    </div>
+                  )}
+                  <div style={{ width: 38, height: 38, borderRadius: 10, background: getBg(item.name), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
+                    {getIcon(item.name)}
                   </div>
-                )}
-
-                {/* Icon */}
-                <div style={{
-                  width: 44, height: 44, borderRadius: 10, background: getBg(item.name),
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0,
-                }}>
-                  {getIcon(item.name)}
-                </div>
-
-                {/* Name + open/close badge */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--ink)', lineHeight: 1.3 }}>
-                    {item.name}
-                  </div>
-                  <div style={{ marginTop: 4 }}>
-                    {canEdit ? (
-                      <button
-                        onClick={() => toggleOpen(item)}
-                        style={{
-                          fontSize: 11, padding: '2px 8px', borderRadius: 20, border: 'none', cursor: 'pointer', fontWeight: 600,
-                          background: item.is_open ? '#DCFCE7' : '#F3F4F6',
-                          color: item.is_open ? '#166534' : '#6B7280',
-                        }}
-                      >
-                        {item.is_open ? '● เปิดขาย' : '○ ปิดขาย'}
-                      </button>
-                    ) : (
-                      <span style={{ fontSize: 11, color: item.is_open ? '#16A34A' : '#9CA3AF' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--ink)', lineHeight: 1.3 }}>{item.name}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 11, color: item.is_open ? '#16A34A' : '#9CA3AF', fontWeight: 600 }}>
                         {item.is_open ? '● เปิดขาย' : '○ ปิดขาย'}
                       </span>
-                    )}
+                      {spoiled > 0 && (
+                        <span style={{ fontSize: 10, color: '#DC2626', background: '#FEF2F2', borderRadius: 8, padding: '1px 6px', fontWeight: 700 }}>
+                          🗑 เสีย {spoiled}
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  <button
+                    onClick={() => setDetailItem(item)}
+                    style={{ background: '#F5F0EB', border: 'none', borderRadius: 8, padding: '4px 8px', fontSize: 11, color: 'var(--accent)', fontWeight: 700, cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}
+                  >
+                    รายละเอียด ›
+                  </button>
                 </div>
 
-                {/* Qty + Spoiled steppers */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                  {/* Main qty stepper */}
+                {/* ── Bottom row: stepper + unit ── */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--line)' }}>
                   {canEdit ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: '#F9F5F0', borderRadius: 10, padding: '2px' }}>
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', background: '#F9F5F0', borderRadius: 10, padding: 3 }}>
                       <button
                         onClick={() => adjustQty(item, -1)}
                         disabled={qty === 0 || isSaving}
-                        style={{
-                          width: 36, height: 36, border: 'none', background: qty === 0 ? 'transparent' : '#fff',
-                          borderRadius: 8, fontSize: 20, cursor: qty === 0 ? 'not-allowed' : 'pointer',
-                          color: qty === 0 ? '#D1D5DB' : '#DC2626', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          boxShadow: qty === 0 ? 'none' : '0 1px 2px rgba(0,0,0,0.1)',
-                        }}
+                        style={{ width: 38, height: 38, border: 'none', borderRadius: 8, fontSize: 22, fontWeight: 700, cursor: qty === 0 ? 'not-allowed' : 'pointer', color: qty === 0 ? '#D1D5DB' : '#DC2626', background: qty === 0 ? 'transparent' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: qty === 0 ? 'none' : '0 1px 2px rgba(0,0,0,0.08)', flexShrink: 0 }}
                       >−</button>
-                      <div style={{
-                        width: 44, textAlign: 'center', fontWeight: 700, fontSize: 20,
-                        color: qty > 0 ? '#166534' : '#9CA3AF',
-                      }}>
-                        {isSaving ? '…' : qty}
-                      </div>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={isSaving ? qty : qtyVal}
+                        disabled={isSaving}
+                        onChange={e => setQtyInput(prev => ({ ...prev, [item.id]: e.target.value }))}
+                        onBlur={() => {
+                          const v = Number(qtyVal);
+                          if (!isNaN(v) && v !== qty) setQtyAbsolute(item, v);
+                          setQtyInput(prev => { const n = { ...prev }; delete n[item.id]; return n; });
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') { e.target.blur(); }
+                        }}
+                        style={{ flex: 1, textAlign: 'center', fontWeight: 800, fontSize: 22, border: 'none', background: 'transparent', outline: 'none', color: qty > 0 ? '#166534' : '#9CA3AF', minWidth: 0, fontFamily: 'inherit' }}
+                      />
                       <button
                         onClick={() => adjustQty(item, +1)}
                         disabled={isSaving}
-                        style={{
-                          width: 36, height: 36, border: 'none', background: '#fff',
-                          borderRadius: 8, fontSize: 20, cursor: 'pointer',
-                          color: '#16A34A', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                        }}
+                        style={{ width: 38, height: 38, border: 'none', borderRadius: 8, fontSize: 22, fontWeight: 700, cursor: 'pointer', color: '#16A34A', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.08)', flexShrink: 0 }}
                       >+</button>
                     </div>
                   ) : (
-                    <div style={{ fontWeight: 700, fontSize: 24, minWidth: 36, textAlign: 'right', color: qty > 0 ? '#166534' : '#9CA3AF' }}>
-                      {qty || '—'}
-                    </div>
+                    <div style={{ flex: 1, textAlign: 'center', fontWeight: 800, fontSize: 22, color: qty > 0 ? '#166534' : '#9CA3AF' }}>{qty || '—'}</div>
                   )}
-                  {/* Spoiled counter */}
-                  {canEdit ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-                      <div style={{ fontSize: 10, color: '#DC2626', fontWeight: 600, paddingRight: 2 }}>ของเสีย</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: '#FEF2F2', borderRadius: 8, padding: '2px 4px' }}>
-                      <button
-                        onClick={() => adjustSpoiled(item, -1)}
-                        disabled={spoiled === 0 || isSavingSpoiled}
-                        style={{
-                          width: 24, height: 24, border: 'none', background: spoiled === 0 ? 'transparent' : '#fff',
-                          borderRadius: 6, fontSize: 15, cursor: spoiled === 0 ? 'not-allowed' : 'pointer',
-                          color: spoiled === 0 ? '#FECACA' : '#DC2626', fontWeight: 700,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}
-                      >−</button>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: spoiled > 0 ? '#DC2626' : '#FCA5A5', width: 40, textAlign: 'center' }}>
-                        {isSavingSpoiled ? '…' : `🗑 ${spoiled}`}
-                      </div>
-                      <button
-                        onClick={() => adjustSpoiled(item, +1)}
-                        disabled={isSavingSpoiled}
-                        style={{
-                          width: 24, height: 24, border: 'none', background: '#fff',
-                          borderRadius: 6, fontSize: 15, cursor: 'pointer',
-                          color: '#DC2626', fontWeight: 700,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}
-                      >+</button>
-                    </div>
-                    </div>
-                  ) : (
-                    spoiled > 0 && (
-                      <div style={{ fontSize: 11, color: '#DC2626', fontWeight: 600 }}>🗑 เสีย {spoiled}</div>
-                    )
-                  )}
+                  <span style={{ fontSize: 12, color: 'var(--muted)', flexShrink: 0 }}>ชิ้น</span>
                 </div>
-                {/* Request delete */}
-                {canEdit && (
-                  <button onClick={() => setPendingDelete(item)}
-                    style={{ background: 'none', border: 'none', fontSize: 16, color: '#D1C4B5', cursor: 'pointer', padding: '4px 2px', flexShrink: 0 }}
-                    title="ขอลบรายการ">🗑</button>
-                )}
               </div>
-
-              {/* Spoiled details panel — shown when qty_spoiled > 0 */}
-              {canEdit && spoiled > 0 && (
-                <div style={{ marginTop: 6, padding: '10px 12px', background: '#FFF5F5', borderRadius: 10, border: '1px solid #FECACA' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#B91C1C', marginBottom: 8 }}>
-                    📋 ระบุสาเหตุขนมเสีย ({spoiled} ชิ้น)
-                  </div>
-                  {/* Reason chips */}
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-                    {SPOILED_REASONS.map(r => (
-                      <button key={r.value}
-                        onClick={() => setSpoiledDetails(prev => ({ ...prev, [item.id]: { ...prev[item.id], reason: r.value } }))}
-                        style={{
-                          padding: '5px 11px', borderRadius: 16, border: '1.5px solid',
-                          borderColor: details.reason === r.value ? '#DC2626' : '#FECACA',
-                          background: details.reason === r.value ? '#FEE2E2' : '#fff',
-                          color: details.reason === r.value ? '#B91C1C' : '#9CA3AF',
-                          fontSize: 12, fontWeight: details.reason === r.value ? 700 : 400,
-                          cursor: 'pointer',
-                        }}>
-                        {r.label}
-                      </button>
-                    ))}
-                  </div>
-                  {/* Custom note when อื่นๆ selected */}
-                  {details.reason === 'other' && (
-                    <input
-                      type="text"
-                      placeholder="ระบุสาเหตุ..."
-                      value={details.note || ''}
-                      onChange={e => setSpoiledDetails(prev => ({ ...prev, [item.id]: { ...prev[item.id], note: e.target.value } }))}
-                      style={{
-                        width: '100%', boxSizing: 'border-box',
-                        padding: '7px 10px', borderRadius: 8, border: '1.5px solid #FECACA',
-                        fontSize: 13, fontFamily: 'inherit', marginBottom: 8,
-                        outline: 'none', background: '#fff', color: '#1F2937',
-                      }}
-                    />
-                  )}
-                  {/* Photo */}
-                  <input type="file" accept="image/*" capture="environment" id={photoInputId}
-                    style={{ display: 'none' }}
-                    onChange={e => {
-                      const file = e.target.files[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = ev => setSpoiledDetails(prev => ({ ...prev, [item.id]: { ...prev[item.id], photo: ev.target.result } }));
-                      reader.readAsDataURL(file);
-                    }} />
-                  {details.photo ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <img src={details.photo} alt="waste" style={{ height: 52, width: 52, objectFit: 'cover', borderRadius: 8, border: '1px solid #FECACA' }} />
-                      <button onClick={() => setSpoiledDetails(prev => ({ ...prev, [item.id]: { ...prev[item.id], photo: '' } }))}
-                        style={{ fontSize: 12, color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
-                        ✕ ลบรูป
-                      </button>
-                    </div>
-                  ) : (
-                    <label htmlFor={photoInputId} style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 6,
-                      padding: '6px 12px', borderRadius: 8, border: '1.5px dashed #FECACA',
-                      background: '#fff', color: '#DC2626', fontSize: 12, cursor: 'pointer', fontWeight: 600,
-                    }}>
-                      📷 ถ่ายรูปของเสีย
-                    </label>
-                  )}
-                </div>
-              )}
               </div>
             );
           })
@@ -1156,6 +1060,111 @@ export default function CakeStockPage({ navigate }) {
           </div>
         </ModalOverlay>
       )}
+
+      {/* ── Detail Drawer ── */}
+      {detailItem && (() => {
+        const di = detailItem;
+        const dQty = stockMap[di.id] || 0;
+        const dSpoiled = spoiledMap[di.id] || 0;
+        const dDetails = spoiledDetails[di.id] || {};
+        const dIsSaving = saving === di.id;
+        const dIsSavingSpoiled = savingSpoiled === di.id;
+        const photoInputId = `spoiled-photo-detail-${di.id}`;
+        return (
+          <div onClick={() => setDetailItem(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 150, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 430, maxHeight: '88vh', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.2s ease' }}>
+              {/* Header */}
+              <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 42, height: 42, borderRadius: 12, background: getBg(di.name), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>{getIcon(di.name)}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--ink)' }}>{di.name}</div>
+                  <div style={{ fontSize: 11, color: di.is_open ? '#16A34A' : '#9CA3AF', fontWeight: 600, marginTop: 2 }}>{di.is_open ? '● เปิดขาย' : '○ ปิดขาย'}</div>
+                </div>
+                <button onClick={() => setDetailItem(null)} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--muted)', cursor: 'pointer', padding: '4px 6px' }}>✕</button>
+              </div>
+
+              <div style={{ overflowY: 'auto', flex: 1, padding: 14, display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 32 }}>
+                {/* Qty adjust */}
+                <div style={{ background: 'var(--surface)', borderRadius: 14, padding: '14px 16px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 10 }}>ปรับจำนวน</div>
+                  <div style={{ display: 'flex', alignItems: 'center', background: '#F9F5F0', borderRadius: 12, padding: 4 }}>
+                    <button onClick={() => adjustQty(di, -1)} disabled={dQty === 0 || dIsSaving}
+                      style={{ width: 44, height: 44, border: 'none', borderRadius: 10, fontSize: 24, fontWeight: 700, cursor: dQty === 0 ? 'not-allowed' : 'pointer', color: dQty === 0 ? '#D1D5DB' : '#DC2626', background: dQty === 0 ? 'transparent' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: dQty === 0 ? 'none' : '0 1px 3px rgba(0,0,0,0.1)', flexShrink: 0 }}>−</button>
+                    <div style={{ flex: 1, textAlign: 'center', fontWeight: 800, fontSize: 28, color: dQty > 0 ? '#166534' : '#9CA3AF' }}>{dIsSaving ? '…' : dQty}</div>
+                    <button onClick={() => adjustQty(di, +1)} disabled={dIsSaving}
+                      style={{ width: 44, height: 44, border: 'none', borderRadius: 10, fontSize: 24, fontWeight: 700, cursor: 'pointer', color: '#16A34A', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', flexShrink: 0 }}>+</button>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 6 }}>ชิ้น</div>
+                </div>
+
+                {/* Spoiled */}
+                {isMyBranch && (
+                  <div style={{ background: 'var(--surface)', borderRadius: 14, padding: '14px 16px' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#DC2626', marginBottom: 10 }}>ของเสีย</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#FEF2F2', borderRadius: 10, padding: '6px 8px', marginBottom: dSpoiled > 0 ? 12 : 0 }}>
+                      <button onClick={() => adjustSpoiled(di, -1)} disabled={dSpoiled === 0 || dIsSavingSpoiled}
+                        style={{ width: 32, height: 32, border: 'none', borderRadius: 8, fontSize: 18, fontWeight: 700, cursor: dSpoiled === 0 ? 'not-allowed' : 'pointer', color: dSpoiled === 0 ? '#FECACA' : '#DC2626', background: dSpoiled === 0 ? 'transparent' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                      <div style={{ flex: 1, textAlign: 'center', fontWeight: 700, fontSize: 18, color: dSpoiled > 0 ? '#DC2626' : '#FCA5A5' }}>{dIsSavingSpoiled ? '…' : `🗑 ${dSpoiled}`}</div>
+                      <button onClick={() => adjustSpoiled(di, +1)} disabled={dIsSavingSpoiled}
+                        style={{ width: 32, height: 32, border: 'none', borderRadius: 8, fontSize: 18, fontWeight: 700, cursor: 'pointer', color: '#DC2626', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                    </div>
+                    {dSpoiled > 0 && (
+                      <>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#B91C1C', marginBottom: 8 }}>ระบุสาเหตุ</div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                          {SPOILED_REASONS.map(r => (
+                            <button key={r.value}
+                              onClick={() => setSpoiledDetails(prev => ({ ...prev, [di.id]: { ...prev[di.id], reason: r.value } }))}
+                              style={{ padding: '5px 11px', borderRadius: 16, border: '1.5px solid', borderColor: dDetails.reason === r.value ? '#DC2626' : '#FECACA', background: dDetails.reason === r.value ? '#FEE2E2' : '#fff', color: dDetails.reason === r.value ? '#B91C1C' : '#9CA3AF', fontSize: 12, fontWeight: dDetails.reason === r.value ? 700 : 400, cursor: 'pointer' }}>
+                              {r.label}
+                            </button>
+                          ))}
+                        </div>
+                        {dDetails.reason === 'other' && (
+                          <input type="text" placeholder="ระบุสาเหตุ..." value={dDetails.note || ''}
+                            onChange={e => setSpoiledDetails(prev => ({ ...prev, [di.id]: { ...prev[di.id], note: e.target.value } }))}
+                            style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px', borderRadius: 8, border: '1.5px solid #FECACA', fontSize: 13, fontFamily: 'inherit', marginBottom: 8, outline: 'none', background: '#fff', color: '#1F2937' }} />
+                        )}
+                        <input type="file" accept="image/*" capture="environment" id={photoInputId} style={{ display: 'none' }}
+                          onChange={e => {
+                            const file = e.target.files[0]; if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = ev => setSpoiledDetails(prev => ({ ...prev, [di.id]: { ...prev[di.id], photo: ev.target.result } }));
+                            reader.readAsDataURL(file);
+                          }} />
+                        {dDetails.photo ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <img src={dDetails.photo} alt="waste" style={{ height: 52, width: 52, objectFit: 'cover', borderRadius: 8, border: '1px solid #FECACA' }} />
+                            <button onClick={() => setSpoiledDetails(prev => ({ ...prev, [di.id]: { ...prev[di.id], photo: '' } }))}
+                              style={{ fontSize: 12, color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>✕ ลบรูป</button>
+                          </div>
+                        ) : (
+                          <label htmlFor={photoInputId} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: '1.5px dashed #FECACA', background: '#fff', color: '#DC2626', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
+                            📷 ถ่ายรูปของเสีย
+                          </label>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Status + Delete */}
+                {isMyBranch && (
+                  <div style={{ background: 'var(--surface)', borderRadius: 14, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>สถานะการขาย</div>
+                    <button onClick={() => { toggleOpen(di); setDetailItem(prev => ({ ...prev, is_open: !prev.is_open })); }}
+                      style={{ fontSize: 12, padding: '5px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontWeight: 700, background: di.is_open ? '#DCFCE7' : '#F3F4F6', color: di.is_open ? '#166534' : '#6B7280' }}>
+                      {di.is_open ? '● เปิดขาย' : '○ ปิดขาย'}
+                    </button>
+                    <button onClick={() => { setPendingDelete(di); setDetailItem(null); }}
+                      style={{ background: 'none', border: 'none', fontSize: 15, color: '#D1C4B5', cursor: 'pointer', padding: '4px 2px' }} title="ขอลบรายการ">🗑</button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
