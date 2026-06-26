@@ -199,8 +199,10 @@ export default function CakeStockPage({ navigate }) {
   const [logsLoading, setLogsLoading] = useState(false);
   const [showRequestAdd, setShowRequestAdd] = useState(false);
   const [requestName, setRequestName] = useState('');
+  const [requestQty, setRequestQty] = useState(1);
   const [requestSending, setRequestSending] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null); // item to request delete
+  const [myPendingRequests, setMyPendingRequests] = useState([]);
 
   // Detail drawer
   const [detailItem, setDetailItem] = useState(null);
@@ -262,6 +264,18 @@ export default function CakeStockPage({ navigate }) {
         }
       });
   }, [orgId]);
+
+  // Load my pending requests (refresh when modal opens/closes)
+  useEffect(() => {
+    if (!empId || !orgId) return;
+    supabase.from('cake_items')
+      .select('id,name')
+      .eq('org_id', orgId)
+      .eq('status', 'pending_add')
+      .eq('requested_by', empId)
+      .order('id', { ascending: false })
+      .then(({ data }) => { if (data) setMyPendingRequests(data); });
+  }, [empId, orgId, showRequestAdd]);
 
   // Load branches
   useEffect(() => {
@@ -575,9 +589,10 @@ export default function CakeStockPage({ navigate }) {
         status: 'pending_add',
         requested_by: empId,
       });
-      await writeLog(null, requestName.trim(), 'request_add', null, null, `ขอเพิ่มโดย ${empName}`);
+      await writeLog(null, requestName.trim(), 'request_add', requestQty || null, null, `ขอเพิ่มโดย ${empName}`);
       setShowRequestAdd(false);
       setRequestName('');
+      setRequestQty(1);
       alert('ส่งคำขอแล้ว รอแอดมินอนุมัติ');
     } finally {
       setRequestSending(false);
@@ -910,6 +925,20 @@ export default function CakeStockPage({ navigate }) {
         </div>
       )}
 
+      {/* My pending requests banner */}
+      {myPendingRequests.length > 0 && (
+        <div style={{ margin: '8px 12px 0', background: '#FFF7ED', border: '1.5px solid #F97316', borderRadius: 14, padding: '10px 14px' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#C2410C', marginBottom: 4 }}>📋 รายการที่ขอเพิ่ม ({myPendingRequests.length})</div>
+          {myPendingRequests.map(r => (
+            <div key={r.id} style={{ fontSize: 12, color: '#9A3412', padding: '3px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>⏳</span>
+              <span style={{ flex: 1 }}>{r.name}</span>
+              <span style={{ color: '#D97706', fontWeight: 600, fontSize: 11 }}>รอแอดมินอนุมัติ</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Item list */}
       <div style={{ padding: '12px 12px 24px' }}>
         {loading ? (
@@ -1104,6 +1133,24 @@ export default function CakeStockPage({ navigate }) {
                 fontSize: 16, boxSizing: 'border-box', fontFamily: 'inherit',
               }}
             />
+
+            {/* Qty input */}
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>จำนวนเริ่มต้น</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button onClick={() => setRequestQty(q => Math.max(0, q - 1))}
+                  style={{ width: 36, height: 36, borderRadius: 9, border: '1.5px solid var(--line)', background: 'var(--bg)', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                <input
+                  type="number" min="0" value={requestQty}
+                  onChange={e => setRequestQty(Math.max(0, parseInt(e.target.value) || 0))}
+                  style={{ width: 64, textAlign: 'center', padding: '8px 4px', borderRadius: 9, border: '1.5px solid var(--line)', fontSize: 16, fontFamily: 'inherit', boxSizing: 'border-box' }}
+                />
+                <button onClick={() => setRequestQty(q => q + 1)}
+                  style={{ width: 36, height: 36, borderRadius: 9, border: '1.5px solid var(--line)', background: 'var(--bg)', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                <span style={{ fontSize: 13, color: 'var(--muted)' }}>ชิ้น</span>
+              </div>
+            </div>
+
             <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
               คำขอจะส่งให้แอดมินอนุมัติก่อนแสดงในระบบ
             </div>
