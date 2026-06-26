@@ -207,6 +207,10 @@ export default function CakeStockPage({ navigate }) {
   // Inline qty input buffer { item_id: string }
   const [qtyInput, setQtyInput] = useState({});
 
+  // Production claim: unclaimed production entries { [normName]: [{id,qty,unit,batch,jobNo,empName,time}] }
+  const [prodClaims, setProdClaims] = useState({});
+  const [claimedIds, setClaimedIds] = useState(new Set());
+
   // Drag-to-reorder
   const dragItem = useRef(null);
   const dragOver = useRef(null);
@@ -314,6 +318,48 @@ export default function CakeStockPage({ navigate }) {
 
   useEffect(() => { load(); }, [load]);
 
+  // Load today's production entries + already-claimed IDs
+  useEffect(() => {
+    if (!orgId) return;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    Promise.all([
+      supabase.from('employee_ops_entries')
+        .select('id,payload,created_at')
+        .eq('org_id', orgId)
+        .eq('task_key', 'production')
+        .gte('created_at', `${todayStr}T00:00:00`)
+        .lte('created_at', `${todayStr}T23:59:59`)
+        .order('created_at', { ascending: true }),
+      supabase.from('cake_stock_log')
+        .select('note')
+        .eq('org_id', orgId)
+        .eq('action', 'production_claim')
+        .gte('created_at', `${todayStr}T00:00:00`),
+    ]).then(([{ data: prodData }, { data: claimData }]) => {
+      const alreadyClaimed = new Set((claimData || []).map(c => c.note).filter(Boolean));
+      setClaimedIds(alreadyClaimed);
+      const grouped = {};
+      (prodData || []).forEach(e => {
+        if (alreadyClaimed.has(String(e.id))) return;
+        const name = (e.payload?.product || '').trim();
+        if (!name) return;
+        const key = name.toLowerCase();
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push({
+          id: String(e.id),
+          qty: parseFloat(e.payload?.quantity || 0) || 0,
+          unit: e.payload?.unit || 'ชิ้น',
+          batch: e.payload?.batch || '',
+          jobNo: e.payload?.jobNo || '',
+          empName: e.payload?.recordedBy || '',
+          time: (e.created_at || '').slice(11, 16),
+          productName: name,
+        });
+      });
+      setProdClaims(grouped);
+    }).catch(() => {});
+  }, [orgId, activeBranchId]);
+
   // isMyBranch: false in 'all' mode (read-only), true on own branch or if no branch assigned
   const isMyBranch = activeBranchId !== 'all' && (!myBranchId || activeBranchId === myBranchId);
 
@@ -374,6 +420,38 @@ export default function CakeStockPage({ navigate }) {
       }, { onConflict: 'branch_id,item_id' });
       if (error) throw error;
       await writeLog(item.id, item.name, 'adjust', next - prev, next, null);
+    } catch (err) {
+      setStockMap(old => ({ ...old, [item.id]: prev }));
+      alert('บันทึกไม่สำเร็จ: ' + (err?.message || 'กรุณาลองใหม่'));
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  // Receive production into stock (semi-auto claim)
+  async function claimProduction(item, entries) {
+    if (!isMyBranch || !entries?.length) return;
+    const totalQty = entries.reduce((s, e) => s + e.qty, 0);
+    const prev = stockMap[item.id] || 0;
+    const next = prev + totalQty;
+    setSaving(item.id);
+    setStockMap(old => ({ ...old, [item.id]: next }));
+    try {
+      const { error } = await supabase.from('cake_stock').upsert({
+        org_id: orgId, branch_id: activeBranchId, item_id: item.id,
+        qty: next, updated_by: empId, updated_at: new Date().toISOString(),
+      }, { onConflict: 'branch_id,item_id' });
+      if (error) throw error;
+      // Log each claimed entry with its ID in the note field
+      for (const e of entries) {
+        await writeLog(item.id, item.name, 'production_claim', e.qty, next, e.id);
+      }
+      // Remove from pending claims
+      const claimedKey = item.name.toLowerCase();
+      setProdClaims(prev => { const n = { ...prev }; delete n[claimedKey]; return n; });
+      setClaimedIds(prev => { const n = new Set(prev); entries.forEach(e => n.add(e.id)); return n; });
+      // Update detail view qty
+      if (detailItem?.id === item.id) setDetailItem(d => ({ ...d }));
     } catch (err) {
       setStockMap(old => ({ ...old, [item.id]: prev }));
       alert('บันทึกไม่สำเร็จ: ' + (err?.message || 'กรุณาลองใหม่'));
@@ -819,6 +897,19 @@ export default function CakeStockPage({ navigate }) {
         </div>
       )}
 
+      {/* Production claim banner */}
+      {isMyBranch && Object.keys(prodClaims).length > 0 && (
+        <div style={{ margin: '8px 12px 0', background: '#E6F4F0', border: '1.5px solid var(--accent)', borderRadius: 14, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 36, height: 36, background: '#fff', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.2"><path d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 13h12l1-13"/></svg>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>📦 ผลผลิตใหม่ {Object.keys(prodClaims).length} รายการ</div>
+            <div style={{ fontSize: 11, color: '#5a9a8a', marginTop: 1 }}>กดรายละเอียดแต่ละรายการเพื่อรับเข้าสต็อก</div>
+          </div>
+        </div>
+      )}
+
       {/* Item list */}
       <div style={{ padding: '12px 12px 24px' }}>
         {loading ? (
@@ -840,6 +931,8 @@ export default function CakeStockPage({ navigate }) {
             const details = spoiledDetails[item.id] || {};
             const photoInputId = `spoiled-photo-${item.id}`;
             const qtyVal = qtyInput[item.id] !== undefined ? qtyInput[item.id] : String(qty);
+            const pendingEntries = prodClaims[item.name.toLowerCase()] || [];
+            const pendingTotal = pendingEntries.reduce((s, e) => s + e.qty, 0);
             return (
               <div key={item.id} style={{ marginBottom: 8 }}>
               <div
@@ -854,6 +947,7 @@ export default function CakeStockPage({ navigate }) {
                 onTouchEnd={canEdit ? e => onTouchEnd(e, idx) : undefined}
                 style={{
                   background: dragOverIdx === idx && dragActiveIdx !== idx ? 'var(--hover)' : 'var(--surface)',
+                  border: pendingTotal > 0 ? '1.5px solid var(--accent)' : '1.5px solid transparent',
                   borderRadius: 14,
                   padding: '12px 14px',
                   boxShadow: 'var(--shadow-sm)',
@@ -885,6 +979,11 @@ export default function CakeStockPage({ navigate }) {
                       {spoiled > 0 && (
                         <span style={{ fontSize: 10, color: '#DC2626', background: '#FEF2F2', borderRadius: 8, padding: '1px 6px', fontWeight: 700 }}>
                           🗑 เสีย {spoiled}
+                        </span>
+                      )}
+                      {pendingTotal > 0 && (
+                        <span style={{ fontSize: 10, color: 'var(--accent)', background: '#E6F4F0', borderRadius: 8, padding: '1px 6px', fontWeight: 700 }}>
+                          📦 +{pendingTotal} รอรับ
                         </span>
                       )}
                     </div>
@@ -1066,6 +1165,8 @@ export default function CakeStockPage({ navigate }) {
         const di = detailItem;
         const dQty = stockMap[di.id] || 0;
         const dSpoiled = spoiledMap[di.id] || 0;
+        const dPendingEntries = prodClaims[di.name.toLowerCase()] || [];
+        const dPendingTotal = dPendingEntries.reduce((s, e) => s + e.qty, 0);
         const dDetails = spoiledDetails[di.id] || {};
         const dIsSaving = saving === di.id;
         const dIsSavingSpoiled = savingSpoiled === di.id;
@@ -1084,6 +1185,42 @@ export default function CakeStockPage({ navigate }) {
               </div>
 
               <div style={{ overflowY: 'auto', flex: 1, padding: 14, display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 32 }}>
+                {/* Production claim card */}
+                {isMyBranch && dPendingTotal > 0 && (
+                  <div style={{ background: '#fff', border: '1.5px solid var(--accent)', borderRadius: 14, padding: '14px 16px' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 13h12l1-13"/></svg>
+                      ผลผลิตวันนี้รอรับเข้าสต็อก
+                    </div>
+                    {dPendingEntries.map((e, i) => (
+                      <div key={i} style={{ background: '#F0FAF7', borderRadius: 10, padding: '8px 12px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)' }}>
+                            {e.jobNo ? `[${e.jobNo}] ` : ''}{e.batch || 'รอบผลิต'} · {e.empName || ''}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#5a9a8a', marginTop: 1 }}>{e.time}</div>
+                        </div>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--accent)' }}>+{e.qty} {e.unit}</div>
+                      </div>
+                    ))}
+                    <div style={{ background: '#E6F4F0', borderRadius: 10, padding: '8px 12px', marginBottom: 10, fontSize: 13 }}>
+                      ยอดเก่า <strong>{dQty}</strong> + ผลิตมา <strong>{dPendingTotal}</strong> = <span style={{ fontWeight: 800, fontSize: 15, color: 'var(--accent)' }}>{dQty + dPendingTotal} ชิ้น</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => { setProdClaims(p => { const n={...p}; delete n[di.name.toLowerCase()]; return n; }); }}
+                        style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', background: '#F5F0EB', color: 'var(--muted)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                        ข้ามไป
+                      </button>
+                      <button
+                        onClick={() => claimProduction(di, dPendingEntries)}
+                        disabled={saving === di.id}
+                        style={{ flex: 2, padding: '10px', borderRadius: 10, border: 'none', background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                        {saving === di.id ? '…' : '✓ รับเข้าสต็อก'}
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {/* Qty adjust */}
                 <div style={{ background: 'var(--surface)', borderRadius: 14, padding: '14px 16px' }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 10 }}>ปรับจำนวน</div>
