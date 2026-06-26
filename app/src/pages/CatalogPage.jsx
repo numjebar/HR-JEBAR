@@ -2,25 +2,6 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
-// ─── JE BAR Logo (inline SVG using Cinzel font loaded in index.html) ─────────
-function JeBarLogo() {
-  return (
-    <svg viewBox="0 0 600 108" style={{ maxWidth: 280, width: '72%', height: 'auto', display: 'block', margin: '0 auto' }} xmlns="http://www.w3.org/2000/svg">
-      <text x="0" y="92" fontFamily="'Cinzel', 'Palatino Linotype', Georgia, serif" fontSize="96" fontWeight="700" fill="#2d2d2d" letterSpacing="-3">JE</text>
-      <text x="202" y="92" fontFamily="'Cinzel', 'Palatino Linotype', Georgia, serif" fontSize="96" fontWeight="700" fill="#2d2d2d">B</text>
-      <g transform="translate(281,4)">
-        {/* Triangle: apex top-center, straight sides, straight base */}
-        <polygon points="38,0 76,92 0,92" fill="none" stroke="#b0882a" strokeWidth="5.5" strokeLinejoin="miter"/>
-        {/* Curved arc below base */}
-        <path d="M3,92 Q38,110 73,92" fill="none" stroke="#b0882a" strokeWidth="5.5" strokeLinecap="round"/>
-        {/* Teardrop: pointed top, round bottom */}
-        <path d="M38,20 C32,34 26,52 26,65 A12,12 0 0 0 50,65 C50,52 44,34 38,20 Z" fill="#b0882a"/>
-      </g>
-      <text x="364" y="92" fontFamily="'Cinzel', 'Palatino Linotype', Georgia, serif" fontSize="96" fontWeight="700" fill="#2d2d2d">R</text>
-    </svg>
-  );
-}
-
 // ─── Icon fallback ────────────────────────────────────────────────────────────
 const ICON_MAP = [
   [/ชีสเค้ก|cheese\s*cake/i, '🍰'],
@@ -126,7 +107,7 @@ export default function CatalogPage() {
       {/* ── Header ── */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e8e0d4', padding: '18px 20px 14px' }}>
         <div style={{ maxWidth: 560, margin: '0 auto' }}>
-          <JeBarLogo />
+          <img src="/jebar-logo.png" alt="JE BAR" style={{ maxWidth: 280, width: '72%', height: 'auto', display: 'block', margin: '0 auto' }} />
           <div style={{ marginTop: 14, textAlign: 'center' }}>
             <div style={{ fontSize: 22, fontWeight: 800, color: '#2d2d2d', fontFamily: "Georgia, 'Times New Roman', serif" }}>
               ขนมในตู้วันนี้
