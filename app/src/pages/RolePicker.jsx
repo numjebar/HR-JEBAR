@@ -1,5 +1,4 @@
 ﻿import { useNavigate } from 'react-router-dom';
-import diamond from '../assets/lucid-diamond.svg';
 
 export default function RolePicker() {
   const nav = useNavigate();
@@ -7,10 +6,9 @@ export default function RolePicker() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 32, padding: 24 }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-        <img src={diamond} alt="LUCID HR" style={{ height: 72 }} />
+        <img src="/jebar-logo.png" alt="JE BAR" style={{ maxWidth: 240, width: '70vw', height: 'auto' }} />
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--ink)', letterSpacing: '-.5px', lineHeight: 1 }}>LUCID HR</div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', letterSpacing: '2px', marginTop: 4 }}>HUMAN RESOURCE PLATFORM</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', letterSpacing: '2px', marginTop: 4 }}>STAFF & STORE PLATFORM</div>
         </div>
       </div>
       <div style={{ textAlign: 'center' }}>

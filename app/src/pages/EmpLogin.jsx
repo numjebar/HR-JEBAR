@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabase';
-import diamond from '../assets/lucid-diamond.svg';
 
 function Avatar({ emp }) {
   const displayName = emp.nickname || emp.name || 'พนักงาน';
@@ -120,7 +119,7 @@ export default function EmpLogin() {
     return (
       <div style={{ minHeight: '100vh', padding: 24, maxWidth: 480, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 24, marginBottom: 28 }}>
-          <img src={diamond} alt="LUCID HR" style={{ height: 36 }} />
+          <img src="/jebar-logo.png" alt="JE BAR" style={{ height: 28, width: 'auto' }} />
           <span style={{ fontWeight: 700, fontSize: 16 }}>เลือกบัญชีของคุณ</span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

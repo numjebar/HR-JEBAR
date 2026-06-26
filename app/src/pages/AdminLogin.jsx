@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import diamond from '../assets/lucid-diamond.svg';
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('');
@@ -28,12 +27,9 @@ export default function AdminLogin() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div className="card" style={{ width: '100%', maxWidth: 400, padding: 32 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
-          <img src={diamond} alt="LUCID HR" style={{ height: 40 }} />
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 16, letterSpacing: '-.2px' }}>LUCID HR</div>
-            <div style={{ color: 'var(--muted)', fontSize: 13 }}>เข้าสู่ระบบแอดมิน</div>
-          </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginBottom: 28 }}>
+          <img src="/jebar-logo.png" alt="JE BAR" style={{ maxWidth: 180, width: '60%', height: 'auto' }} />
+          <div style={{ color: 'var(--muted)', fontSize: 13 }}>เข้าสู่ระบบแอดมิน</div>
         </div>
         <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>

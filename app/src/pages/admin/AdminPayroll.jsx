@@ -237,7 +237,7 @@ export default function AdminPayroll() {
     } else {
       ctx.fillStyle = '#2f302e';
       ctx.font = '700 38px sans-serif';
-      ctx.fillText('LUCID', 132, 148);
+      ctx.fillText('JE BAR', 132, 148);
     }
 
     ctx.fillStyle = '#ffffff';
@@ -294,7 +294,7 @@ export default function AdminPayroll() {
     ctx.font = '400 18px sans-serif';
     ctx.fillText(`สร้างเมื่อ ${new Date().toLocaleString('th-TH')}`, 100, 1060);
     ctx.textAlign = 'right';
-    ctx.fillText('LUCID HR', 800, 1060);
+    ctx.fillText('JE BAR', 800, 1060);
     ctx.textAlign = 'left';
 
     const a = document.createElement('a');

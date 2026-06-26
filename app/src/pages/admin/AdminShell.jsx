@@ -2,7 +2,6 @@
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
-import diamond from '../../assets/lucid-diamond.svg';
 import { APP_VERSION } from '../../lib/version';
 import AdminDashboard from './AdminDashboard';
 import AdminEmployees from './AdminEmployees';
@@ -101,8 +100,7 @@ export default function AdminShell() {
       <div className="admin-topbar">
         <button className="admin-menu-btn" onClick={() => setSidebarOpen(true)} aria-label="เปิดเมนู">☰</button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <img src={diamond} alt="LUCID HR" style={{ height: 26 }} />
-          <span style={{ fontWeight: 800, fontSize: 15, letterSpacing: '-.3px', color: 'var(--ink)' }}>LUCID HR</span>
+          <img src="/jebar-logo.png" alt="JE BAR" style={{ height: 22, width: 'auto' }} />
         </div>
       </div>
       {sidebarOpen && <button className="admin-sidebar-overlay" onClick={closeSidebar} aria-label="ปิดเมนู" />}
@@ -110,11 +108,7 @@ export default function AdminShell() {
         <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <img src={diamond} alt="LUCID HR" style={{ height: 36 }} />
-              <div>
-                <div style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-.3px', color: 'var(--ink)', lineHeight: 1 }}>LUCID HR</div>
-                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '1.5px', marginTop: 3 }}>HUMAN RESOURCE</div>
-              </div>
+              <img src="/jebar-logo.png" alt="JE BAR" style={{ height: 30, width: 'auto' }} />
             </div>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>แอดมิน</div>
           </div>
