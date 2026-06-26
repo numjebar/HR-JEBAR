@@ -712,6 +712,7 @@ function EmpFormModal({ emp, branches, orgId, onClose }) {
         org_id: orgId,
         weekly_cycle_start_day: form.pay_type === 'weekly' ? Number(form.weekly_cycle_start_day) : null,
         monthly_cycle_start_day: form.pay_type === 'monthly' ? Number(form.monthly_cycle_start_day) : null,
+        branch_id: form.branch_id || null,
       };
     payload.closing_tasks = form.closing_tasks_text
       .split('\n')
