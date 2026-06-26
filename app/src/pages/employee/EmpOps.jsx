@@ -25,13 +25,29 @@ function catalogNoDataMsg(catalog, listEmpty) {
 }
 
 const TASKS = [
-  { key: 'bills',          path: '/emp/ops/bills',          title: 'ถ่ายบิลซื้อของ',       subtitle: 'ถ่ายรูปบิล AI อ่านรายการ แล้วส่งให้ระบบจัดการต่อ', icon: '📷' },
-  { key: 'production',     path: '/emp/ops/production',     title: 'บันทึกการผลิตขนม',     subtitle: 'บันทึกเมนูที่ผลิต จำนวน และรายละเอียดของแต่ละรอบ', icon: '🏭' },
-  { key: 'inventory',      path: '/emp/ops/inventory',      title: 'วัตถุดิบและสต๊อก',      subtitle: 'ตรวจเช็กวัตถุดิบคงเหลือ และแจ้งสิ่งที่ควรติดตามต่อ', icon: '📦' },
-  { key: 'cake-stock',     path: '/emp/ops/cake-stock',     title: 'เช็คสต๊อกเค้ก',         subtitle: 'นับเค้กหน้าตู้แยกตามสาขา พร้อมสถานะพร้อมขาย จอง หรือเสียหาย', icon: '🍰' },
-  { key: 'supplies-count', path: '/emp/ops/supplies-count', title: 'นับสต๊อกของใช้',        subtitle: 'นับของใช้สิ้นเปลือง เช่น ทิชชู่ น้ำยา และอุปกรณ์หน้าร้าน', icon: '🧴' },
-  { key: 'purchase-list',  path: '/emp/ops/purchase-list',  title: 'ใบสั่งซื้อก่อนไปซื้อ', subtitle: 'เตรียมรายการที่ต้องซื้อก่อนออกไปซื้อของจริงหน้าร้าน', icon: '🛒' },
+  { key: 'bills',          path: '/emp/ops/bills',          title: 'ถ่ายบิลซื้อของ',       subtitle: 'ถ่ายรูปบิล AI อ่านรายการ แล้วส่งให้ระบบจัดการต่อ' },
+  { key: 'production',     path: '/emp/ops/production',     title: 'บันทึกการผลิตขนม',     subtitle: 'บันทึกเมนูที่ผลิต จำนวน และรายละเอียดของแต่ละรอบ' },
+  { key: 'inventory',      path: '/emp/ops/inventory',      title: 'วัตถุดิบและสต๊อก',      subtitle: 'ตรวจเช็กวัตถุดิบคงเหลือ และแจ้งสิ่งที่ควรติดตามต่อ' },
+  { key: 'cake-stock',     path: '/emp/ops/cake-stock',     title: 'เช็คสต๊อกเค้ก',         subtitle: 'นับเค้กหน้าตู้แยกตามสาขา พร้อมสถานะพร้อมขาย จอง หรือเสียหาย' },
+  { key: 'supplies-count', path: '/emp/ops/supplies-count', title: 'นับสต๊อกของใช้',        subtitle: 'นับของใช้สิ้นเปลือง เช่น ทิชชู่ น้ำยา และอุปกรณ์หน้าร้าน' },
+  { key: 'purchase-list',  path: '/emp/ops/purchase-list',  title: 'ใบสั่งซื้อก่อนไปซื้อ', subtitle: 'เตรียมรายการที่ต้องซื้อก่อนออกไปซื้อของจริงหน้าร้าน' },
 ];
+
+function TaskIcon({ taskKey, size = 22 }) {
+  const paths = {
+    bills: <><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></>,
+    production: <><rect x="3" y="5" width="18" height="16" rx="2"/><rect x="6" y="9" width="12" height="8" rx="1"/><line x1="3" y1="8" x2="21" y2="8"/><circle cx="8.5" cy="6.5" r="0.8" fill="currentColor" stroke="none"/><circle cx="15.5" cy="6.5" r="0.8" fill="currentColor" stroke="none"/></>,
+    inventory: <><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></>,
+    'cake-stock': <><rect x="2" y="15" width="20" height="6" rx="2"/><rect x="5" y="11" width="14" height="4"/><line x1="5" y1="11" x2="19" y2="11"/><line x1="12" y1="6" x2="12" y2="11"/><path d="M12 6 Q10 3.5 12 2 Q14 3.5 12 6z" fill="currentColor" stroke="none"/></>,
+    'supplies-count': <><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 2v4M15 2v4"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="13" y2="15"/></>,
+    'purchase-list': <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></>,
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      {paths[taskKey] || <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>}
+    </svg>
+  );
+}
 
 const TASK_MAP = Object.fromEntries(TASKS.map((t) => [t.key, t]));
 
@@ -43,7 +59,7 @@ const DEFAULT_DRAFTS = {
     imageName: '', imagePreviewUrl: '', imageBase64: '', imageMimeType: '',
     aiItems: [], date: '', recordedBy: '',
   },
-  production:       { product: '', quantity: '', unit: 'ชิ้น', batch: '', note: '', dispatches: [], date: '', recordedBy: '', photos: [] },
+  production:       { product: '', quantity: '', unit: 'ชิ้น', batch: '', jobNo: '', note: '', dispatches: [], date: '', recordedBy: '', photos: [] },
   inventory:        { itemName: '', stockLeft: '', unit: 'กก.', status: 'ปกติ', note: '', date: '', recordedBy: '', photos: [] },
   'cake-stock':     { branchName: 'สาขากาดน้ำทอง', cakeName: '', available: '', reserved: '', damaged: '', status: 'พร้อมขาย', note: '', date: '', recordedBy: '', photos: [] },
   'supplies-count': { area: 'หน้าร้าน', itemName: '', count: '', unit: 'ชิ้น', status: 'ปกติ', note: '', date: '', recordedBy: '', photos: [] },
@@ -155,7 +171,7 @@ function BillImageSection({ draft, setDraft, geminiKey }) {
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFile} />
       <input ref={albumRef}  type="file" accept="image/*"                        style={{ display: 'none' }} onChange={handleFile} />
       {aiError && <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 4 }}>{aiError}</div>}
-      {!geminiKey && <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4 }}>ตั้งค่า AI Key ในหน้าโปรไฟล์ → ตั้งค่า AI (Gemini) เพื่อใช้ฟีเจอร์นี้</div>}
+      {!geminiKey && <div style={{ fontSize: 12, color: '#9a8070', marginTop: 4 }}>AI ยังไม่พร้อม — แจ้งแอดมินเพื่อเปิดใช้งาน</div>}
       {draft.imagePreviewUrl && (
         <div style={{ marginTop: 8, position: 'relative', display: 'inline-block' }}>
           <img
@@ -608,7 +624,7 @@ function OpsHome({ navigate }) {
     <div style={pageStyle}>
       <section style={heroCardStyle}>
         <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>งานร้านของพนักงาน</div>
-        <div style={{ fontWeight: 800, fontSize: 28, color: '#2f241f' }}>LUCID OPS</div>
+        <div style={{ fontWeight: 800, fontSize: 28, color: 'var(--ink)' }}>LUCID OPS</div>
         <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 8, lineHeight: 1.6 }}>
           ใช้ส่งบิล บันทึกการผลิต เช็กวัตถุดิบ เช็กสต๊อกเค้ก สต๊อกของใช้ และเตรียมรายการซื้อ
         </div>
@@ -621,9 +637,9 @@ function OpsHome({ navigate }) {
           const hasAlert = todayAlerts[task.key];
           return (
             <button key={task.key} onClick={() => navigate(task.path)} style={taskCardButtonStyle}>
-              <div style={taskIconStyle}>{task.icon}</div>
+              <div style={taskIconStyle}><TaskIcon taskKey={task.key} size={26} /></div>
               <div style={{ flex: 1, textAlign: 'left' }}>
-                <div style={{ fontWeight: 800, fontSize: 18, color: '#2f241f', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   {task.title}
                   {todayCount > 0 && (
                     <span style={{ background: '#ecfdf3', color: '#0d7a46', borderRadius: 999, padding: '2px 8px', fontSize: 12, fontWeight: 700 }}>
@@ -665,8 +681,11 @@ function OpsTaskPage({ taskKey, navigate }) {
   const backend = useTaskBackend(taskKey);
   const { orgId, employeeSessionToken: taskPageToken } = useAuthStore();
 
-  // Gemini key: env var first, then localStorage fallback
-  const geminiKey = import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('hr_gemini_key') || '';
+  // Gemini key priority: build env → org_settings (sessionStorage) → localStorage (legacy)
+  const geminiKey = import.meta.env.VITE_GEMINI_API_KEY
+    || sessionStorage.getItem('hr_org_gemini_key')
+    || localStorage.getItem('hr_gemini_key')
+    || '';
 
   async function reloadCatalog() {
     clearCatalogCache();
@@ -729,8 +748,10 @@ function OpsTaskPage({ taskKey, navigate }) {
         <button onClick={() => navigate('/emp/ops')} style={{ ...inlineGhostButtonStyle, marginBottom: 14 }}>
           ← กลับหน้าพนักงาน
         </button>
-        <div style={{ fontSize: 40, marginBottom: 6 }}>{task.icon}</div>
-        <div style={{ fontWeight: 800, fontSize: 34, color: '#2f241f', lineHeight: 1.15 }}>{task.title}</div>
+        <div style={{ width: 56, height: 56, borderRadius: 16, background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', marginBottom: 10 }}>
+          <TaskIcon taskKey={taskKey} size={30} />
+        </div>
+        <div style={{ fontWeight: 800, fontSize: 34, color: 'var(--ink)', lineHeight: 1.15 }}>{task.title}</div>
         <div style={{ fontSize: 15, color: 'var(--muted)', marginTop: 10, lineHeight: 1.6 }}>{task.subtitle}</div>
       </section>
 
@@ -962,8 +983,8 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
                   <img src={row.imageUrl} alt={row.cakeName}
                     style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block' }} />
                 ) : (
-                  <div style={{ width: '100%', aspectRatio: '4/3', background: '#f5f0e8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>
-                    🍰
+                  <div style={{ width: '100%', aspectRatio: '4/3', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--line)' }}>
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="15" width="20" height="6" rx="2"/><rect x="5" y="11" width="14" height="4"/><line x1="5" y1="11" x2="19" y2="11"/><line x1="12" y1="6" x2="12" y2="11"/><path d="M12 6 Q10 3.5 12 2 Q14 3.5 12 6z" fill="currentColor" stroke="none"/></svg>
                   </div>
                 )}
                 {/* Select toggle */}
@@ -1191,7 +1212,7 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
         let total = 0;
         matching.forEach(e => { total += parseFloat(e.payload?.quantity || 0) || 0; });
         setTodayProductionTotal({ total, unit: matching[0]?.payload?.unit || '', count: matching.length });
-        setTodayProductionBatches(matching.map(e => ({ batch: e.payload?.batch || '', quantity: e.payload?.quantity || '0', unit: e.payload?.unit || '', note: e.payload?.note || '', time: (e.created_at || '').slice(11, 16) })));
+        setTodayProductionBatches(matching.map(e => ({ batch: e.payload?.batch || '', quantity: e.payload?.quantity || '0', unit: e.payload?.unit || '', note: e.payload?.note || '', jobNo: e.payload?.jobNo || '', time: (e.created_at || '').slice(11, 16) })));
       });
     return () => { cancelled = true; };
   }, [draft.product, taskKey, orgId, prodRefreshTick]);
@@ -1264,6 +1285,14 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
           photoUploadFailed = true;
         }
         setUploadMsg('');
+      }
+
+      // Upsert by jobNo: ถ้าเลขใบงานซ้ำ → ลบรายการเดิมก่อน แล้วค่อย insert ใหม่
+      if (taskKey === 'production' && draft.jobNo) {
+        const existing = backend.items.find(item => item.payload?.jobNo === draft.jobNo);
+        if (existing) {
+          try { await backend.remove(existing.id); } catch (_) {}
+        }
       }
 
       const { error } = await supabase.rpc('employee_submit_ops_entry_v2', {
@@ -1476,13 +1505,21 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                   {todayProductionBatches.map((b, i) => (
                     <span key={i} style={{ background: '#fff', border: '1px solid #bbe7cf', borderRadius: 8, padding: '2px 8px', fontSize: 11, color: '#1a5e3a' }}>
-                      {b.batch ? `${b.batch} · ` : ''}{b.quantity} {b.unit}{b.note ? ` (${b.note})` : ''} @{b.time}
+                      {b.jobNo ? <strong>[{b.jobNo}]</strong> : ''}{b.jobNo ? ' ' : ''}{b.batch ? `${b.batch} · ` : ''}{b.quantity} {b.unit}{b.note ? ` (${b.note})` : ''} @{b.time}
                     </span>
                   ))}
                 </div>
               )}
             </div>
           )}
+          <Field label="เลขใบงาน">
+            <input value={draft.jobNo}
+              onChange={e => setDraft({ ...draft, jobNo: e.target.value })}
+              placeholder="เช่น JB-001 (ไม่บังคับ)" />
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
+              ใส่เลขเดิมเพื่อ<strong>ทับรายการนั้น</strong> · ไม่ใส่ก็ได้
+            </div>
+          </Field>
           <TwoColRow>
             <Field label="จำนวน">
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -2045,7 +2082,7 @@ function hasAnyInput(taskKey, draft) {
 function summarizeDraft(taskKey, draft) {
   switch (taskKey) {
     case 'bills':         return `${draft.vendor||'-'} / ${draft.amount||'-'} บาท / ${draft.category||'วัตถุดิบ'}${draft.aiItems?.length ? ` / AI ${draft.aiItems.length} รายการ` : ''}`;
-    case 'production':    return `${draft.product||'-'} / ${draft.quantity||'0'} ${draft.unit||''} / ${draft.batch||'-'}`;
+    case 'production':    return `${draft.jobNo ? `[${draft.jobNo}] ` : ''}${draft.product||'-'} / ${draft.quantity||'0'} ${draft.unit||''} / ${draft.batch||'-'}`;
     case 'inventory':     return `${draft.itemName||'-'} / ${draft.stockLeft||'0'} ${draft.unit||''} / ${draft.status||'-'}`;
     case 'cake-stock':    return `${draft.branchName||'-'} / ${draft.cakeName||'-'} / พร้อมขาย ${draft.available||'0'} จอง ${draft.reserved||'0'} เสีย ${draft.damaged||'0'}`;
     case 'supplies-count':return `${draft.area||'-'} / ${draft.itemName||'-'} / ${draft.count||'0'} ${draft.unit||''} / ${draft.status||'ปกติ'}`;
@@ -2057,7 +2094,7 @@ function summarizeDraft(taskKey, draft) {
 function renderHistoryLine(taskKey, payload) {
   switch (taskKey) {
     case 'bills':         return `${payload.vendor||'-'} / ${payload.amount||'-'} บาท / ${payload.category||'วัตถุดิบ'}`;
-    case 'production':    return `${payload.product||'-'} / ${payload.quantity||'0'} ${payload.unit||''} / ${payload.batch||'-'}`;
+    case 'production':    return `${payload.jobNo ? `[${payload.jobNo}] ` : ''}${payload.product||'-'} / ${payload.quantity||'0'} ${payload.unit||''} / ${payload.batch||'-'}`;
     case 'inventory':     return `${payload.itemName||'-'} / ${payload.stockLeft||'0'} ${payload.unit||''} / ${payload.status||'-'}`;
     case 'cake-stock':    return `${payload.branchName||'-'} / ${payload.cakeName||'-'} / พร้อมขาย ${payload.available||'0'} จอง ${payload.reserved||'0'} เสีย ${payload.damaged||'0'} / ${payload.status||'-'}`;
     case 'supplies-count':return `${payload.area||'-'} / ${payload.itemName||'-'} / ${payload.count||'0'} ${payload.unit||''} / ${payload.status||'ปกติ'}`;
@@ -2138,8 +2175,8 @@ function formatDateTime(value) {
 const pageStyle         = { padding: '16px 16px 24px', display: 'flex', flexDirection: 'column', gap: 14 };
 const heroCardStyle     = { padding: 18, borderRadius: 26, background: 'linear-gradient(180deg,rgba(255,249,241,.96) 0%,rgba(255,255,255,.96) 100%)', border: '1px solid rgba(197,162,117,.24)' };
 const cardStyle         = { padding: 18, borderRadius: 24, display: 'grid', gap: 12, background: 'var(--surface)', border: '1px solid var(--line)' };
-const taskCardButtonStyle = { display: 'grid', gridTemplateColumns: '64px 1fr 22px', alignItems: 'center', gap: 14, padding: 18, borderRadius: 24, color: 'inherit', background: '#fff', border: '1px solid #eadcc6', cursor: 'pointer' };
-const taskIconStyle     = { width: 54, height: 54, borderRadius: 18, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 };
+const taskCardButtonStyle = { display: 'grid', gridTemplateColumns: '64px 1fr 22px', alignItems: 'center', gap: 14, padding: 18, borderRadius: 24, color: 'inherit', background: 'var(--surface)', border: '1px solid var(--line)', cursor: 'pointer' };
+const taskIconStyle     = { width: 54, height: 54, borderRadius: 18, background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)' };
 const fieldGridStyle    = { display: 'grid', gap: 12 };
 const actionRowStyle    = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 };
 const summaryPillStyle  = { background: '#f6efe3', border: '1px solid #eadcc6', borderRadius: 16, padding: '12px 14px', fontSize: 13, color: '#7a5b2b' };

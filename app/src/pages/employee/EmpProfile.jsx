@@ -113,9 +113,6 @@ export default function EmpProfile() {
         ))}
       </div>
 
-      {/* AI settings */}
-      <AISettingsCard />
-
       <button className="btn btn-ghost" style={{ width: '100%', marginTop: 8, color: 'var(--danger-fg)' }} onClick={empLogout}>
         ออกจากระบบ
       </button>
@@ -125,57 +122,6 @@ export default function EmpProfile() {
   );
 }
 
-function AISettingsCard() {
-  const stored = () => localStorage.getItem('hr_gemini_key') || '';
-  const [key, setKey] = useState(stored);
-  const [saved, setSaved] = useState(!!stored());
-
-  function save() {
-    const k = key.trim();
-    if (k) { localStorage.setItem('hr_gemini_key', k); setSaved(true); }
-    else { localStorage.removeItem('hr_gemini_key'); setSaved(false); }
-  }
-  function clear() { localStorage.removeItem('hr_gemini_key'); setKey(''); setSaved(false); }
-
-  return (
-    <div className="card" style={{ padding: '16px 20px', marginBottom: 14 }}>
-      <div style={{ fontWeight: 600, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-        ตั้งค่า AI (Gemini)
-        {saved && <span style={{ fontSize: 11, background: 'var(--accent-soft)', color: 'var(--accent)', borderRadius: 99, padding: '2px 8px' }}>พร้อมใช้</span>}
-      </div>
-      <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
-        ใส่ Gemini API Key เพื่อเปิดใช้ AI อ่านบิลในหน้า OPS · เก็บเฉพาะในเครื่องนี้
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <input
-          type="password"
-          value={key}
-          onChange={e => { setKey(e.target.value); setSaved(false); }}
-          placeholder="AIza..."
-          style={{ fontFamily: 'monospace', fontSize: 13 }}
-        />
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-primary" onClick={save} style={{ flex: 1, fontSize: 13 }}>
-            บันทึก Key
-          </button>
-          {saved && (
-            <button className="btn" onClick={clear} style={{ fontSize: 13, color: 'var(--danger-fg)', borderColor: 'var(--danger-fg)' }}>
-              ลบออก
-            </button>
-          )}
-        </div>
-        {!saved && (
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-            ขอ Key ได้ที่{' '}
-            <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', fontWeight: 600 }}>
-              Google AI Studio
-            </a>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function EditSheet({ employee, employeeSessionToken, onSaved, onClose }) {
   const [form, setForm] = useState({

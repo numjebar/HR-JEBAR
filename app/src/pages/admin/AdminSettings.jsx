@@ -17,6 +17,8 @@ export default function AdminSettings() {
   const [opsUrl, setOpsUrl] = useState('');
   const [opsKey, setOpsKey] = useState('');
   const [opsSaved, setOpsSaved] = useState(false);
+  const [geminiKey, setGeminiKey] = useState('');
+  const [geminiSaved, setGeminiSaved] = useState(false);
   const [connStatus, setConnStatus] = useState(null); // null | 'testing' | {ok, menus, ingredients, materials} | {ok:false, error}
   const autoTestedRef = useRef(false);
 
@@ -32,6 +34,7 @@ export default function AdminSettings() {
       const cfg = st.rules?.ops_config || {};
       setOpsUrl(cfg.url || '');
       setOpsKey(cfg.key || '');
+      setGeminiKey(st.rules?.gemini_key || '');
     }
     if (brs && brs.length > 0 && !activeBranch) {
       selectBranch(brs[0]);
@@ -137,6 +140,21 @@ export default function AdminSettings() {
     setOpsSaved(true);
     setTimeout(() => setOpsSaved(false), 3000);
     testOpsConnection();
+  }
+
+  async function saveGeminiKey() {
+    setBusy(true);
+    setGeminiSaved(false);
+    const { data: st } = await supabase.from('org_settings').select('org_id,rules').eq('org_id', orgId).maybeSingle();
+    const merged = { ...(st?.rules || {}), gemini_key: geminiKey.trim() };
+    if (st) {
+      await supabase.from('org_settings').update({ rules: merged }).eq('org_id', orgId);
+    } else {
+      await supabase.from('org_settings').insert({ org_id: orgId, rules: merged, shop_rules: [] });
+    }
+    setBusy(false);
+    setGeminiSaved(true);
+    setTimeout(() => setGeminiSaved(false), 3000);
   }
 
   async function deleteBranch(id) {
@@ -351,6 +369,42 @@ export default function AdminSettings() {
               </div>
             )
           )}
+        </div>
+      </div>
+
+      {/* Gemini AI key */}
+      <div className="card" style={{ padding: '20px 24px', marginTop: 24 }}>
+        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>🤖 AI อ่านบิล (Google Gemini)</div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12 }}>
+          ใส่ Gemini API Key ครั้งเดียว — พนักงานทุกคนใช้ AI อ่านบิลได้เลยโดยไม่ต้องตั้งค่าเอง
+        </div>
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
+              Gemini API Key
+              <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" style={{ marginLeft: 10, color: 'var(--accent)', fontWeight: 400, fontSize: 12 }}>
+                ขอ Key ที่ Google AI Studio →
+              </a>
+            </label>
+            <input
+              type="password"
+              value={geminiKey}
+              onChange={e => setGeminiKey(e.target.value)}
+              placeholder="AIzaSy..."
+              style={{ width: '100%', fontSize: 14, fontFamily: 'monospace' }}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button className="btn btn-primary" onClick={saveGeminiKey} disabled={busy} style={{ fontSize: 14 }}>
+              บันทึก
+            </button>
+            {geminiKey && (
+              <button className="btn" onClick={() => { setGeminiKey(''); }} style={{ fontSize: 14 }}>
+                ล้าง
+              </button>
+            )}
+            {geminiSaved && <span style={{ fontSize: 13, color: '#0d7a46', fontWeight: 700 }}>✓ บันทึกแล้ว — พนักงานจะใช้ AI ได้ในครั้งต่อไปที่ล็อกอิน</span>}
+          </div>
         </div>
       </div>
 

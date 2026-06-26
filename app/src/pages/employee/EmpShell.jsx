@@ -48,6 +48,10 @@ export default function EmpShell() {
           try { sessionStorage.setItem(OPS_CONFIG_KEY, JSON.stringify({ url: cfg.url, key: cfg.key })); } catch { /* ignore */ }
           if (changed) clearCatalogCache(); // bust cache so new config is used
         }
+        const orgGeminiKey = data?.settings?.rules?.gemini_key;
+        if (orgGeminiKey) {
+          try { sessionStorage.setItem('hr_org_gemini_key', orgGeminiKey); } catch { /* ignore */ }
+        }
       }).catch(() => { /* ignore */ });
   }, [employeeSessionToken]);
 
