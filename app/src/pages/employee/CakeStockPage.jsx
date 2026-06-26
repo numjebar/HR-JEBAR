@@ -206,6 +206,8 @@ export default function CakeStockPage({ navigate }) {
 
   // Detail drawer
   const [detailItem, setDetailItem] = useState(null);
+  const [priceInput, setPriceInput] = useState('');
+  const [priceSaving, setPriceSaving] = useState(false);
   // Inline qty input buffer { item_id: string }
   const [qtyInput, setQtyInput] = useState({});
 
@@ -515,6 +517,17 @@ export default function CakeStockPage({ navigate }) {
     setItems(prev => prev.map(i => i.id === item.id ? { ...i, is_open: newOpen } : i));
     await supabase.from('cake_items').update({ is_open: newOpen, updated_at: new Date().toISOString() }).eq('id', item.id);
     await writeLog(item.id, item.name, newOpen ? 'open' : 'close', null, null, null);
+  }
+
+  // Save price to cake_items
+  async function savePrice(item) {
+    const p = parseFloat(priceInput);
+    if (isNaN(p) || p < 0) return;
+    setPriceSaving(true);
+    await supabase.from('cake_items').update({ price: p }).eq('id', item.id);
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, price: p } : i));
+    setDetailItem(prev => ({ ...prev, price: p }));
+    setPriceSaving(false);
   }
 
   // Upload product photo to Supabase Storage, save URL to cake_items
@@ -1439,9 +1452,22 @@ export default function CakeStockPage({ navigate }) {
                         onChange={e => { if (e.target.files[0]) uploadItemPhoto(di, e.target.files[0]); e.target.value = ''; }} />
                     </label>
                   )}
-                  {di.price && (
-                    <div style={{ marginTop: 8, fontSize: 13, color: 'var(--muted)' }}>ราคา <strong style={{ color: 'var(--ink)' }}>฿{di.price}</strong></div>
-                  )}
+                  {/* Price input */}
+                  <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 13, color: 'var(--muted)', whiteSpace: 'nowrap' }}>ราคา ฿</span>
+                    <input
+                      type="number" inputMode="decimal" placeholder={di.price ?? 'ยังไม่ได้ตั้ง'}
+                      defaultValue={di.price ?? ''}
+                      key={di.id}
+                      onChange={e => setPriceInput(e.target.value)}
+                      style={{ flex: 1, fontSize: 14, fontWeight: 700, padding: '6px 10px', borderRadius: 8, border: '1.5px solid var(--line)', background: 'var(--bg)', color: 'var(--ink)', maxWidth: 100 }}
+                    />
+                    <button
+                      onClick={() => savePrice(di)}
+                      disabled={priceSaving}
+                      style={{ fontSize: 12, fontWeight: 700, padding: '6px 14px', borderRadius: 8, border: 'none', background: '#b0882a', color: '#fff', cursor: 'pointer' }}
+                    >{priceSaving ? '...' : 'บันทึก'}</button>
+                  </div>
                 </div>
 
                 {/* Status + Delete */}
