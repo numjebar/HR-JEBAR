@@ -145,7 +145,7 @@ export default function AdminAttendance() {
       const { data: emp } = await supabase.from('employees').select('*').eq('id', leave.emp_id).single();
       if (emp) {
         const br = branches.find((b) => b.id === emp.branch_id);
-        if (Boolean(leave.urgent)) {
+        if (leave.urgent) {
           const rules = rulesFor(settings?.rules, br, emp);
           const deductDays = Number(rules?.urgentLeaveDeductDays || 0);
           if (deductDays > 0) {

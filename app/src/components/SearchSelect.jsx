@@ -7,12 +7,9 @@ export default function SearchSelect({
   placeholder = 'พิมพ์หรือค้นหา...',
   maxVisible = 5,
 }) {
-  const [q, setQ] = useState(value);
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
   const inputRef = useRef(null);
-
-  useEffect(() => { setQ(value); }, [value]);
 
   useEffect(() => {
     const handle = (e) => {
@@ -22,6 +19,7 @@ export default function SearchSelect({
     return () => document.removeEventListener('mousedown', handle);
   }, []);
 
+  const q = value || '';
   const lower = q.trim().toLowerCase();
   const filtered = lower
     ? options.filter(o => (o.name || '').toLowerCase().includes(lower))
@@ -32,7 +30,6 @@ export default function SearchSelect({
   const listH = Math.min(visible.length, maxVisible) * ITEM_H;
 
   function pick(name) {
-    setQ(name);
     onChange(name);
     setOpen(false);
   }
@@ -53,7 +50,7 @@ export default function SearchSelect({
         <input
           ref={inputRef}
           value={q}
-          onChange={e => { setQ(e.target.value); onChange(e.target.value); if (!open) setOpen(true); }}
+          onChange={e => { onChange(e.target.value); if (!open) setOpen(true); }}
           onFocus={() => setOpen(true)}
           placeholder={placeholder}
           autoComplete="off"

@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:bangkok-time": "node scripts/check-bangkok-time.mjs",
+    "check:ops-inbox": "node scripts/check-ops-inbox-helpers.mjs",
+    "check:emp-ops-production": "node scripts/check-emp-ops-production-fields.mjs",
+    "check:ops-guards": "node scripts/check-ops-guards.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

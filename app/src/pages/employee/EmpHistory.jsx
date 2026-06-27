@@ -182,7 +182,6 @@ export default function EmpHistory() {
       {showLeaveForm && (
         <LeaveForm
           employee={employee}
-          orgId={orgId}
           branch={branch}
           settings={settings}
           employeeSessionToken={employeeSessionToken}
@@ -205,7 +204,7 @@ function opsPayloadSummary(taskKey, p) {
   }
 }
 
-function LeaveForm({ employee, orgId, branch, settings, employeeSessionToken, onClose }) {
+function LeaveForm({ employee, branch, settings, employeeSessionToken, onClose }) {
   const rules = rulesFor(settings?.rules, branch, employee);
   const [type, setType] = useState('ลาป่วย');
   const [dateFrom, setDateFrom] = useState(ymd(new Date()));
@@ -239,7 +238,7 @@ function LeaveForm({ employee, orgId, branch, settings, employeeSessionToken, on
           headers: { 'Authorization': `Bearer ${branch.line_notify_token}`, 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({ message: `\n📋 ใบลาใหม่ (รอการอนุมัติ)\nพนักงาน: ${name}\nประเภท: ${type}\nวันที่: ${dateStr}${reason ? `\nเหตุผล: ${reason}` : ''}` }),
         });
-      } catch (e) { /* silent */ }
+      } catch { /* silent */ }
     }
     setBusy(false);
     onClose();

@@ -153,7 +153,6 @@ export default function AdminSettings() {
     <div>
       <h1 style={{ fontWeight: 700, fontSize: 24, marginBottom: 24 }}>ตั้งค่ากฎ</h1>
 
-      {/* global anti-cheat */}
       <div className="card" style={{ padding: '20px 24px', marginBottom: 24 }}>
         <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 16 }}>🌐 การตั้งค่า Global (ทุกสาขา)</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>

@@ -3,7 +3,6 @@ import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
 import { THB, rulesFor } from '../../lib/payroll';
 
-const LOCKED_FIELDS = ['pay_type', 'rate', 'commission', 'branch_id', 'closing_tasks', 'rule_overrides', 'day_off'];
 const PAY_TYPE_LABEL = {
   daily: 'รายวัน',
   weekly: 'รายสัปดาห์',

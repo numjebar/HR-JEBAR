@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { fetchOperateCatalog } from '../../lib/operateCatalog';
+import { formatBangkokDateISO } from '../../lib/bangkokTime';
+import { inventoryAlertKey, isOpsEntryOnBangkokDay, opsEntryBangkokDay } from '../../lib/opsInboxHelpers';
 
 const REVIEWED_KEY = 'hr_ops_reviewed_ids';
 
@@ -150,16 +152,17 @@ export default function AdminOpsInbox() {
   }, [orgId]);
 
   const filteredItems = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    const today = formatBangkokDateISO();
+    const weekAgo = formatBangkokDateISO(new Date(Date.now() - 7 * 86400000));
     const q = searchText.trim().toLowerCase();
     return items.filter((item) => {
+      const itemDay = opsEntryBangkokDay(item);
       if (hideReviewed && reviewed.has(item.id)) return false;
       if (taskFilter !== 'all' && item.task_key !== taskFilter) return false;
-      if (dateFilter === 'today' && (item.created_at || '').slice(0, 10) !== today) return false;
-      if (dateFilter === 'week' && (item.created_at || '').slice(0, 10) < weekAgo) return false;
+      if (dateFilter === 'today' && itemDay !== today) return false;
+      if (dateFilter === 'week' && itemDay < weekAgo) return false;
       if (dateFilter === 'custom') {
-        const d = (item.created_at || '').slice(0, 10);
+        const d = itemDay;
         if (dateFrom && d < dateFrom) return false;
         if (dateTo && d > dateTo) return false;
       }
@@ -192,9 +195,9 @@ export default function AdminOpsInbox() {
   }, [items]);
 
   const productionSummary = useMemo(() => {
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = formatBangkokDateISO();
     const prodItems = filteredItems.filter(item =>
-      item.task_key === 'production' && (item.created_at || '').slice(0, 10) === todayStr
+      item.task_key === 'production' && isOpsEntryOnBangkokDay(item, todayStr)
     );
     if (prodItems.length === 0) return null;
     const byProduct = new Map();
@@ -212,9 +215,9 @@ export default function AdminOpsInbox() {
   }, [filteredItems]);
 
   const billsSummary = useMemo(() => {
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = formatBangkokDateISO();
     const billItems = filteredItems.filter(item =>
-      item.task_key === 'bills' && (item.created_at || '').slice(0, 10) === todayStr
+      item.task_key === 'bills' && isOpsEntryOnBangkokDay(item, todayStr)
     );
     if (billItems.length < 2) return null;
     const total = billItems.reduce((sum, item) => sum + (parseFloat(item.payload?.amount) || 0), 0);
@@ -222,9 +225,9 @@ export default function AdminOpsInbox() {
   }, [filteredItems]);
 
   const cakeStockSummary = useMemo(() => {
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = formatBangkokDateISO();
     const cakeItems = filteredItems.filter(item =>
-      item.task_key === 'cake-stock' && (item.created_at || '').slice(0, 10) === todayStr
+      item.task_key === 'cake-stock' && isOpsEntryOnBangkokDay(item, todayStr)
     );
     if (cakeItems.length === 0) return null;
     const byBranch = new Map();
@@ -245,9 +248,9 @@ export default function AdminOpsInbox() {
   }, [filteredItems]);
 
   const inventoryAlertSummary = useMemo(() => {
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = formatBangkokDateISO();
     const alertItems = filteredItems.filter(item => {
-      if ((item.created_at || '').slice(0, 10) !== todayStr) return false;
+      if (!isOpsEntryOnBangkokDay(item, todayStr)) return false;
       const s = item.payload?.status;
       if (!s) return false;
       if (item.task_key === 'inventory' || item.task_key === 'supplies-count') return s !== 'ปกติ';
@@ -257,15 +260,16 @@ export default function AdminOpsInbox() {
     if (alertItems.length === 0) return null;
     const seen = new Set();
     return alertItems.filter(item => {
-      const name = item.task_key === 'cake-stock' ? item.payload?.cakeName : item.payload?.itemName;
-      if (!name || seen.has(name)) return false;
-      seen.add(name);
+      const key = inventoryAlertKey(item);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
       return true;
     }).map(item => {
       const p = item.payload || {};
       const emp = employees.find(e => e.id === item.emp_id);
       const isCake = item.task_key === 'cake-stock';
       return {
+        key: inventoryAlertKey(item),
         itemName: (isCake ? p.cakeName : p.itemName) || '?',
         stockLeft: isCake ? p.available : p.stockLeft,
         unit: isCake ? 'ชิ้น' : (p.unit || ''),
@@ -278,11 +282,11 @@ export default function AdminOpsInbox() {
   }, [filteredItems, employees]);
 
   const groupedItems = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const today = formatBangkokDateISO();
+    const yesterday = formatBangkokDateISO(new Date(Date.now() - 86400000));
     const groups = new Map();
     filteredItems.forEach(item => {
-      const day = (item.created_at || '').slice(0, 10);
+      const day = opsEntryBangkokDay(item);
       let label;
       if (day === today) label = 'วันนี้';
       else if (day === yesterday) label = 'เมื่อวาน';
@@ -314,7 +318,7 @@ export default function AdminOpsInbox() {
   const [lineCopied, setLineCopied] = useState(false);
 
   function copySummaryForLine() {
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = formatBangkokDateISO();
     const todayLabel = new Date(todayStr + 'T00:00:00').toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
     const lines = [`📊 สรุปงานร้านประจำวัน ${todayLabel}`, ''];
 
@@ -351,7 +355,7 @@ export default function AdminOpsInbox() {
       lines.push('');
     }
 
-    const todayCount = filteredItems.filter(i => (i.created_at || '').slice(0, 10) === todayStr).length;
+    const todayCount = filteredItems.filter(i => isOpsEntryOnBangkokDay(i, todayStr)).length;
     lines.push(`รวมทั้งหมด ${todayCount} รายการ`);
 
     navigator.clipboard.writeText(lines.join('\n')).then(() => {
@@ -527,12 +531,12 @@ export default function AdminOpsInbox() {
         <div className="card" style={{ padding: '16px 18px', marginBottom: 16, border: '1px solid #fca5a5', background: '#fff1f1' }}>
           <div style={{ fontWeight: 700, marginBottom: 12, color: '#b42318', fontSize: 14 }}>⚠️ สต๊อกต้องติดตามวันนี้ ({inventoryAlertSummary.length} รายการ)</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8 }}>
-            {inventoryAlertSummary.map(({ itemName, stockLeft, unit, status, empName, isCake, branchName }) => {
+            {inventoryAlertSummary.map(({ key, itemName, stockLeft, unit, status, empName, isCake, branchName }) => {
               const isUrgent = status === 'ต้องสั่งเพิ่ม' || status === 'มีปัญหา' || status === 'หมดแล้ว' || status === 'หมด' || status === 'ต้องเติมจากครัว';
               const imgUrl = isCake ? (menuImgMap[itemName] || null) : null;
               if (isCake) {
                 return (
-                  <div key={itemName} style={{ background: '#fff', border: `1.5px solid ${isUrgent ? '#fca5a5' : '#fed7aa'}`, borderRadius: 14, overflow: 'hidden' }}>
+                  <div key={key} style={{ background: '#fff', border: `1.5px solid ${isUrgent ? '#fca5a5' : '#fed7aa'}`, borderRadius: 14, overflow: 'hidden' }}>
                     <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1', background: '#fef2f2' }}>
                       {imgUrl
                         ? <img src={imgUrl} alt={itemName} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
@@ -561,7 +565,7 @@ export default function AdminOpsInbox() {
                 );
               }
               return (
-                <div key={itemName} style={{ background: '#fff', border: `1px solid ${isUrgent ? '#fca5a5' : '#fed7aa'}`, borderRadius: 12, padding: '10px 12px' }}>
+                <div key={key} style={{ background: '#fff', border: `1px solid ${isUrgent ? '#fca5a5' : '#fed7aa'}`, borderRadius: 12, padding: '10px 12px' }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#2f241f', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {itemName}
                   </div>

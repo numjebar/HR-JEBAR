@@ -29,7 +29,7 @@ export default function EmpShell() {
     try {
       const { data } = await supabase.rpc('employee_get_messages_v2', { p_session_token: employeeSessionToken });
       setUnreadCount((data || []).filter((m) => m.from === 'admin' && !m.read_at).length);
-    } catch {}
+    } catch { /* ignore unread badge errors */ }
   }
 
   useEffect(() => { fetchUnread(); }, [employeeSessionToken]);
@@ -144,4 +144,3 @@ function ChatIcon({ size = 24 }) {
 function UserIcon({ size = 24 }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>;
 }
-

@@ -1,8 +1,9 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { APP_VERSION } from '../../lib/version';
+import { bangkokDayUtcRange, formatBangkokDateISO, formatBangkokTime, minutesSinceMidnightBangkok } from '../../lib/bangkokTime';
 import SearchSelect from '../../components/SearchSelect';
 import VoiceBtn from '../../components/VoiceBtn';
 import PhotoSection from '../../components/PhotoSection';
@@ -34,7 +35,7 @@ const TASKS = [
 
 const TASK_MAP = Object.fromEntries(TASKS.map((t) => [t.key, t]));
 
-function todayISO() { return new Date().toISOString().slice(0, 10); }
+function todayISO() { return formatBangkokDateISO(); }
 
 const DEFAULT_DRAFTS = {
   bills: {
@@ -42,7 +43,7 @@ const DEFAULT_DRAFTS = {
     imageName: '', imagePreviewUrl: '', imageBase64: '', imageMimeType: '',
     aiItems: [], date: '', recordedBy: '',
   },
-  production:       { product: '', quantity: '', unit: 'ชิ้น', batch: '', note: '', date: '', recordedBy: '', photos: [] },
+  production:       { product: '', quantity: '', unit: 'ชิ้น', batch: '', dispatches: [], wasteQty: '', note: '', date: '', recordedBy: '', photos: [] },
   inventory:        { itemName: '', stockLeft: '', unit: 'กก.', status: 'ปกติ', note: '', date: '', recordedBy: '', photos: [] },
   'cake-stock':     { branchName: 'สาขากาดน้ำทอง', cakeName: '', available: '', reserved: '', damaged: '', status: 'พร้อมขาย', note: '', date: '', recordedBy: '', photos: [] },
   'supplies-count': { area: 'หน้าร้าน', itemName: '', count: '', unit: 'ชิ้น', status: 'ปกติ', note: '', date: '', recordedBy: '', photos: [] },
@@ -113,7 +114,7 @@ function BillImageSection({ draft, setDraft, geminiKey }) {
           if (!isNaN(d.getTime()) && Math.abs(d.getFullYear() - new Date().getFullYear()) <= 1) {
             billDate = d.toISOString().slice(0, 10);
           }
-        } catch {}
+        } catch { /* ignore invalid bill date parse */ }
       }
       setDraft({
         ...draft,
@@ -562,7 +563,7 @@ function hasDraftData(taskKey) {
     switch (taskKey) {
       case 'bills':          return !!(s.vendor || s.amount || s.imageName);
       case 'purchase-list':  return (s.items?.length || 0) > 0;
-      case 'production':     return !!(s.product || s.quantity || s.batch || s.note);
+      case 'production':     return !!(s.product || s.quantity || s.batch || s.note || s.wasteQty || (s.dispatches || []).length > 0);
       case 'inventory':      return !!(s.itemName || s.stockLeft || s.note);
       case 'cake-stock':     return !!(s.cakeName || s.available || s.reserved || s.damaged || s.note);
       case 'supplies-count': return !!(s.itemName || s.count || s.note);
@@ -578,7 +579,7 @@ function OpsHome({ navigate }) {
 
   useEffect(() => {
     if (!employeeSessionToken) return;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = formatBangkokDateISO();
     Promise.all(
       TASKS.map(task =>
         supabase.rpc('employee_get_ops_entries_v2', {
@@ -783,14 +784,8 @@ function OpsTaskPage({ taskKey, navigate }) {
   );
 }
 
-function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCatalog, draft, setDraft, branches, employeeSessionToken, backend, saveLocalDraft, todayCakeLog, setCakeRefreshTick }) {
-  const buildRows = (menus) => (menus || []).map(m => ({
-    cakeName: m.name, imageUrl: m.imageUrl || null,
-    category: m.category || '', priceStore: m.priceStore || 0,
-    included: false, available: 0, reserved: 0, damaged: 0,
-  }));
-
-  const [rows, setRows] = useState(() => buildRows(catalog?.menus));
+function CakeStockBatchForm({ catalog, draft, setDraft, branches, employeeSessionToken, backend, saveLocalDraft, todayCakeLog, setCakeRefreshTick }) {
+  const [rowValues, setRowValues] = useState({});
   const [catTab, setCatTab] = useState('all');
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
@@ -798,9 +793,19 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
   const [warnDups, setWarnDups] = useState([]);
   const [dupMode, setDupMode] = useState(false);
 
-  useEffect(() => {
-    setRows(buildRows(catalog?.menus));
-  }, [(catalog?.menus || []).map(m => m.name).join('|')]);
+  const rows = useMemo(() => (catalog?.menus || []).map(m => {
+    const saved = rowValues[m.name] || {};
+    return {
+      cakeName: m.name,
+      imageUrl: m.imageUrl || null,
+      category: m.category || '',
+      priceStore: m.priceStore || 0,
+      included: saved.included || false,
+      available: saved.available || 0,
+      reserved: saved.reserved || 0,
+      damaged: saved.damaged || 0,
+    };
+  }), [catalog?.menus, rowValues]);
 
   const categories = [...new Set(rows.map(r => r.category).filter(Boolean))];
   const includedRows = rows.filter(r => r.included);
@@ -812,10 +817,13 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
     : rows.filter(r => r.category === catTab);
 
   function updateRow(cakeName, field, val) {
-    setRows(prev => prev.map(r => r.cakeName === cakeName ? { ...r, [field]: val } : r));
+    setRowValues(prev => ({ ...prev, [cakeName]: { ...prev[cakeName], [field]: val } }));
   }
   function toggleInclude(cakeName) {
-    setRows(prev => prev.map(r => r.cakeName === cakeName ? { ...r, included: !r.included } : r));
+    setRowValues(prev => {
+      const current = prev[cakeName] || {};
+      return { ...prev, [cakeName]: { ...current, included: !current.included } };
+    });
   }
 
   function buildLogMap() {
@@ -826,13 +834,11 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
 
   function findDups(toSave) {
     const logMap = buildLogMap();
-    const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+    const nowMin = minutesSinceMidnightBangkok();
     return toSave
       .filter(row => {
         const entry = logMap[row.cakeName];
-        if (!entry) return false;
-        const [h, m] = entry.time.split(':').map(Number);
-        return Math.abs(nowMin - (h * 60 + m)) < 30;
+        return entry && nowMin !== null && entry.minuteOfDay !== null && Math.abs(nowMin - entry.minuteOfDay) < 30;
       })
       .map(row => ({ cakeName: row.cakeName, time: logMap[row.cakeName].time }));
   }
@@ -860,7 +866,7 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
       await backend.reload();
       setCakeRefreshTick(t => t + 1);
       setSuccess(`บันทึก ${saved} รายการเข้า backend แล้ว`);
-      setRows(prev => prev.map(r => ({ ...r, included: false, available: 0, reserved: 0, damaged: 0 })));
+      setRowValues({});
     } catch (err) {
       const msg = String(err?.message || '');
       if (msg.includes('employee_submit_ops_entry_v2') || msg.includes('employee_ops_entries')) {
@@ -888,7 +894,7 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
   }
 
   function clearAll() {
-    setRows(prev => prev.map(r => ({ ...r, included: false, available: 0, reserved: 0, damaged: 0 })));
+    setRowValues({});
     setSuccess(''); setErrMsg(''); setWarnDups([]); setDupMode(false); setCatTab('all');
   }
 
@@ -943,10 +949,8 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {displayRows.map(row => {
           const logged = logMap[row.cakeName];
-          const isRecentDup = logged && (() => {
-            const [h, m] = logged.time.split(':').map(Number);
-            return Math.abs(new Date().getHours() * 60 + new Date().getMinutes() - (h * 60 + m)) < 30;
-          })();
+          const nowMin = minutesSinceMidnightBangkok();
+          const isRecentDup = logged && nowMin !== null && logged.minuteOfDay !== null && Math.abs(nowMin - logged.minuteOfDay) < 30;
           return (
             <div key={row.cakeName} style={{
               borderRadius: 14, overflow: 'hidden',
@@ -1087,7 +1091,7 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
             <div style={{ fontSize: 11, color: 'var(--muted)' }}>รวมพร้อมขาย {totalQty} ชิ้น</div>
           </div>
           <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-            {new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+            {new Date().toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' })}
           </div>
         </div>
       )}
@@ -1171,14 +1175,14 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
       return;
     }
     let cancelled = false;
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const { startIso, endIso } = bangkokDayUtcRange();
     supabase
       .from('employee_ops_entries')
       .select('payload,created_at')
       .eq('org_id', orgId)
       .eq('task_key', 'production')
-      .gte('created_at', `${todayStr}T00:00:00`)
-      .lte('created_at', `${todayStr}T23:59:59`)
+      .gte('created_at', startIso)
+      .lte('created_at', endIso)
       .order('created_at', { ascending: true })
       .then(({ data }) => {
         if (cancelled) return;
@@ -1188,7 +1192,7 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
         let total = 0;
         matching.forEach(e => { total += parseFloat(e.payload?.quantity || 0) || 0; });
         setTodayProductionTotal({ total, unit: matching[0]?.payload?.unit || '', count: matching.length });
-        setTodayProductionBatches(matching.map(e => ({ batch: e.payload?.batch || '', quantity: e.payload?.quantity || '0', unit: e.payload?.unit || '', note: e.payload?.note || '', time: (e.created_at || '').slice(11, 16) })));
+        setTodayProductionBatches(matching.map(e => ({ batch: e.payload?.batch || '', quantity: e.payload?.quantity || '0', unit: e.payload?.unit || '', note: e.payload?.note || '', time: formatBangkokTime(e.created_at) })));
       });
     return () => { cancelled = true; };
   }, [draft.product, taskKey, orgId, prodRefreshTick]);
@@ -1196,14 +1200,14 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
   useEffect(() => {
     if (taskKey !== 'cake-stock' || !orgId) { setTodayCakeLog([]); return; }
     let cancelled = false;
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const { startIso, endIso } = bangkokDayUtcRange();
     supabase
       .from('employee_ops_entries')
       .select('payload,created_at')
       .eq('org_id', orgId)
       .eq('task_key', 'cake-stock')
-      .gte('created_at', `${todayStr}T00:00:00`)
-      .lte('created_at', `${todayStr}T23:59:59`)
+      .gte('created_at', startIso)
+      .lte('created_at', endIso)
       .order('created_at', { ascending: true })
       .then(({ data }) => {
         if (cancelled) return;
@@ -1215,7 +1219,8 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
           reserved: e.payload?.reserved || '0',
           damaged: e.payload?.damaged || '0',
           status: e.payload?.status || '',
-          time: (e.created_at || '').slice(11, 16),
+          time: formatBangkokTime(e.created_at),
+          minuteOfDay: minutesSinceMidnightBangkok(e.created_at),
         })));
       });
     return () => { cancelled = true; };
@@ -1308,9 +1313,6 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
         </TwoColRow>
         <CakeStockBatchForm
           catalog={catalog}
-          catalogReady={catalogReady}
-          catalogRetrying={catalogRetrying}
-          reloadCatalog={reloadCatalog}
           draft={draft}
           setDraft={setDraft}
           branches={branches}
@@ -1516,6 +1518,52 @@ function renderFormFields(taskKey, draft, setDraft, catalog, geminiKey, branches
               ))}
             </div>
           </Field>
+          <Field label="ส่งไปสาขา (ถ้ามี)">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {(draft.dispatches || []).map((d, idx) => (
+                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 80px auto', gap: 6, alignItems: 'center' }}>
+                  <select value={d.branchName} onChange={e => setDraft({ ...draft, dispatches: (draft.dispatches || []).map((x, i) => i === idx ? { ...x, branchName: e.target.value } : x) })} style={{ fontSize: 13 }}>
+                    <option value="">— เลือกสาขา —</option>
+                    {branches.length > 0
+                      ? branches.map(b => <option key={b.id} value={b.label}>{b.label}</option>)
+                      : <option value={draft.branchName}>{draft.branchName}</option>
+                    }
+                  </select>
+                  <input type="number" min="0" value={d.qty} inputMode="numeric"
+                    onChange={e => setDraft({ ...draft, dispatches: (draft.dispatches || []).map((x, i) => i === idx ? { ...x, qty: e.target.value } : x) })}
+                    placeholder="จำนวน" style={{ textAlign: 'center', fontSize: 13 }} />
+                  <button type="button" onClick={() => setDraft({ ...draft, dispatches: (draft.dispatches || []).filter((_, i) => i !== idx) })}
+                    style={{ color: 'var(--red)', fontSize: 18, lineHeight: 1, padding: '0 4px', background: 'none', border: 'none', cursor: 'pointer' }}>×</button>
+                </div>
+              ))}
+              <button type="button"
+                onClick={() => setDraft({ ...draft, dispatches: [...(draft.dispatches || []), { branchName: '', qty: '' }] })}
+                style={{ fontSize: 12, color: 'var(--accent)', background: 'var(--accent-soft)', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', alignSelf: 'flex-start', fontFamily: 'inherit' }}>
+                + เพิ่มสาขา
+              </button>
+              {(draft.dispatches || []).some(d => d.branchName && Number(d.qty) > 0) && (
+                <div style={{ fontSize: 12, color: 'var(--ink-2)' }}>
+                  ส่งรวม {(draft.dispatches || []).filter(d => d.branchName && Number(d.qty) > 0).reduce((s, d) => s + Number(d.qty), 0)} ชิ้น — {(draft.dispatches || []).filter(d => d.branchName && Number(d.qty) > 0).map(d => `${d.branchName} (${d.qty})`).join(', ')}
+                </div>
+              )}
+            </div>
+          </Field>
+          <TwoColRow>
+            <Field label="ของเสีย (ชิ้น)">
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input type="number" min="0" style={{ flex: 1 }} value={draft.wasteQty || ''} inputMode="numeric"
+                  onChange={e => setDraft({ ...draft, wasteQty: e.target.value })} placeholder="0" />
+                <VoiceBtn onResult={v => setDraft({ ...draft, wasteQty: v.replace(/[^0-9.]/g, '') })} size={36} />
+              </div>
+            </Field>
+            {draft.wasteQty && Number(draft.wasteQty) > 0 && Number(draft.quantity) > 0 && (
+              <Field label="อัตราของเสีย">
+                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--red)', paddingTop: 4 }}>
+                  {((Number(draft.wasteQty) / Number(draft.quantity)) * 100).toFixed(1)}%
+                </div>
+              </Field>
+            )}
+          </TwoColRow>
           <Field label="หมายเหตุ">
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
               <textarea rows={3} style={{ flex: 1 }} value={draft.note}
@@ -1948,7 +1996,7 @@ function sanitizePayload(taskKey, draft) {
 function hasAnyInput(taskKey, draft) {
   if (taskKey === 'bills')          return !!(draft.vendor || draft.amount || draft.imageName);
   if (taskKey === 'purchase-list')  return (draft.items?.length || 0) > 0;
-  if (taskKey === 'production')     return !!(draft.product || draft.quantity || draft.batch || draft.note);
+  if (taskKey === 'production')     return !!(draft.product || draft.quantity || draft.batch || draft.note || draft.wasteQty || (draft.dispatches || []).length > 0);
   if (taskKey === 'inventory')      return !!(draft.itemName || draft.stockLeft || draft.note);
   if (taskKey === 'cake-stock')     return !!(draft.cakeName || draft.available || draft.reserved || draft.damaged || draft.note);
   if (taskKey === 'supplies-count') return !!(draft.itemName || draft.count || draft.note);

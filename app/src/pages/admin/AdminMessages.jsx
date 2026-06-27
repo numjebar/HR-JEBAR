@@ -214,7 +214,7 @@ function BroadcastModal({ employees, orgId, onClose }) {
   const [due, setDue] = useState('');
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
-  const [targetIds, setTargetIds] = useState(null);
+  const [targetIds] = useState(null);
 
   const activeEmps = employees.filter(e => e.id);
 

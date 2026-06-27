@@ -1,5 +1,33 @@
 # HR JEBAR Handoff
 
+## Update 2026-06-27 (OPS Bangkok time + inbox + guards — v89)
+
+### สถานะล่าสุด
+
+**รวม notes v83–v88 เป็น entry เดียวเพื่อให้อ่านง่ายและลด handoff noise**
+
+- เพิ่ม `app/src/lib/bangkokTime.js` สำหรับวันที่ไทย, UTC range ของวันไทย, เวลาแสดงผล, minute-of-day และ invalid-date fallback
+- Employee OPS ใช้ Bangkok helpers กับ production/cake-stock day range, เวลาแสดงผล และ duplicate detection ของ cake-stock
+- คืน production fields ที่หายไป: `dispatches`, `wasteQty`, UI ส่งไปสาขา, UI ของเสีย และอัตราของเสีย พร้อม draft/input detection
+- Admin OPS inbox ใช้ helper วันที่ไทยกับ filter, summary, grouping, LINE summary count และแยก `opsInboxHelpers.js` สำหรับ test logic โดยไม่ต้อง mount React
+- inventory/cake alert ใช้ normalized composite key (`task + item + branch`) เพื่อกัน duplicate/key collision และยังแยกเค้กชื่อเดียวกันคนละสาขา
+- cake batch rows derive metadata จาก catalog โดยตรงและเก็บเฉพาะค่าที่ผู้ใช้กรอก (`included`, `available`, `reserved`, `damaged`) ใน state เพื่อให้ menu `name`, `imageUrl`, `category`, หรือ `priceStore` เปลี่ยนแล้ว UI refresh โดยไม่ต้อง sync state ใน effect
+- เพิ่ม guard scripts:
+  - `npm run check:bangkok-time`
+  - `npm run check:ops-inbox`
+  - `npm run check:emp-ops-production`
+  - `npm run check:ops-guards`
+- เพิ่มคำอธิบาย guard workflow ใน `app/README.md` สำหรับทีมที่จะแก้ Employee OPS / Admin OPS Inbox / cake-stock ต่อ
+- badge ปัจจุบัน: `Build 2026.06.27-cake-batch-derived-rows-v89`
+
+### Checks ล่าสุด
+
+- `npm run check:ops-guards` — pass
+- `npm run build` — pass
+- `npm run lint` — ยัง fail จาก React hook lint debt เดิมทั่ว repo; รอบ v89 ลด warning/error ใน cake batch rows โดยเอา sync effect ออก
+
+---
+
 ## Update 2026-06-20 (monthly attendance summary — v60)
 
 ### สิ่งที่เพิ่มใน v60

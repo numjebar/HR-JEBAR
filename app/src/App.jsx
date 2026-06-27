@@ -12,7 +12,7 @@ import EmpShell from './pages/employee/EmpShell';
 function App() {
   const { init, loading, isAdmin, employee } = useAuthStore();
 
-  useEffect(() => { init(); }, []);
+  useEffect(() => { init(); }, [init]);
 
   if (loading) {
     return (

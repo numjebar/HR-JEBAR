@@ -35,7 +35,7 @@ function drawSlipSection(ctx, title, rows, y, color, sign) {
   return cy;
 }
 
-async function generatePaySlip({ employee, branch, pay, payRange, settings }) {
+async function generatePaySlip({ employee, branch, pay, payRange }) {
   const scale = 3;
   const W = 900, H = 1180;
   const canvas = document.createElement('canvas');
@@ -127,12 +127,6 @@ const PERIODS = [
   { k: 'month', label: 'เดือน' },
 ];
 
-const PAY_TYPE_LABEL = {
-  daily: 'วัน',
-  weekly: 'สัปดาห์',
-  monthly: 'เดือน',
-};
-
 function payrollPeriodForEmployee(employee, requestedPeriod) {
   if (!employee) return requestedPeriod || 'month';
   if (employee.pay_type === 'weekly') return 'week';
@@ -153,7 +147,6 @@ export default function EmpPay() {
   const [period, setPeriod] = useState(naturalPeriod);
   const [pay, setPay] = useState(null);
   const [branch, setBranch] = useState(null);
-  const [settings, setSettings] = useState(null);
   const [payRange, setPayRange] = useState(null);
   const [payment, setPayment] = useState(null);
   const [downloading, setDownloading] = useState(false);
@@ -171,7 +164,6 @@ export default function EmpPay() {
     const br = data?.branch || null;
     const st = data?.settings || null;
     setBranch(br);
-    setSettings(st);
     setPayment(data?.payment || null);
     const rules = rulesFor(st?.rules, br, employee);
     setPay(computePay(employee, data?.attendance || [], data?.sales || [], data?.adjustments || [], rules, range));
@@ -187,7 +179,7 @@ export default function EmpPay() {
     if (!pay || !payRange) return;
     setDownloading(true);
     try {
-      const dataUrl = await generatePaySlip({ employee, branch, pay, payRange, settings });
+      const dataUrl = await generatePaySlip({ employee, branch, pay, payRange });
       const a = document.createElement('a');
       a.href = dataUrl;
       a.download = `slip-${employee.nickname || employee.name}-${payRange.from}-${payRange.to}.png`;

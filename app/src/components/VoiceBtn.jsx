@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 
-export function useVoiceInput(onResult) {
+function useVoiceInput(onResult) {
   const [listening, setListening] = useState(false);
   const recRef = useRef(null);
 
