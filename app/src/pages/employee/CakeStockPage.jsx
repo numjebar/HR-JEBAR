@@ -58,6 +58,8 @@ function typeToCategory(type) {
 function resolveCategory(menu) {
   return menu.subCategory || typeToCategory(menu.type) || guessCategory(menu.name);
 }
+// normalize ชื่อสำหรับ match ข้ามแอป (ตัดช่องว่าง + ตัวพิมพ์)
+const normName = s => (s || '').trim().toLowerCase().replace(/\s+/g, '');
 function catLabel(id) {
   return (CAKE_CATEGORIES.find(c => c.id === id) || {}).label || '📦 อื่นๆ';
 }
@@ -241,6 +243,8 @@ export default function CakeStockPage({ navigate }) {
   const [priceSaving, setPriceSaving] = useState(false);
   const [priceSavedId, setPriceSavedId] = useState(null);
   const [catFilter, setCatFilter] = useState('all');
+  const [operateMenus, setOperateMenus] = useState([]); // เมนู bakery จาก Operate (ไว้ cross-check)
+  const [showMissingOnly, setShowMissingOnly] = useState(false);
   // Inline qty input buffer { item_id: string }
   const [qtyInput, setQtyInput] = useState({});
 
@@ -286,11 +290,17 @@ export default function CakeStockPage({ navigate }) {
 
         // Modal suggestions = เฉพาะที่ยังขายอยู่
         setMenuSuggestions(bakeryMenus.filter(m => m.status !== 'หยุดขาย').map(m => m.name));
+        setOperateMenus(bakeryMenus); // เก็บไว้ cross-check ตัวเช็คข้อมูล
 
         if (!bakeryMenus.length) return;
+        const opPrice = m => m.priceStore ?? m.price ?? m.selling_price ?? null;
         const { data: existing } = await supabase
-          .from('cake_items').select('name').eq('org_id', orgId);
+          .from('cake_items').select('id,name,price,category').eq('org_id', orgId);
         const existingNames = new Set((existing || []).map(e => e.name));
+        const existingByNorm = {};
+        (existing || []).forEach(e => { existingByNorm[normName(e.name)] = e; });
+
+        // 1) เพิ่มเมนูใหม่
         const toInsert = bakeryMenus
           .filter(m => !existingNames.has(m.name))
           .map((m, i) => ({
@@ -298,13 +308,25 @@ export default function CakeStockPage({ navigate }) {
             name: m.name,
             sort_order: 9000 + i,
             is_open: m.status !== 'หยุดขาย',
-            price: m.priceStore ?? m.price ?? m.selling_price ?? null,
+            price: opPrice(m),
             category: resolveCategory(m),
           }));
-        if (toInsert.length) {
-          await supabase.from('cake_items').insert(toInsert);
-          load();
+        if (toInsert.length) await supabase.from('cake_items').insert(toInsert);
+
+        // 2) เติมราคา/หมวดให้เมนูเดิมที่ยัง "ว่าง" อัตโนมัติ (ไม่ทับค่าที่ตั้งเอง)
+        let filled = 0;
+        for (const m of bakeryMenus) {
+          const ex = existingByNorm[normName(m.name)];
+          if (!ex) continue;
+          const patch = {};
+          if (ex.price == null && opPrice(m) != null) patch.price = opPrice(m);
+          if (ex.category == null) { const c = resolveCategory(m); if (c) patch.category = c; }
+          if (Object.keys(patch).length) {
+            const { error: upErr } = await supabase.from('cake_items').update(patch).eq('id', ex.id);
+            if (!upErr) filled++;
+          }
         }
+        if (toInsert.length || filled) load();
       });
   }, [orgId]);
 
@@ -949,6 +971,15 @@ export default function CakeStockPage({ navigate }) {
     }
   }
 
+  // ─── ตัวเช็คข้อมูล (ราคา / match กับ Operate) ───
+  const opNormSet = new Set(operateMenus.map(m => normName(m.name)));
+  const itemNoPrice = it => it.price == null || it.price === '';
+  const itemNotInOp = it => operateMenus.length > 0 && !opNormSet.has(normName(it.name));
+  const itemMissing = it => itemNoPrice(it) || itemNotInOp(it);
+  const noPriceCount = items.filter(itemNoPrice).length;
+  const notInOpCount = items.filter(itemNotInOp).length;
+  const missingCount = items.filter(itemMissing).length;
+
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
@@ -1115,6 +1146,31 @@ export default function CakeStockPage({ navigate }) {
         </div>
       )}
 
+      {/* ตัวเช็คข้อมูล — รายการที่ขาดราคา / ไม่เจอใน Operate */}
+      {isMyBranch && items.length > 0 && missingCount > 0 && (
+        <div style={{ margin: '10px 12px 0', background: '#FFF7ED', border: '1.5px solid #F97316', borderRadius: 14, padding: '12px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#C2410C' }}>
+              ⚠️ ตรวจข้อมูล — {missingCount} รายการยังไม่ครบ
+            </div>
+            <button onClick={() => setShowMissingOnly(v => !v)}
+              style={{ fontSize: 12, fontWeight: 700, padding: '5px 12px', borderRadius: 16, border: 'none', cursor: 'pointer',
+                background: showMissingOnly ? '#C2410C' : '#FED7AA', color: showMissingOnly ? '#fff' : '#9A3412' }}>
+              {showMissingOnly ? '✓ กำลังกรอง' : 'ดูเฉพาะที่ขาด'}
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: 14, marginTop: 8, fontSize: 12, color: '#9A3412', flexWrap: 'wrap' }}>
+            {noPriceCount > 0 && <span>💰 ไม่มีราคา: <b>{noPriceCount}</b></span>}
+            {notInOpCount > 0 && <span>🔗 ไม่เจอใน Operate: <b>{notInOpCount}</b></span>}
+          </div>
+          {notInOpCount > 0 && (
+            <div style={{ fontSize: 10.5, color: '#B45309', marginTop: 6 }}>
+              💡 "ไม่เจอใน Operate" = ชื่อไม่ตรงกับเมนูใน Operate → ราคา/หมวดเลย sync ไม่ได้ (แก้ชื่อให้ตรง หรือ override ราคาที่นี่)
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Category filter chips */}
       {items.length > 0 && (
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '10px 12px 2px', WebkitOverflowScrolling: 'touch' }}>
@@ -1157,6 +1213,7 @@ export default function CakeStockPage({ navigate }) {
           items.map((item, idx) => {
             const itemCat = item.category || guessCategory(item.name);
             if (catFilter !== 'all' && itemCat !== catFilter) return null;
+            if (showMissingOnly && !itemMissing(item)) return null;
             const qty = stockMap[item.id] || 0;
             const spoiled = spoiledMap[item.id] || 0;
             const isSaving = saving === item.id;
@@ -1217,6 +1274,14 @@ export default function CakeStockPage({ navigate }) {
                       <span style={{ fontSize: 10, color: 'var(--muted)', background: 'var(--bg)', borderRadius: 8, padding: '1px 7px' }}>
                         {catLabel(itemCat)}
                       </span>
+                      {item.price != null && item.price !== '' ? (
+                        <span style={{ fontSize: 10, color: '#166534', background: '#DCFCE7', borderRadius: 8, padding: '1px 7px', fontWeight: 700 }}>฿{item.price}</span>
+                      ) : (
+                        <span style={{ fontSize: 10, color: '#C2410C', background: '#FFEDD5', borderRadius: 8, padding: '1px 7px', fontWeight: 700 }}>ไม่มีราคา</span>
+                      )}
+                      {itemNotInOp(item) && (
+                        <span style={{ fontSize: 10, color: '#B91C1C', background: '#FEE2E2', borderRadius: 8, padding: '1px 7px', fontWeight: 700 }}>ไม่เจอใน Operate</span>
+                      )}
                       {spoiled > 0 && (
                         <span style={{ fontSize: 10, color: '#DC2626', background: '#FEF2F2', borderRadius: 8, padding: '1px 6px', fontWeight: 700 }}>
                           🗑 เสีย {spoiled}
