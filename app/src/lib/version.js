@@ -1,1 +1,1 @@
-export const APP_VERSION = 'Build 2026.06.27-splitsync-fix-v128';
+export const APP_VERSION = 'Build 2026.06.27-export-branches-v129';
