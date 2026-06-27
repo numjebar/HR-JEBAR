@@ -1,6 +1,6 @@
 # HR JEBAR Handoff
 
-## Update 2026-06-27 (OPS Bangkok time + inbox + guards — v89)
+## Update 2026-06-27 (OPS Bangkok time + inbox + guards — v90)
 
 ### สถานะล่าสุด
 
@@ -18,13 +18,14 @@
   - `npm run check:emp-ops-production`
   - `npm run check:ops-guards`
 - เพิ่มคำอธิบาย guard workflow ใน `app/README.md` สำหรับทีมที่จะแก้ Employee OPS / Admin OPS Inbox / cake-stock ต่อ
-- badge ปัจจุบัน: `Build 2026.06.27-cake-batch-derived-rows-v89`
+- EmpPay payroll period cleanup: เอา sync effect ที่ reset period ตาม employee ออก แล้ว derive period จาก employee id + user choice พร้อมย้าย pay loading เข้า async effect ที่ cancel ได้
+- badge ปัจจุบัน: `Build 2026.06.27-emp-pay-effect-cleanup-v90`
 
 ### Checks ล่าสุด
 
 - `npm run check:ops-guards` — pass
 - `npm run build` — pass
-- `npm run lint` — ยัง fail จาก React hook lint debt เดิมทั่ว repo; รอบ v89 ลด warning/error ใน cake batch rows โดยเอา sync effect ออก
+- `npm run lint` — ยัง fail จาก React hook lint debt เดิมทั่ว repo; รอบ v89–v90 ลด warning/error ใน cake batch rows และ EmpPay effects
 
 ---
 

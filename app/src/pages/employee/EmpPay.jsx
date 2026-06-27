@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
 import { computePay, rulesFor, rangeForEmployee, THB, fmtHM } from '../../lib/payroll';
@@ -143,37 +143,41 @@ function allowedPeriodsForEmployee(employee) {
 
 export default function EmpPay() {
   const { employee, employeeSessionToken } = useAuthStore();
+  const employeeId = employee?.id || '';
   const naturalPeriod = payrollPeriodForEmployee(employee, 'month');
-  const [period, setPeriod] = useState(naturalPeriod);
+  const [periodChoice, setPeriodChoice] = useState({ employeeId, period: naturalPeriod });
   const [pay, setPay] = useState(null);
   const [branch, setBranch] = useState(null);
   const [payRange, setPayRange] = useState(null);
   const [payment, setPayment] = useState(null);
   const [downloading, setDownloading] = useState(false);
+  const period = periodChoice.employeeId === employeeId ? periodChoice.period : naturalPeriod;
   const effectivePeriod = payrollPeriodForEmployee(employee, period);
   const periodOptions = allowedPeriodsForEmployee(employee);
 
-  async function load() {
-    const range = rangeForEmployee(effectivePeriod, employee);
-    setPayRange(range);
-    const { data } = await supabase.rpc('employee_pay_data_v2', {
-      p_session_token: employeeSessionToken,
-      p_from: range.from,
-      p_to: range.to,
-    });
-    const br = data?.branch || null;
-    const st = data?.settings || null;
-    setBranch(br);
-    setPayment(data?.payment || null);
-    const rules = rulesFor(st?.rules, br, employee);
-    setPay(computePay(employee, data?.attendance || [], data?.sales || [], data?.adjustments || [], rules, range));
-  }
-
   useEffect(() => {
-    setPeriod(naturalPeriod);
-  }, [employee?.id, naturalPeriod]);
+    let cancelled = false;
 
-  useEffect(() => { load(); }, [effectivePeriod, employee?.id]);
+    async function loadPay() {
+      const range = rangeForEmployee(effectivePeriod, employee);
+      const { data } = await supabase.rpc('employee_pay_data_v2', {
+        p_session_token: employeeSessionToken,
+        p_from: range.from,
+        p_to: range.to,
+      });
+      if (cancelled) return;
+      const br = data?.branch || null;
+      const st = data?.settings || null;
+      const rules = rulesFor(st?.rules, br, employee);
+      setPayRange(range);
+      setBranch(br);
+      setPayment(data?.payment || null);
+      setPay(computePay(employee, data?.attendance || [], data?.sales || [], data?.adjustments || [], rules, range));
+    }
+
+    loadPay();
+    return () => { cancelled = true; };
+  }, [effectivePeriod, employee, employeeSessionToken]);
 
   async function downloadSlip() {
     if (!pay || !payRange) return;
@@ -213,7 +217,7 @@ export default function EmpPay() {
         {periodOptions.map((p) => (
           <button
             key={p.k}
-            onClick={() => setPeriod(p.k)}
+            onClick={() => setPeriodChoice({ employeeId, period: p.k })}
             className="btn"
             style={{
               background: period === p.k ? 'var(--accent)' : 'var(--surface)',
