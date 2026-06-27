@@ -43,6 +43,21 @@ function guessCategory(name) {
   for (const c of CAKE_CATEGORIES) if (c.re && c.re.test(name || '')) return c.id;
   return 'other';
 }
+
+// แมป "ประเภท" (menu.type จาก Operate) → หมวดย่อย bakery
+// types: Cake, Bread, Cookie, Snack, Other bakery (+ เครื่องดื่มที่ถูกกรองออกแล้ว)
+function typeToCategory(type) {
+  const t = (type || '').toLowerCase();
+  if (/cake|เค้ก|โรล|roll|gateau/.test(t)) return 'cake';
+  if (/bread|ขนมปัง|ปัง|toast|bun|croissant|ครัวซอง/.test(t)) return 'bread';
+  if (/cookie|snack|คุกกี้|สแน็ค|ขนมขบเคี้ยว/.test(t)) return 'snack';
+  if (/other\s*bakery|อื่น/.test(t)) return 'other';
+  return null; // ไม่รู้จัก → ให้ตัวเรียกไป fallback ต่อ
+}
+// ลำดับความสำคัญ: subCategory (override) → ประเภท → เดาจากชื่อ
+function resolveCategory(menu) {
+  return menu.subCategory || typeToCategory(menu.type) || guessCategory(menu.name);
+}
 function catLabel(id) {
   return (CAKE_CATEGORIES.find(c => c.id === id) || {}).label || '📦 อื่นๆ';
 }
@@ -284,7 +299,7 @@ export default function CakeStockPage({ navigate }) {
             sort_order: 9000 + i,
             is_open: m.status !== 'หยุดขาย',
             price: m.priceStore ?? m.price ?? m.selling_price ?? null,
-            category: m.subCategory || guessCategory(m.name),
+            category: resolveCategory(m),
           }));
         if (toInsert.length) {
           await supabase.from('cake_items').insert(toInsert);
@@ -759,12 +774,12 @@ export default function CakeStockPage({ navigate }) {
         }
       });
 
-      // map ชื่อ (normalized) → ราคา (priceStore) + หมวดย่อย (subCategory) จาก Operate
+      // map ชื่อ (normalized) → ราคา (priceStore) + หมวด (จาก type/subCategory) จาก Operate
       const metaByName = {};
       menus.forEach(m => {
         metaByName[norm(m.name)] = {
           price: m.priceStore ?? m.price ?? m.selling_price ?? null,
-          category: m.subCategory || null,
+          category: resolveCategory(m),
         };
       });
 
