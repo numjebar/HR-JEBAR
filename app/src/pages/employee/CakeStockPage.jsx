@@ -1518,11 +1518,11 @@ export default function CakeStockPage({ navigate }) {
                             </button>
                           ))}
                         </div>
-                        {dDetails.reason === 'other' && (
-                          <input type="text" placeholder="ระบุสาเหตุ..." value={dDetails.note || ''}
-                            onChange={e => setSpoiledDetails(prev => ({ ...prev, [di.id]: { ...prev[di.id], note: e.target.value } }))}
-                            style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px', borderRadius: 8, border: '1.5px solid #FECACA', fontSize: 13, fontFamily: 'inherit', marginBottom: 8, outline: 'none', background: '#fff', color: '#1F2937' }} />
-                        )}
+                        <input type="text"
+                          placeholder={dDetails.reason === 'other' ? 'ระบุสาเหตุ...' : 'หมายเหตุเพิ่มเติม (ไม่บังคับ)'}
+                          value={dDetails.note || ''}
+                          onChange={e => setSpoiledDetails(prev => ({ ...prev, [di.id]: { ...prev[di.id], note: e.target.value } }))}
+                          style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px', borderRadius: 8, border: '1.5px solid #FECACA', fontSize: 13, fontFamily: 'inherit', marginBottom: 8, outline: 'none', background: '#fff', color: '#1F2937' }} />
                         <input type="file" accept="image/*" capture="environment" id={photoInputId} style={{ display: 'none' }}
                           onChange={e => {
                             const file = e.target.files[0]; if (!file) return;

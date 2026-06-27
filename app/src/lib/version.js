@@ -1,1 +1,1 @@
-export const APP_VERSION = 'Build 2026.06.27-cakecat-price-v124';
+export const APP_VERSION = 'Build 2026.06.27-spoiled-note-v125';
