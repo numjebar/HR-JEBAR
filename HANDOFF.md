@@ -1,5 +1,73 @@
 # HR JEBAR Handoff
 
+## Update 2026-06-27 (OPS Bangkok time checks — v83)
+
+### สิ่งที่ปรับใน v83
+
+**Employee OPS — เพิ่ม automated check ให้ helper เวลาไทย**
+
+- เพิ่ม `npm run check:bangkok-time` เพื่อตรวจ helper เวลาไทยแบบ deterministic โดยไม่ต้องพึ่ง backend
+- ตรวจ boundary สำคัญเวลาไทย: ก่อน/หลังเที่ยงคืนไทย, UTC range ของวันไทย, minute-of-day, invalid date fallback และรูปแบบเวลาแสดงผล
+- จำกัดการแก้เฉพาะไฟล์ helper/testing/version/handoff/package script เพื่อไม่ทับงาน cake-grid/admin ของทีมอื่น
+- bump badge เป็น `Build 2026.06.27-ops-bangkok-time-v83`
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/scripts/check-bangkok-time.mjs` — NEW automated check สำหรับ `bangkokTime.js`
+- `app/package.json` — เพิ่ม script `check:bangkok-time`
+- `app/src/lib/version.js` — bump เป็น v83
+
+### Commit
+
+- committed on current branch
+
+---
+
+## Update 2026-06-27 (OPS Bangkok time helper — v82)
+
+### สิ่งที่ปรับใน v82
+
+**Employee OPS — จัด helper เวลาไทยแยกเป็น lib กลาง และลดความเสี่ยงจากการ parse เวลาแสดงผล**
+
+- ย้าย helper เวลา `Asia/Bangkok` ไปไว้ที่ `app/src/lib/bangkokTime.js` เพื่อให้ใช้ซ้ำได้และไม่ปนกับ component
+- สร้างวันที่ไทยด้วย `formatToParts()` แทนการพึ่งรูปแบบ string จาก locale โดยตรง
+- รายการเช็คสต๊อกเค้กเก็บ `minuteOfDay` แยกจากข้อความเวลา ทำให้ duplicate warning ไม่ต้อง parse เวลาไทยที่ใช้แสดงผล
+- bump badge เป็น `Build 2026.06.27-ops-bangkok-time-v82`
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/lib/bangkokTime.js` — NEW helper เวลาไทย
+- `app/src/pages/employee/EmpOps.jsx` — ใช้ helper กลางและใช้ minuteOfDay สำหรับ duplicate detection
+- `app/src/lib/version.js` — bump เป็น v82
+
+### Commit
+
+- committed on current branch
+
+---
+
+## Update 2026-06-22 (OPS Bangkok day/time — v81)
+
+### สิ่งที่เพิ่มใน v81
+
+**Employee OPS — ใช้วันและเวลาตามประเทศไทยในรายการวันนี้**
+
+- เพิ่ม helper เวลา `Asia/Bangkok` สำหรับวันที่วันนี้, ช่วงเวลา UTC ของวันไทย, เวลาแสดงผล และการตรวจ duplicate ภายใน 30 นาที
+- หน้า OPS home ใช้วันที่ไทยในการนับงานที่ส่งวันนี้ แทน `toISOString()` ที่อิง UTC
+- ฟอร์มผลิตขนมและเช็คสต๊อกเค้กดึงรายการ “วันนี้” จากช่วง 00:00–23:59 ของประเทศไทย แล้วแสดงเวลาเป็นเวลาไทย
+- แถบสรุปล่างของเช็คสต๊อกเค้กและระบบเตือนบันทึกซ้ำใช้เวลาไทยให้ตรงกับเวลาหน้าร้าน
+
+### ไฟล์ที่เปลี่ยน
+
+- `app/src/pages/employee/EmpOps.jsx` — เพิ่ม helper เวลาไทยและเปลี่ยน query/การแสดงผลรายการวันนี้ของ OPS
+- `app/src/lib/version.js` — bump เป็น `Build 2026.06.22-ops-bangkok-day-v81`
+
+### Commit
+
+- committed on current branch
+
+---
+
 ## Update 2026-06-20 (monthly attendance summary — v60)
 
 ### สิ่งที่เพิ่มใน v60

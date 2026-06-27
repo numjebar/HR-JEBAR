@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { APP_VERSION } from '../../lib/version';
+import { bangkokDayUtcRange, formatBangkokDateISO, formatBangkokTime, minutesSinceMidnightBangkok } from '../../lib/bangkokTime';
 import SearchSelect from '../../components/SearchSelect';
 import VoiceBtn from '../../components/VoiceBtn';
 import PhotoSection from '../../components/PhotoSection';
@@ -34,7 +35,7 @@ const TASKS = [
 
 const TASK_MAP = Object.fromEntries(TASKS.map((t) => [t.key, t]));
 
-function todayISO() { return new Date().toISOString().slice(0, 10); }
+function todayISO() { return formatBangkokDateISO(); }
 
 const DEFAULT_DRAFTS = {
   bills: {
@@ -578,7 +579,7 @@ function OpsHome({ navigate }) {
 
   useEffect(() => {
     if (!employeeSessionToken) return;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = formatBangkokDateISO();
     Promise.all(
       TASKS.map(task =>
         supabase.rpc('employee_get_ops_entries_v2', {
@@ -826,13 +827,11 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
 
   function findDups(toSave) {
     const logMap = buildLogMap();
-    const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+    const nowMin = minutesSinceMidnightBangkok();
     return toSave
       .filter(row => {
         const entry = logMap[row.cakeName];
-        if (!entry) return false;
-        const [h, m] = entry.time.split(':').map(Number);
-        return Math.abs(nowMin - (h * 60 + m)) < 30;
+        return entry && nowMin !== null && entry.minuteOfDay !== null && Math.abs(nowMin - entry.minuteOfDay) < 30;
       })
       .map(row => ({ cakeName: row.cakeName, time: logMap[row.cakeName].time }));
   }
@@ -943,10 +942,8 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {displayRows.map(row => {
           const logged = logMap[row.cakeName];
-          const isRecentDup = logged && (() => {
-            const [h, m] = logged.time.split(':').map(Number);
-            return Math.abs(new Date().getHours() * 60 + new Date().getMinutes() - (h * 60 + m)) < 30;
-          })();
+          const nowMin = minutesSinceMidnightBangkok();
+          const isRecentDup = logged && nowMin !== null && logged.minuteOfDay !== null && Math.abs(nowMin - logged.minuteOfDay) < 30;
           return (
             <div key={row.cakeName} style={{
               borderRadius: 14, overflow: 'hidden',
@@ -1087,7 +1084,7 @@ function CakeStockBatchForm({ catalog, catalogReady, catalogRetrying, reloadCata
             <div style={{ fontSize: 11, color: 'var(--muted)' }}>รวมพร้อมขาย {totalQty} ชิ้น</div>
           </div>
           <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-            {new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+            {new Date().toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' })}
           </div>
         </div>
       )}
@@ -1171,14 +1168,14 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
       return;
     }
     let cancelled = false;
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const { startIso, endIso } = bangkokDayUtcRange();
     supabase
       .from('employee_ops_entries')
       .select('payload,created_at')
       .eq('org_id', orgId)
       .eq('task_key', 'production')
-      .gte('created_at', `${todayStr}T00:00:00`)
-      .lte('created_at', `${todayStr}T23:59:59`)
+      .gte('created_at', startIso)
+      .lte('created_at', endIso)
       .order('created_at', { ascending: true })
       .then(({ data }) => {
         if (cancelled) return;
@@ -1188,7 +1185,7 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
         let total = 0;
         matching.forEach(e => { total += parseFloat(e.payload?.quantity || 0) || 0; });
         setTodayProductionTotal({ total, unit: matching[0]?.payload?.unit || '', count: matching.length });
-        setTodayProductionBatches(matching.map(e => ({ batch: e.payload?.batch || '', quantity: e.payload?.quantity || '0', unit: e.payload?.unit || '', note: e.payload?.note || '', time: (e.created_at || '').slice(11, 16) })));
+        setTodayProductionBatches(matching.map(e => ({ batch: e.payload?.batch || '', quantity: e.payload?.quantity || '0', unit: e.payload?.unit || '', note: e.payload?.note || '', time: formatBangkokTime(e.created_at) })));
       });
     return () => { cancelled = true; };
   }, [draft.product, taskKey, orgId, prodRefreshTick]);
@@ -1196,14 +1193,14 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
   useEffect(() => {
     if (taskKey !== 'cake-stock' || !orgId) { setTodayCakeLog([]); return; }
     let cancelled = false;
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const { startIso, endIso } = bangkokDayUtcRange();
     supabase
       .from('employee_ops_entries')
       .select('payload,created_at')
       .eq('org_id', orgId)
       .eq('task_key', 'cake-stock')
-      .gte('created_at', `${todayStr}T00:00:00`)
-      .lte('created_at', `${todayStr}T23:59:59`)
+      .gte('created_at', startIso)
+      .lte('created_at', endIso)
       .order('created_at', { ascending: true })
       .then(({ data }) => {
         if (cancelled) return;
@@ -1215,7 +1212,8 @@ function OpsFormCard({ taskKey, draft, setDraft, resetDraft, saveLocalDraft, bac
           reserved: e.payload?.reserved || '0',
           damaged: e.payload?.damaged || '0',
           status: e.payload?.status || '',
-          time: (e.created_at || '').slice(11, 16),
+          time: formatBangkokTime(e.created_at),
+          minuteOfDay: minutesSinceMidnightBangkok(e.created_at),
         })));
       });
     return () => { cancelled = true; };
