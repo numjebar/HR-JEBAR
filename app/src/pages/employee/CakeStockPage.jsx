@@ -222,6 +222,7 @@ export default function CakeStockPage({ navigate }) {
   const [operateMenus, setOperateMenus] = useState([]); // เมนู bakery จาก Operate (ไว้ cross-check)
   const [showMissingOnly, setShowMissingOnly] = useState(false);
   const [pushingOperate, setPushingOperate] = useState(false);
+  const [detailBranchQty, setDetailBranchQty] = useState([]); // จำนวนแยกสาขาของเมนูที่เปิดดูรายละเอียด
   // Inline qty input buffer { item_id: string }
   const [qtyInput, setQtyInput] = useState({});
 
@@ -589,6 +590,22 @@ export default function CakeStockPage({ navigate }) {
   useEffect(() => {
     setPriceInput(detailItem?.price != null ? String(detailItem.price) : '');
   }, [detailItem?.id]);
+
+  // โหลดจำนวนแยกสาขาเมื่อเปิดรายละเอียด
+  useEffect(() => {
+    if (!detailItem || !orgId) { setDetailBranchQty([]); return; }
+    let cancelled = false;
+    supabase.from('cake_stock').select('branch_id,qty').eq('org_id', orgId).eq('item_id', detailItem.id)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const byBranch = {};
+        (data || []).forEach(r => { byBranch[r.branch_id] = (byBranch[r.branch_id] || 0) + (Number(r.qty) || 0); });
+        const list = (branches.length ? branches : Object.keys(byBranch).map(id => ({ id, label: id })))
+          .map(b => ({ id: b.id, label: b.label, qty: byBranch[b.id] || 0 }));
+        setDetailBranchQty(list);
+      });
+    return () => { cancelled = true; };
+  }, [detailItem?.id, orgId, branches]);
 
   // Push เมนูที่ "ไม่เจอใน Operate" ขึ้นไปสร้างเป็นเมนูใน Operate (jebar_app_state.db.menus)
   // อ่าน state สดก่อนเขียน + append เท่านั้น (ไม่แตะเมนูเดิม) เพื่อลดการชนกับ Operate
@@ -1557,6 +1574,24 @@ export default function CakeStockPage({ navigate }) {
               </div>
 
               <div style={{ overflowY: 'auto', flex: 1, padding: 14, display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 32 }}>
+                {/* จำนวนแยกสาขา + รวม */}
+                {detailBranchQty.length > 0 && (
+                  <div style={{ background: 'var(--surface)', borderRadius: 14, padding: '12px 16px' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 8 }}>จำนวนแยกสาขา</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      {detailBranchQty.map(b => (
+                        <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13 }}>
+                          <span style={{ color: 'var(--ink)' }}>{b.id === myBranchId ? '★ ' : ''}{b.label}</span>
+                          <span style={{ fontWeight: 700, color: b.qty > 0 ? '#166534' : '#9CA3AF' }}>{b.qty} ชิ้น</span>
+                        </div>
+                      ))}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13.5, paddingTop: 6, marginTop: 1, borderTop: '1px solid var(--line)', fontWeight: 800 }}>
+                        <span>รวมทุกสาขา</span>
+                        <span style={{ color: 'var(--accent)' }}>{detailBranchQty.reduce((s, b) => s + b.qty, 0)} ชิ้น</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {/* Production claim card */}
                 {isMyBranch && dPendingTotal > 0 && (
                   <div style={{ background: '#fff', border: '1.5px solid var(--accent)', borderRadius: 14, padding: '14px 16px' }}>
