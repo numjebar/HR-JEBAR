@@ -64,117 +64,93 @@ function catLabel(id) {
   return (CAKE_CATEGORIES.find(c => c.id === id) || {}).label || '📦 อื่นๆ';
 }
 
-// ─── Canvas Export ────────────────────────────────────────────────────────────
-function drawExport(canvas, { items, stockMap, spoiledMap, branchName, empName }) {
-  const W = 800;
-  const LINE_H = 46;
-  const HEADER_H = 160;
-  const FOOTER_H = 72;
+// ─── Canvas Export (แยกจำนวนต่อสาขา + รวม · แสดงทุกรายการ ยอด 0 ก็แสดง) ──────────
+function drawExport(canvas, { items, branches, qtyMap, spoiledByItem, empName }) {
+  const cols = (branches && branches.length) ? branches : [{ id: '__all', label: 'จำนวน' }];
+  const LM = 28, RM = 28;
+  const numW = 46, nameW = 300;
+  const brW = Math.max(74, Math.min(130, Math.round(660 / (cols.length + 1))));
+  const totW = 96;
+  const LINE_H = 46, HEADER_H = 170, FOOTER_H = 76;
+  const W = LM + numW + nameW + cols.length * brW + totW + RM;
   const H = HEADER_H + LINE_H + items.length * LINE_H + FOOTER_H;
-  canvas.width = W;
-  canvas.height = H;
+  canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
   const F = (size, bold) => `${bold ? 'bold ' : ''}${size}px "Sarabun","Tahoma","Arial",sans-serif`;
+  const fit = (text, maxW) => { if (ctx.measureText(text).width <= maxW) return text; let t = text; while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1); return t + '…'; };
+  const qOf = (itemId, branchId) => qtyMap[`${itemId}__${branchId}`] || 0;
 
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, W, H);
 
   // Header strip
-  ctx.fillStyle = '#4A2E1A';
-  ctx.fillRect(0, 0, W, 100);
-
-  ctx.fillStyle = '#E8C89E';
-  ctx.font = F(28, true);
-  ctx.textAlign = 'center';
-  ctx.fillText('☕ JE BAR Coffee & Pastry', W / 2, 38);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = F(20, true);
-  ctx.fillText('ใบเช็คสต็อคขนม', W / 2, 68);
+  ctx.fillStyle = '#4A2E1A'; ctx.fillRect(0, 0, W, 104);
+  ctx.fillStyle = '#E8C89E'; ctx.font = F(28, true); ctx.textAlign = 'center';
+  ctx.fillText('☕ JE BAR Coffee & Pastry', W / 2, 40);
+  ctx.fillStyle = '#FFFFFF'; ctx.font = F(20, true);
+  ctx.fillText('ใบเช็คสต็อคขนม', W / 2, 72);
   ctx.font = F(14);
   const dateStr = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
-  ctx.fillText(`${dateStr}  |  สาขา: ${branchName}  |  ผู้เช็ค: ${empName}`, W / 2, 92);
+  ctx.fillText(`${dateStr}  |  ผู้เช็ค: ${empName}`, W / 2, 96);
 
-  // Sub-header bar
-  ctx.fillStyle = '#F9F5F0';
-  ctx.fillRect(0, 100, W, 60);
-  ctx.fillStyle = '#6B4226';
-  ctx.font = F(13);
-  ctx.textAlign = 'left';
-  const hasStockCount = items.filter(i => (stockMap[i.id] || 0) > 0).length;
-  const totalSpoiled = items.reduce((s, i) => s + (spoiledMap[i.id] || 0), 0);
-  ctx.fillText(`รายการทั้งหมด: ${items.length}  |  มีสินค้า: ${hasStockCount}  |  ขนมเสีย: ${totalSpoiled} ชิ้น`, 32, 136);
+  // Sub-header summary
+  ctx.fillStyle = '#F9F5F0'; ctx.fillRect(0, 104, W, 62);
+  const grandTotal = items.reduce((s, it) => s + cols.reduce((a, b) => a + qOf(it.id, b.id), 0), 0);
+  const grandSpoiled = items.reduce((s, it) => s + ((spoiledByItem && spoiledByItem[it.id]) || 0), 0);
+  ctx.fillStyle = '#6B4226'; ctx.font = F(13); ctx.textAlign = 'left';
+  ctx.fillText(`รายการทั้งหมด: ${items.length}  |  รวมทุกสาขา: ${grandTotal} ชิ้น  |  ขนมเสีย: ${grandSpoiled} ชิ้น`, LM, 140);
 
   // Table header
   const y0 = HEADER_H;
-  ctx.fillStyle = '#4A2E1A';
-  ctx.fillRect(0, y0, W, LINE_H);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = F(14, true);
+  ctx.fillStyle = '#4A2E1A'; ctx.fillRect(0, y0, W, LINE_H);
+  ctx.fillStyle = '#FFFFFF'; ctx.font = F(13.5, true);
   ctx.textAlign = 'left';
-  ctx.fillText('#', 24, y0 + 30);
-  ctx.fillText('รายการขนม', 68, y0 + 30);
+  ctx.fillText('#', LM + 4, y0 + 30);
+  ctx.fillText('รายการขนม', LM + numW, y0 + 30);
   ctx.textAlign = 'right';
-  ctx.fillText('เสีย', W - 170, y0 + 30);
-  ctx.fillText('จำนวน (ชิ้น)', W - 32, y0 + 30);
+  cols.forEach((b, i) => {
+    const x = LM + numW + nameW + i * brW + brW - 10;
+    ctx.font = F(12.5, true);
+    ctx.fillText(fit(String(b.label || '').replace(/^[^\wก-๙]+/, '').trim() || 'สาขา', brW - 14), x, y0 + 30);
+  });
+  ctx.font = F(13.5, true);
+  ctx.fillText('รวม', LM + numW + nameW + cols.length * brW + totW - 10, y0 + 30);
 
-  // Rows
+  // Rows — ทุกรายการ (ยอด 0 แสดง 0)
   items.forEach((item, idx) => {
     const ry = y0 + LINE_H + idx * LINE_H;
-    const qty = stockMap[item.id] || 0;
-    const spoiled = spoiledMap[item.id] || 0;
     ctx.fillStyle = idx % 2 === 0 ? '#FFFFFF' : '#FAF7F3';
     ctx.fillRect(0, ry, W, LINE_H);
+    ctx.strokeStyle = '#E5DDD5'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, ry + LINE_H - 0.5); ctx.lineTo(W, ry + LINE_H - 0.5); ctx.stroke();
 
-    // Divider
-    ctx.strokeStyle = '#E5DDD5';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, ry + LINE_H - 0.5);
-    ctx.lineTo(W, ry + LINE_H - 0.5);
-    ctx.stroke();
+    ctx.fillStyle = '#9CA3AF'; ctx.font = F(12.5); ctx.textAlign = 'left';
+    ctx.fillText(String(idx + 1), LM + 4, ry + 30);
 
-    // Row number
-    ctx.fillStyle = '#9CA3AF';
-    ctx.font = F(13);
-    ctx.textAlign = 'left';
-    ctx.fillText(String(idx + 1), 24, ry + 30);
+    ctx.fillStyle = '#1F2937'; ctx.font = F(14.5, true);
+    ctx.fillText(fit(`${getIcon(item.name)}  ${item.name}`, nameW - 12), LM + numW, ry + 30);
 
-    // Item name
-    ctx.fillStyle = '#1F2937';
-    ctx.font = F(15, true);
-    ctx.fillText(`${getIcon(item.name)}  ${item.name}`, 68, ry + 30);
-
-    // Spoiled
     ctx.textAlign = 'right';
-    ctx.fillStyle = spoiled > 0 ? '#DC2626' : '#D1D5DB';
-    ctx.font = F(14, spoiled > 0);
-    ctx.fillText(spoiled > 0 ? String(spoiled) : '—', W - 170, ry + 30);
-
-    // Qty
-    if (qty > 0) {
-      ctx.fillStyle = '#166534';
-      ctx.font = F(18, true);
-    } else {
-      ctx.fillStyle = '#9CA3AF';
-      ctx.font = F(15);
-    }
-    ctx.fillText(qty > 0 ? String(qty) : '—', W - 32, ry + 30);
+    let rowTotal = 0;
+    cols.forEach((b, i) => {
+      const q = qOf(item.id, b.id); rowTotal += q;
+      const x = LM + numW + nameW + i * brW + brW - 10;
+      ctx.fillStyle = q > 0 ? '#166534' : '#C4C4C4'; ctx.font = F(15, q > 0);
+      ctx.fillText(String(q), x, ry + 30);
+    });
+    ctx.fillStyle = rowTotal > 0 ? '#4A2E1A' : '#C4C4C4'; ctx.font = F(16.5, true);
+    ctx.fillText(String(rowTotal), LM + numW + nameW + cols.length * brW + totW - 10, ry + 30);
   });
 
   // Footer
   const fy = y0 + LINE_H + items.length * LINE_H;
-  ctx.fillStyle = '#4A2E1A';
-  ctx.fillRect(0, fy, W, FOOTER_H);
-  ctx.fillStyle = '#E8C89E';
-  ctx.font = F(13, true);
-  ctx.textAlign = 'center';
-  const totalQty = items.reduce((s, i) => s + (stockMap[i.id] || 0), 0);
-  ctx.fillText(`รวม ${totalQty} ชิ้น  |  เสีย ${totalSpoiled} ชิ้น  |  JE BAR`, W / 2, fy + 42);
+  ctx.fillStyle = '#4A2E1A'; ctx.fillRect(0, fy, W, FOOTER_H);
+  ctx.fillStyle = '#E8C89E'; ctx.font = F(13, true); ctx.textAlign = 'center';
+  ctx.fillText(`รวม ${grandTotal} ชิ้น  |  เสีย ${grandSpoiled} ชิ้น  |  ${cols.length} สาขา  |  JE BAR`, W / 2, fy + 44);
 }
 
-async function exportToImage({ items, stockMap, spoiledMap, branchName, empName }) {
+async function exportToImage(payload) {
   const canvas = document.createElement('canvas');
-  drawExport(canvas, { items, stockMap, spoiledMap, branchName, empName });
+  drawExport(canvas, payload);
   return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
 }
 
@@ -917,15 +893,25 @@ export default function CakeStockPage({ navigate }) {
     setLogsLoading(false);
   }
 
-  // Export image
+  // Export image — แยกจำนวนทุกสาขา + รวม · รายการครบ (ยอด 0 แสดง 0)
   async function handleExport() {
-    const activeBranch = branches.find(b => b.id === activeBranchId);
-    const branchName = activeBranchId === 'all' ? 'รวมทุกสาขา' : (activeBranch?.label || 'ไม่ระบุสาขา');
-    const blob = await exportToImage({ items: items.filter(i => i.is_open), stockMap, spoiledMap, branchName, empName });
+    // ดึงสต็อกทุกสาขา (ทั้ง org) เพื่อทำคอลัมน์ต่อสาขา
+    const { data: stockData } = await supabase.from('cake_stock')
+      .select('item_id,branch_id,qty,qty_spoiled').eq('org_id', orgId);
+    const qtyMap = {}, spoiledByItem = {};
+    (stockData || []).forEach(r => {
+      qtyMap[`${r.item_id}__${r.branch_id}`] = (qtyMap[`${r.item_id}__${r.branch_id}`] || 0) + (Number(r.qty) || 0);
+      spoiledByItem[r.item_id] = (spoiledByItem[r.item_id] || 0) + (Number(r.qty_spoiled) || 0);
+    });
+    // คอลัมน์สาขา: ใช้ branches; ถ้าไม่มี ให้ดึงจาก branch_id ที่พบ
+    let cols = branches.length ? branches
+      : [...new Set((stockData || []).map(r => r.branch_id).filter(Boolean))].map(id => ({ id, label: id }));
+    if (!cols.length) cols = [{ id: '__all', label: 'จำนวน' }];
+    const blob = await exportToImage({ items, branches: cols, qtyMap, spoiledByItem, empName });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `cake-stock-${branchName}-${new Date().toISOString().slice(0, 10)}.png`;
+    a.download = `cake-stock-ทุกสาขา-${new Date().toISOString().slice(0, 10)}.png`;
     a.click();
     URL.revokeObjectURL(url);
   }
