@@ -31,6 +31,37 @@ function getBg(name) {
   return '#F9FAFB';
 }
 
+// ─── Categories ─────────────────────────────────────────────────────────────
+const CAKE_CATEGORIES = [
+  { id: 'cake',   label: '🎂 เค้ก',   re: /เค้ก|cake|โรล|roll|ม้วน|ชีสเค้ก|cheese|gateau|กาโต/i },
+  { id: 'bread',  label: '🥖 ขนมปัง', re: /ขนมปัง|bread|บาแก็ต|baguette|ครัวซอง|croissant|โดนัท|donut|ปัง|toast|บัน|bun/i },
+  { id: 'snack',  label: '🍪 Snack',  re: /คุกกี้|cookie|บราวนี่|brownie|มัฟฟิน|muffin|ทาร์ต|tart|พาย|pie|มาการอง|macaron|วาฟเฟิล|waffle|scone|สโคน|พุดดิ้ง|pudding|ช็อค|chocolate/i },
+  { id: 'other',  label: '📦 อื่นๆ',  re: null },
+];
+
+function guessCategory(name) {
+  for (const c of CAKE_CATEGORIES) if (c.re && c.re.test(name || '')) return c.id;
+  return 'other';
+}
+
+// แมป "ประเภท" (menu.type จาก Operate) → หมวดย่อย bakery
+// types: Cake, Bread, Cookie, Snack, Other bakery (+ เครื่องดื่มที่ถูกกรองออกแล้ว)
+function typeToCategory(type) {
+  const t = (type || '').toLowerCase();
+  if (/cake|เค้ก|โรล|roll|gateau/.test(t)) return 'cake';
+  if (/bread|ขนมปัง|ปัง|toast|bun|croissant|ครัวซอง/.test(t)) return 'bread';
+  if (/cookie|snack|คุกกี้|สแน็ค|ขนมขบเคี้ยว/.test(t)) return 'snack';
+  if (/other\s*bakery|อื่น/.test(t)) return 'other';
+  return null; // ไม่รู้จัก → ให้ตัวเรียกไป fallback ต่อ
+}
+// ลำดับความสำคัญ: subCategory (override) → ประเภท → เดาจากชื่อ
+function resolveCategory(menu) {
+  return menu.subCategory || typeToCategory(menu.type) || guessCategory(menu.name);
+}
+function catLabel(id) {
+  return (CAKE_CATEGORIES.find(c => c.id === id) || {}).label || '📦 อื่นๆ';
+}
+
 // ─── Canvas Export ────────────────────────────────────────────────────────────
 function drawExport(canvas, { items, stockMap, spoiledMap, branchName, empName }) {
   const W = 800;
@@ -208,6 +239,8 @@ export default function CakeStockPage({ navigate }) {
   const [detailItem, setDetailItem] = useState(null);
   const [priceInput, setPriceInput] = useState('');
   const [priceSaving, setPriceSaving] = useState(false);
+  const [priceSavedId, setPriceSavedId] = useState(null);
+  const [catFilter, setCatFilter] = useState('all');
   // Inline qty input buffer { item_id: string }
   const [qtyInput, setQtyInput] = useState({});
 
@@ -265,7 +298,8 @@ export default function CakeStockPage({ navigate }) {
             name: m.name,
             sort_order: 9000 + i,
             is_open: m.status !== 'หยุดขาย',
-            price: m.price ?? m.selling_price ?? null,
+            price: m.priceStore ?? m.price ?? m.selling_price ?? null,
+            category: resolveCategory(m),
           }));
         if (toInsert.length) {
           await supabase.from('cake_items').insert(toInsert);
@@ -317,7 +351,7 @@ export default function CakeStockPage({ navigate }) {
       }
       const [{ data: itemData }, { data: stockData }] = await Promise.all([
         supabase.from('cake_items')
-          .select('id,name,sort_order,is_open,status,photo_url,price')
+          .select('id,name,sort_order,is_open,status,photo_url,price,category')
           .eq('org_id', orgId)
           .in('status', ['active'])
           .order('sort_order'),
@@ -519,16 +553,43 @@ export default function CakeStockPage({ navigate }) {
     await writeLog(item.id, item.name, newOpen ? 'open' : 'close', null, null, null);
   }
 
-  // Save price to cake_items
+  // Save price to cake_items (manual override — ปกติราคาจะ sync จาก Operate)
   async function savePrice(item) {
+    if (priceInput === '' || priceInput == null) { alert('กรุณาใส่ราคาก่อนบันทึก'); return; }
     const p = parseFloat(priceInput);
-    if (isNaN(p) || p < 0) return;
+    if (isNaN(p) || p < 0) { alert('ราคาไม่ถูกต้อง'); return; }
     setPriceSaving(true);
-    await supabase.from('cake_items').update({ price: p }).eq('id', item.id);
-    setItems(prev => prev.map(i => i.id === item.id ? { ...i, price: p } : i));
-    setDetailItem(prev => ({ ...prev, price: p }));
-    setPriceSaving(false);
+    try {
+      const { error } = await supabase.from('cake_items').update({ price: p }).eq('id', item.id);
+      if (error) throw error;
+      setItems(prev => prev.map(i => i.id === item.id ? { ...i, price: p } : i));
+      setDetailItem(prev => prev ? { ...prev, price: p } : prev);
+      setPriceSavedId(item.id);
+      setTimeout(() => setPriceSavedId(null), 2000);
+    } catch (err) {
+      alert('บันทึกราคาไม่สำเร็จ: ' + (err?.message || 'กรุณาลองใหม่'));
+    } finally {
+      setPriceSaving(false);
+    }
   }
+
+  // Save sub-category override to cake_items
+  async function saveCategory(item, cat) {
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, category: cat } : i));
+    setDetailItem(prev => prev && prev.id === item.id ? { ...prev, category: cat } : prev);
+    try {
+      const { error } = await supabase.from('cake_items').update({ category: cat }).eq('id', item.id);
+      if (error) throw error;
+      await writeLog(item.id, item.name, 'adjust', null, null, `จัดหมวด: ${catLabel(cat)}`);
+    } catch (err) {
+      alert('บันทึกหมวดไม่สำเร็จ: ' + (err?.message || 'กรุณาลองใหม่'));
+    }
+  }
+
+  // Seed price input when opening the detail drawer
+  useEffect(() => {
+    setPriceInput(detailItem?.price != null ? String(detailItem.price) : '');
+  }, [detailItem?.id]);
 
   // Upload product photo to Supabase Storage, save URL to cake_items
   async function uploadItemPhoto(item, file) {
@@ -713,28 +774,55 @@ export default function CakeStockPage({ navigate }) {
         }
       });
 
-      // อัปเดต cake_stock และ stockMap
+      // map ชื่อ (normalized) → ราคา (priceStore) + หมวด (จาก type/subCategory) จาก Operate
+      const metaByName = {};
+      menus.forEach(m => {
+        metaByName[norm(m.name)] = {
+          price: m.priceStore ?? m.price ?? m.selling_price ?? null,
+          category: resolveCategory(m),
+        };
+      });
+
+      // อัปเดต cake_stock (qty) + cake_items (price, category) ให้ตรงกับ Operate
       let updated = 0;
       const newStockMap = { ...stockMap };
+      const itemPatch = {}; // { item_id: {price?, category?} }
       for (const item of items) {
         const key = norm(item.name);
-        if (onHandByName[key] === undefined) continue;
-        const newQty = onHandByName[key];
-        const { error: upsertErr } = await supabase.from('cake_stock').upsert({
-          org_id: orgId,
-          branch_id: activeBranchId,
-          item_id: item.id,
-          qty: newQty,
-          updated_by: empId,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'branch_id,item_id' });
-        if (!upsertErr) {
-          newStockMap[item.id] = newQty;
-          updated++;
+        // qty
+        if (onHandByName[key] !== undefined) {
+          const newQty = onHandByName[key];
+          const { error: upsertErr } = await supabase.from('cake_stock').upsert({
+            org_id: orgId,
+            branch_id: activeBranchId,
+            item_id: item.id,
+            qty: newQty,
+            updated_by: empId,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'branch_id,item_id' });
+          if (!upsertErr) {
+            newStockMap[item.id] = newQty;
+            updated++;
+          }
+        }
+        // price + category — ดึงจาก Operate เป็นแหล่งข้อมูลหลัก
+        const meta = metaByName[key];
+        if (meta) {
+          const patch = {};
+          if (meta.price != null && Number(meta.price) !== Number(item.price)) patch.price = meta.price;
+          const cat = meta.category || guessCategory(item.name);
+          if (cat && cat !== item.category) patch.category = cat;
+          if (Object.keys(patch).length) {
+            const { error: upErr } = await supabase.from('cake_items').update(patch).eq('id', item.id);
+            if (!upErr) itemPatch[item.id] = patch;
+          }
         }
       }
       setStockMap(newStockMap);
-      setOperateSyncMsg(updated > 0 ? `ดึงยอดจาก Operate แล้ว ${updated} รายการ` : 'ไม่พบข้อมูลสต็อกจาก Operate');
+      if (Object.keys(itemPatch).length) {
+        setItems(prev => prev.map(i => itemPatch[i.id] ? { ...i, ...itemPatch[i.id] } : i));
+      }
+      setOperateSyncMsg(updated > 0 ? `ดึงจาก Operate แล้ว ${updated} รายการ (ยอด+ราคา+หมวด)` : 'ไม่พบข้อมูลสต็อกจาก Operate');
     } catch {
       setOperateSyncMsg('เกิดข้อผิดพลาด ลองใหม่อีกครั้ง');
     } finally {
@@ -1027,6 +1115,33 @@ export default function CakeStockPage({ navigate }) {
         </div>
       )}
 
+      {/* Category filter chips */}
+      {items.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '10px 12px 2px', WebkitOverflowScrolling: 'touch' }}>
+          {[{ id: 'all', label: `ทั้งหมด (${items.length})` },
+            ...CAKE_CATEGORIES.map(c => ({
+              id: c.id,
+              label: `${c.label} (${items.filter(it => (it.category || guessCategory(it.name)) === c.id).length})`,
+            }))
+          ].map(c => {
+            const on = catFilter === c.id;
+            return (
+              <button key={c.id} onClick={() => setCatFilter(c.id)} style={{
+                flexShrink: 0, padding: '7px 14px', borderRadius: 18, cursor: 'pointer', fontFamily: 'inherit',
+                border: on ? '1.5px solid var(--accent)' : '1.5px solid var(--line)',
+                background: on ? 'var(--accent)' : 'var(--surface)',
+                color: on ? '#fff' : 'var(--muted)', fontSize: 13, fontWeight: on ? 700 : 400, whiteSpace: 'nowrap',
+              }}>{c.label}</button>
+            );
+          })}
+        </div>
+      )}
+      {catFilter !== 'all' && (
+        <div style={{ fontSize: 11, color: 'var(--muted)', padding: '4px 16px 0' }}>
+          ℹ️ ปิดการเรียงลำดับชั่วคราวขณะกรองหมวด — กด "ทั้งหมด" เพื่อจัดลำดับ
+        </div>
+      )}
+
       {/* Item list */}
       <div style={{ padding: '12px 12px 24px' }}>
         {loading ? (
@@ -1040,11 +1155,14 @@ export default function CakeStockPage({ navigate }) {
           </div>
         ) : (
           items.map((item, idx) => {
+            const itemCat = item.category || guessCategory(item.name);
+            if (catFilter !== 'all' && itemCat !== catFilter) return null;
             const qty = stockMap[item.id] || 0;
             const spoiled = spoiledMap[item.id] || 0;
             const isSaving = saving === item.id;
             const isSavingSpoiled = savingSpoiled === item.id;
             const canEdit = isMyBranch;
+            const canReorder = canEdit && catFilter === 'all';
             const details = spoiledDetails[item.id] || {};
             const photoInputId = `spoiled-photo-${item.id}`;
             const qtyVal = qtyInput[item.id] !== undefined ? qtyInput[item.id] : String(qty);
@@ -1054,14 +1172,14 @@ export default function CakeStockPage({ navigate }) {
               <div key={item.id} style={{ marginBottom: 8 }}>
               <div
                 data-drag-idx={idx}
-                draggable={canEdit}
-                onDragStart={() => onDragStart(idx)}
-                onDragEnter={() => onDragEnter(idx)}
-                onDragOver={canEdit ? e => e.preventDefault() : undefined}
-                onDragEnd={onDragEnd}
-                onTouchStart={canEdit ? e => onTouchStart(e, idx) : undefined}
-                onTouchMove={canEdit ? onTouchMove : undefined}
-                onTouchEnd={canEdit ? e => onTouchEnd(e, idx) : undefined}
+                draggable={canReorder}
+                onDragStart={() => canReorder && onDragStart(idx)}
+                onDragEnter={() => canReorder && onDragEnter(idx)}
+                onDragOver={canReorder ? e => e.preventDefault() : undefined}
+                onDragEnd={canReorder ? onDragEnd : undefined}
+                onTouchStart={canReorder ? e => onTouchStart(e, idx) : undefined}
+                onTouchMove={canReorder ? onTouchMove : undefined}
+                onTouchEnd={canReorder ? e => onTouchEnd(e, idx) : undefined}
                 style={{
                   background: dragOverIdx === idx && dragActiveIdx !== idx ? 'var(--hover)' : 'var(--surface)',
                   border: pendingTotal > 0 ? '1.5px solid var(--accent)' : '1.5px solid transparent',
@@ -1076,7 +1194,7 @@ export default function CakeStockPage({ navigate }) {
               >
                 {/* ── Top row: icon + name + status + chevron ── */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {canEdit && (
+                  {canReorder && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0, cursor: 'grab' }}>
                       <button onClick={() => moveItem(idx, -1)} disabled={idx === 0}
                         style={{ background: 'none', border: 'none', padding: '1px 4px', fontSize: 12, color: idx === 0 ? '#E5E7EB' : '#C4B8AC', cursor: idx === 0 ? 'default' : 'pointer', lineHeight: 1 }}>▲</button>
@@ -1095,6 +1213,9 @@ export default function CakeStockPage({ navigate }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 11, color: item.is_open ? '#16A34A' : '#9CA3AF', fontWeight: 600 }}>
                         {item.is_open ? '● เปิดขาย' : '○ ปิดขาย'}
+                      </span>
+                      <span style={{ fontSize: 10, color: 'var(--muted)', background: 'var(--bg)', borderRadius: 8, padding: '1px 7px' }}>
+                        {catLabel(itemCat)}
                       </span>
                       {spoiled > 0 && (
                         <span style={{ fontSize: 10, color: '#DC2626', background: '#FEF2F2', borderRadius: 8, padding: '1px 6px', fontWeight: 700 }}>
@@ -1456,17 +1577,39 @@ export default function CakeStockPage({ navigate }) {
                   <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 13, color: 'var(--muted)', whiteSpace: 'nowrap' }}>ราคา ฿</span>
                     <input
-                      type="number" inputMode="decimal" placeholder={di.price ?? 'ยังไม่ได้ตั้ง'}
-                      defaultValue={di.price ?? ''}
-                      key={di.id}
+                      type="number" inputMode="decimal" placeholder="ยังไม่ได้ตั้ง"
+                      value={priceInput}
                       onChange={e => setPriceInput(e.target.value)}
                       style={{ flex: 1, fontSize: 14, fontWeight: 700, padding: '6px 10px', borderRadius: 8, border: '1.5px solid var(--line)', background: 'var(--bg)', color: 'var(--ink)', maxWidth: 100 }}
                     />
                     <button
                       onClick={() => savePrice(di)}
                       disabled={priceSaving}
-                      style={{ fontSize: 12, fontWeight: 700, padding: '6px 14px', borderRadius: 8, border: 'none', background: '#b0882a', color: '#fff', cursor: 'pointer' }}
-                    >{priceSaving ? '...' : 'บันทึก'}</button>
+                      style={{ fontSize: 12, fontWeight: 700, padding: '6px 14px', borderRadius: 8, border: 'none', background: priceSavedId === di.id ? '#16a34a' : '#b0882a', color: '#fff', cursor: 'pointer' }}
+                    >{priceSaving ? '...' : priceSavedId === di.id ? '✓ บันทึกแล้ว' : 'บันทึก'}</button>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
+                    💡 ราคาปกติดึงจาก Operate (ราคาหน้าร้าน) อัตโนมัติ — แก้ที่นี่เพื่อ override เฉพาะแอปพนักงาน
+                  </div>
+
+                  {/* Sub-category */}
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 8 }}>หมวดหมู่ (bakery)</div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {CAKE_CATEGORIES.map(c => {
+                        const cur = di.category || guessCategory(di.name);
+                        const on = cur === c.id;
+                        return (
+                          <button key={c.id} onClick={() => saveCategory(di, c.id)}
+                            style={{ padding: '5px 12px', borderRadius: 16, border: '1.5px solid', borderColor: on ? 'var(--accent)' : 'var(--line)', background: on ? 'var(--accent)' : 'var(--bg)', color: on ? '#fff' : 'var(--ink)', fontSize: 12, fontWeight: on ? 700 : 400, cursor: 'pointer', fontFamily: 'inherit' }}>
+                            {c.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
+                      💡 ปกติดึงจาก "หมวดย่อย" ในเมนู Operate — แก้ที่นี่เพื่อ override
+                    </div>
                   </div>
                 </div>
 
