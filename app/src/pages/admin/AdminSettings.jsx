@@ -97,7 +97,7 @@ export default function AdminSettings() {
     try {
       // Step 1: lightweight connectivity check (no db column)
       const res = await fetch(
-        `${base}/rest/v1/jebar_app_state?select=shop_code,updated_at&limit=1`,
+        `${base}/rest/v1/jebar_app_state?shop_code=eq.jebar&select=shop_code,updated_at&limit=1`,
         { headers: hdrs }
       );
       if (!res.ok) {
@@ -119,7 +119,7 @@ export default function AdminSettings() {
       // Step 2: try to get stats from db column (may be large — ignore if fails)
       try {
         const res2 = await fetch(
-          `${base}/rest/v1/jebar_app_state?select=db&limit=1`,
+          `${base}/rest/v1/jebar_app_state?shop_code=eq.jebar&select=db&limit=1`,
           { headers: hdrs }
         );
         if (res2.ok) {

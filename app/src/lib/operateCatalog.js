@@ -36,7 +36,7 @@ export async function fetchOperateCatalog() {
 
   try {
     const res = await fetch(
-      `${url.replace(/\/+$/, '')}/rest/v1/jebar_app_state?select=db&limit=1`,
+      `${url.replace(/\/+$/, '')}/rest/v1/jebar_app_state?shop_code=eq.jebar&select=db&limit=1`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
     );
     if (!res.ok) {
