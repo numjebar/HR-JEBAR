@@ -907,7 +907,9 @@ export default function CakeStockPage({ navigate }) {
     let cols = branches.length ? branches
       : [...new Set((stockData || []).map(r => r.branch_id).filter(Boolean))].map(id => ({ id, label: id }));
     if (!cols.length) cols = [{ id: '__all', label: 'จำนวน' }];
-    const blob = await exportToImage({ items, branches: cols, qtyMap, spoiledByItem, empName });
+    // export เฉพาะเมนูที่เปิดขาย (เปิด+ยอด 0 ก็เอา) — ตัดเมนูที่ปิดขายออก
+    const exportItems = items.filter(i => i.is_open);
+    const blob = await exportToImage({ items: exportItems, branches: cols, qtyMap, spoiledByItem, empName });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1282,15 +1284,15 @@ export default function CakeStockPage({ navigate }) {
                 onTouchMove={canReorder ? onTouchMove : undefined}
                 onTouchEnd={canReorder ? e => onTouchEnd(e, idx) : undefined}
                 style={{
-                  background: dragOverIdx === idx && dragActiveIdx !== idx ? 'var(--hover)' : 'var(--surface)',
-                  border: pendingTotal > 0 ? '1.5px solid var(--accent)' : '1.5px solid transparent',
+                  background: dragOverIdx === idx && dragActiveIdx !== idx ? 'var(--hover)' : item.is_open ? 'var(--surface)' : '#F1F1F3',
+                  border: pendingTotal > 0 ? '1.5px solid var(--accent)' : item.is_open ? '1.5px solid transparent' : '1.5px dashed #C9CCD1',
                   borderRadius: 14,
                   padding: '12px 14px',
-                  boxShadow: 'var(--shadow-sm)',
-                  opacity: dragActiveIdx === idx ? 0.35 : item.is_open ? 1 : 0.65,
+                  boxShadow: item.is_open ? 'var(--shadow-sm)' : 'none',
+                  opacity: dragActiveIdx === idx ? 0.35 : 1,
                   userSelect: 'none', WebkitUserSelect: 'none',
                   transition: 'background 0.1s, opacity 0.1s',
-                  borderTop: dragOverIdx === idx && dragActiveIdx !== idx ? '2px solid var(--accent)' : '2px solid transparent',
+                  borderTop: dragOverIdx === idx && dragActiveIdx !== idx ? '2px solid var(--accent)' : undefined,
                 }}
               >
                 {/* ── Top row: icon + name + status + chevron ── */}
@@ -1310,11 +1312,11 @@ export default function CakeStockPage({ navigate }) {
                     }
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--ink)', lineHeight: 1.3 }}>{item.name}</div>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: item.is_open ? 'var(--ink)' : '#9CA3AF', lineHeight: 1.3 }}>{item.name}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 11, color: item.is_open ? '#16A34A' : '#9CA3AF', fontWeight: 600 }}>
-                        {item.is_open ? '● เปิดขาย' : '○ ปิดขาย'}
-                      </span>
+                      {item.is_open
+                        ? <span style={{ fontSize: 10, fontWeight: 700, color: '#166534', background: '#DCFCE7', borderRadius: 8, padding: '2px 8px' }}>● เปิดขาย</span>
+                        : <span style={{ fontSize: 10, fontWeight: 700, color: '#B91C1C', background: '#FEE2E2', borderRadius: 8, padding: '2px 8px' }}>⛔ ปิดขาย</span>}
                       <span style={{ fontSize: 10, color: 'var(--muted)', background: 'var(--bg)', borderRadius: 8, padding: '1px 7px' }}>
                         {catLabel(itemCat)}
                       </span>
