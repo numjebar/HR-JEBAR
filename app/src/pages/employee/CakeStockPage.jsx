@@ -245,6 +245,7 @@ export default function CakeStockPage({ navigate }) {
   const [catFilter, setCatFilter] = useState('all');
   const [operateMenus, setOperateMenus] = useState([]); // เมนู bakery จาก Operate (ไว้ cross-check)
   const [showMissingOnly, setShowMissingOnly] = useState(false);
+  const [pushingOperate, setPushingOperate] = useState(false);
   // Inline qty input buffer { item_id: string }
   const [qtyInput, setQtyInput] = useState({});
 
@@ -612,6 +613,53 @@ export default function CakeStockPage({ navigate }) {
   useEffect(() => {
     setPriceInput(detailItem?.price != null ? String(detailItem.price) : '');
   }, [detailItem?.id]);
+
+  // Push เมนูที่ "ไม่เจอใน Operate" ขึ้นไปสร้างเป็นเมนูใน Operate (jebar_app_state.db.menus)
+  // อ่าน state สดก่อนเขียน + append เท่านั้น (ไม่แตะเมนูเดิม) เพื่อลดการชนกับ Operate
+  async function pushOrphansToOperate() {
+    const opNorm = new Set(operateMenus.map(m => normName(m.name)));
+    const orphans = items.filter(it => operateMenus.length > 0 && !opNorm.has(normName(it.name)));
+    if (!orphans.length) { setOperateSyncMsg('ไม่มีรายการที่ต้องส่งขึ้น Operate'); return; }
+    if (!window.confirm(`ส่ง ${orphans.length} รายการขึ้นไปสร้างเป็นเมนูใน Operate?\n\n• หมวด: Bakery (+ หมวดย่อยตามที่จัดไว้)\n• ราคา: ตามที่ตั้งในแอป (ถ้ายังไม่มีจะเป็น 0)\n• เจ้าของไปใส่สูตร/ต้นทุนเพิ่มใน Operate ทีหลังได้\n\nแนะนำ: ปิดหน้า Operate ขณะส่ง แล้วเปิดใหม่เพื่อให้โหลดเมนูล่าสุด`)) return;
+    setPushingOperate(true);
+    setOperateSyncMsg('');
+    try {
+      const { data, error } = await supabase.from('jebar_app_state').select('db').eq('shop_code', 'jebar').limit(1).single();
+      if (error || !data?.db) throw error || new Error('อ่านข้อมูล Operate ไม่ได้');
+      const opDb = data.db;
+      const menus = Array.isArray(opDb.menus) ? [...opDb.menus] : [];
+      const existNorm = new Set(menus.map(m => normName(m.name)));
+      const catType = { cake: 'Cake', bread: 'Bread', snack: 'Snack', other: 'Other bakery' };
+      const ts = Date.now().toString(36).toUpperCase();
+      let added = 0;
+      orphans.forEach((it, i) => {
+        if (existNorm.has(normName(it.name))) return; // กันซ้ำ
+        const cat = it.category || guessCategory(it.name);
+        menus.push({
+          id: `HRB${ts}${i}`,
+          name: it.name,
+          category: 'Bakery',
+          type: catType[cat] || 'Other bakery',
+          priceStore: Number(it.price) || 0,
+          priceLine: 0,
+          status: it.is_open ? 'ขาย' : 'หยุดขาย',
+          source: 'hr',
+          createdAt: new Date().toISOString(),
+        });
+        existNorm.add(normName(it.name));
+        added++;
+      });
+      if (!added) { setOperateSyncMsg('รายการเหล่านี้มีใน Operate อยู่แล้ว'); return; }
+      const { error: upErr } = await supabase.from('jebar_app_state').update({ db: { ...opDb, menus } }).eq('shop_code', 'jebar');
+      if (upErr) throw upErr;
+      setOperateMenus(prev => [...prev, ...orphans]); // ให้ป้าย "ไม่เจอใน Operate" หาย
+      setOperateSyncMsg(`✓ ส่งขึ้น Operate แล้ว ${added} รายการ — เปิด Operate (กดโหลด/รีเฟรช) เพื่อใส่สูตร/ราคาเพิ่ม`);
+    } catch (e) {
+      alert('ส่งขึ้น Operate ไม่สำเร็จ: ' + (e?.message || 'ลองใหม่'));
+    } finally {
+      setPushingOperate(false);
+    }
+  }
 
   // Upload product photo to Supabase Storage, save URL to cake_items
   async function uploadItemPhoto(item, file) {
@@ -1164,9 +1212,19 @@ export default function CakeStockPage({ navigate }) {
             {notInOpCount > 0 && <span>🔗 ไม่เจอใน Operate: <b>{notInOpCount}</b></span>}
           </div>
           {notInOpCount > 0 && (
-            <div style={{ fontSize: 10.5, color: '#B45309', marginTop: 6 }}>
-              💡 "ไม่เจอใน Operate" = ชื่อไม่ตรงกับเมนูใน Operate → ราคา/หมวดเลย sync ไม่ได้ (แก้ชื่อให้ตรง หรือ override ราคาที่นี่)
-            </div>
+            <>
+              <div style={{ fontSize: 10.5, color: '#B45309', marginTop: 6 }}>
+                💡 "ไม่เจอใน Operate" = เมนูนี้มีแค่ในแอปพนักงาน ยังไม่มีใน Operate (ไม่มีสูตร/ต้นทุน/GP%)
+              </div>
+              <button onClick={pushOrphansToOperate} disabled={pushingOperate}
+                style={{ marginTop: 8, width: '100%', padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                  background: '#0d9488', color: '#fff', fontWeight: 700, fontSize: 13, opacity: pushingOperate ? 0.6 : 1 }}>
+                {pushingOperate ? 'กำลังส่ง...' : `⬆️ ส่ง ${notInOpCount} รายการขึ้น Operate (สร้างเมนู Bakery)`}
+              </button>
+              <div style={{ fontSize: 10, color: '#B45309', marginTop: 4 }}>
+                เจ้าของไปใส่สูตร/ต้นทุนเพิ่มใน Operate ทีหลังได้ — ราคา/หมวดจะ sync กลับมาเอง
+              </div>
+            </>
           )}
         </div>
       )}
