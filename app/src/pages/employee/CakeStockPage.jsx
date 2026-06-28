@@ -451,7 +451,18 @@ export default function CakeStockPage({ navigate }) {
     });
   }
 
-  // Adjust qty (upsert into cake_stock)
+  // เฟส 2 รวมข้อมูล: เรียก stock RPC; คืน { notInstalled } เพื่อให้ caller fallback วิธีเดิมได้
+  async function callStockRpc(fn, args) {
+    const { data, error } = await supabase.rpc(fn, args);
+    if (error) {
+      const notInstalled = error.code === 'PGRST202' ||
+        /could not find the function|does not exist|schema cache/i.test(error.message || '');
+      return { notInstalled, error, data: null };
+    }
+    return { notInstalled: false, error: null, data };
+  }
+
+  // Adjust qty (ผ่าน RPC adjust_cake_stock — relative, atomic; fallback upsert เดิมถ้ายังไม่ติดตั้ง)
   async function adjustQty(item, delta) {
     if (!isMyBranch) return;
     const prev = stockMap[item.id] || 0;
@@ -459,16 +470,22 @@ export default function CakeStockPage({ navigate }) {
     setSaving(item.id);
     setStockMap(old => ({ ...old, [item.id]: next }));
     try {
-      const { error } = await supabase.from('cake_stock').upsert({
-        org_id: orgId,
-        branch_id: activeBranchId,
-        item_id: item.id,
-        qty: next,
-        updated_by: empId,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'branch_id,item_id' });
-      if (error) throw error;
-      await writeLog(item.id, item.name, 'adjust', delta, next, null);
+      const r = await callStockRpc('adjust_cake_stock', {
+        p_branch_id: activeBranchId, p_item_id: item.id, p_delta: delta,
+        p_action: 'adjust', p_actor_id: empId, p_actor_name: empName, p_note: null, p_spoiled: false,
+      });
+      if (r.notInstalled) {
+        const { error } = await supabase.from('cake_stock').upsert({
+          org_id: orgId, branch_id: activeBranchId, item_id: item.id,
+          qty: next, updated_by: empId, updated_at: new Date().toISOString(),
+        }, { onConflict: 'branch_id,item_id' });
+        if (error) throw error;
+        await writeLog(item.id, item.name, 'adjust', delta, next, null);
+      } else if (r.error) {
+        throw r.error;
+      } else if (r.data && typeof r.data.qty === 'number') {
+        setStockMap(old => ({ ...old, [item.id]: r.data.qty }));
+      }
     } catch (err) {
       setStockMap(old => ({ ...old, [item.id]: prev }));
       alert('บันทึกไม่สำเร็จ: ' + (err?.message || 'กรุณาลองใหม่'));
@@ -477,7 +494,7 @@ export default function CakeStockPage({ navigate }) {
     }
   }
 
-  // Set qty to absolute value (called from editable input)
+  // Set qty to absolute value (ผ่าน RPC set_cake_stock — ตั้งยอดเป๊ะ + log delta; fallback เดิม)
   async function setQtyAbsolute(item, newQty) {
     if (!isMyBranch) return;
     const prev = stockMap[item.id] || 0;
@@ -486,12 +503,22 @@ export default function CakeStockPage({ navigate }) {
     setSaving(item.id);
     setStockMap(old => ({ ...old, [item.id]: next }));
     try {
-      const { error } = await supabase.from('cake_stock').upsert({
-        org_id: orgId, branch_id: activeBranchId, item_id: item.id,
-        qty: next, updated_by: empId, updated_at: new Date().toISOString(),
-      }, { onConflict: 'branch_id,item_id' });
-      if (error) throw error;
-      await writeLog(item.id, item.name, 'adjust', next - prev, next, null);
+      const r = await callStockRpc('set_cake_stock', {
+        p_branch_id: activeBranchId, p_item_id: item.id, p_target: next,
+        p_actor_id: empId, p_actor_name: empName, p_note: null,
+      });
+      if (r.notInstalled) {
+        const { error } = await supabase.from('cake_stock').upsert({
+          org_id: orgId, branch_id: activeBranchId, item_id: item.id,
+          qty: next, updated_by: empId, updated_at: new Date().toISOString(),
+        }, { onConflict: 'branch_id,item_id' });
+        if (error) throw error;
+        await writeLog(item.id, item.name, 'adjust', next - prev, next, null);
+      } else if (r.error) {
+        throw r.error;
+      } else if (r.data && typeof r.data.qty === 'number') {
+        setStockMap(old => ({ ...old, [item.id]: r.data.qty }));
+      }
     } catch (err) {
       setStockMap(old => ({ ...old, [item.id]: prev }));
       alert('บันทึกไม่สำเร็จ: ' + (err?.message || 'กรุณาลองใหม่'));
@@ -550,7 +577,7 @@ export default function CakeStockPage({ navigate }) {
     }
   }
 
-  // Adjust spoiled qty
+  // Adjust spoiled qty (ผ่าน RPC adjust_cake_stock p_spoiled=true — relative; fallback เดิม)
   async function adjustSpoiled(item, delta) {
     if (!isMyBranch) return;
     const prev = spoiledMap[item.id] || 0;
@@ -558,16 +585,22 @@ export default function CakeStockPage({ navigate }) {
     setSavingSpoiled(item.id);
     setSpoiledMap(old => ({ ...old, [item.id]: next }));
     try {
-      const { error } = await supabase.from('cake_stock').upsert({
-        org_id: orgId,
-        branch_id: activeBranchId,
-        item_id: item.id,
-        qty_spoiled: next,
-        updated_by: empId,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'branch_id,item_id' });
-      if (error) throw error;
-      await writeLog(item.id, item.name, 'spoiled', delta, next, null);
+      const r = await callStockRpc('adjust_cake_stock', {
+        p_branch_id: activeBranchId, p_item_id: item.id, p_delta: delta,
+        p_action: 'spoiled', p_actor_id: empId, p_actor_name: empName, p_note: null, p_spoiled: true,
+      });
+      if (r.notInstalled) {
+        const { error } = await supabase.from('cake_stock').upsert({
+          org_id: orgId, branch_id: activeBranchId, item_id: item.id,
+          qty_spoiled: next, updated_by: empId, updated_at: new Date().toISOString(),
+        }, { onConflict: 'branch_id,item_id' });
+        if (error) throw error;
+        await writeLog(item.id, item.name, 'spoiled', delta, next, null);
+      } else if (r.error) {
+        throw r.error;
+      } else if (r.data && typeof r.data.qty_spoiled === 'number') {
+        setSpoiledMap(old => ({ ...old, [item.id]: r.data.qty_spoiled }));
+      }
     } catch (err) {
       setSpoiledMap(old => ({ ...old, [item.id]: prev }));
       alert('บันทึกไม่สำเร็จ: ' + (err?.message || 'กรุณาลองใหม่'));
@@ -885,18 +918,24 @@ export default function CakeStockPage({ navigate }) {
       const itemPatch = {}; // { item_id: {price?, category?} }
       for (const item of items) {
         const key = norm(item.name);
-        // qty
+        // qty — ตั้งค่าแบบ absolute ผ่าน RPC set_cake_stock (fallback upsert เดิม)
         if (onHandByName[key] !== undefined) {
           const newQty = onHandByName[key];
-          const { error: upsertErr } = await supabase.from('cake_stock').upsert({
-            org_id: orgId,
-            branch_id: activeBranchId,
-            item_id: item.id,
-            qty: newQty,
-            updated_by: empId,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'branch_id,item_id' });
-          if (!upsertErr) {
+          const r = await callStockRpc('set_cake_stock', {
+            p_branch_id: activeBranchId, p_item_id: item.id, p_target: newQty,
+            p_actor_id: empId, p_actor_name: empName, p_note: 'ดึงจาก Operate',
+          });
+          let ok = false;
+          if (r.notInstalled) {
+            const { error: upsertErr } = await supabase.from('cake_stock').upsert({
+              org_id: orgId, branch_id: activeBranchId, item_id: item.id,
+              qty: newQty, updated_by: empId, updated_at: new Date().toISOString(),
+            }, { onConflict: 'branch_id,item_id' });
+            ok = !upsertErr;
+          } else {
+            ok = !r.error;
+          }
+          if (ok) {
             newStockMap[item.id] = newQty;
             updated++;
           }
