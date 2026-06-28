@@ -21,6 +21,7 @@ export default function AdminDashboard() {
   const [employees, setEmployees] = useState([]);
   const [allBranches, setAllBranches] = useState([]);
   const [orgSettings, setOrgSettings] = useState(null);
+  const [leaveBusy, setLeaveBusy] = useState(null);
   const today = ymd(new Date());
 
   async function load() {
@@ -145,76 +146,68 @@ export default function AdminDashboard() {
   }, [orgId]);
 
   async function approveLeave(id, status) {
-    const { data: leave } = await supabase.from('leaves').select('*').eq('id', id).single();
-    await supabase.from('leaves').update({ status }).eq('id', id);
-    if (leave && status === 'approved') {
-      const days = [];
-      let cursor = new Date(`${leave.date_from}T00:00:00`);
-      const end = new Date(`${leave.date_to}T00:00:00`);
-      while (cursor <= end) {
-        days.push({
-          org_id: leave.org_id,
-          emp_id: leave.emp_id,
-          date: ymd(cursor),
-          clock_in: null,
-          clock_out: null,
-          status: 'leave',
-          ot_min: 0,
-          leave_type: leave.type,
-          paid: true,
-        });
-        cursor = addDays(cursor, 1);
-      }
-      await supabase.from('attendance').upsert(days, { onConflict: 'emp_id,date' });
+    if (leaveBusy) return;
+    setLeaveBusy(id);
+    try {
+      const { data: leave, error: selErr } = await supabase.from('leaves').select('*').eq('id', id).single();
+      if (selErr || !leave) throw new Error(selErr?.message || 'ไม่พบคำขอลานี้');
 
-      const emp = employees.find((item) => item.id === leave.emp_id);
-      const branch = allBranches.find((item) => item.id === emp?.branch_id);
-      const rules = rulesFor(orgSettings?.rules, branch, emp);
-      const deductDays = Number(rules?.urgentLeaveDeductDays || 0);
-      const shouldCreateUrgentDeduct = Boolean(leave.urgent) && deductDays > 0;
+      // หลัก: อัปเดตสถานะคำขอลา — ถ้าพลาด (เช่นสิทธิ์ RLS) ต้องแจ้ง ไม่เงียบ
+      const { error: updErr } = await supabase.from('leaves').update({ status }).eq('id', id);
+      if (updErr) throw new Error('อัปเดตสถานะไม่สำเร็จ: ' + updErr.message);
 
-      if (shouldCreateUrgentDeduct && emp) {
-        const note = `${URGENT_LEAVE_NOTE_PREFIX} (หัก ${deductDays} แรง)`;
-        const deductAmount = Math.round(dayRate(emp) * deductDays);
-        const { data: existingAdjust } = await supabase
-          .from('adjustments')
-          .select('id')
-          .eq('emp_id', leave.emp_id)
-          .eq('date', leave.date_from)
-          .eq('auto', true)
-          .like('note', `${URGENT_LEAVE_NOTE_PREFIX}%`)
-          .maybeSingle();
-
-        if (!existingAdjust && deductAmount > 0) {
-          await supabase.from('adjustments').insert({
-            emp_id: leave.emp_id,
-            org_id: leave.org_id,
-            date: leave.date_from,
-            type: 'other',
-            amount: deductAmount,
-            note,
-            auto: true,
+      // รอง: ลงเวลา/ปรับเงิน — ถ้าพลาดแค่เตือน ไม่ย้อนการอนุมัติ
+      let sideWarn = '';
+      if (status === 'approved') {
+        const days = [];
+        let cursor = new Date(`${leave.date_from}T00:00:00`);
+        const end = new Date(`${leave.date_to}T00:00:00`);
+        while (cursor <= end) {
+          days.push({
+            org_id: leave.org_id, emp_id: leave.emp_id, date: ymd(cursor),
+            clock_in: null, clock_out: null, status: 'leave', ot_min: 0,
+            leave_type: leave.type, paid: true,
           });
+          cursor = addDays(cursor, 1);
+        }
+        const { error: attErr } = await supabase.from('attendance').upsert(days, { onConflict: 'emp_id,date' });
+        if (attErr) sideWarn = 'บันทึกวันลาในตารางเวลายังไม่สำเร็จ';
+
+        const emp = employees.find((item) => item.id === leave.emp_id);
+        const branch = allBranches.find((item) => item.id === emp?.branch_id);
+        const rules = rulesFor(orgSettings?.rules, branch, emp);
+        const deductDays = Number(rules?.urgentLeaveDeductDays || 0);
+        if (Boolean(leave.urgent) && deductDays > 0 && emp) {
+          const note = `${URGENT_LEAVE_NOTE_PREFIX} (หัก ${deductDays} แรง)`;
+          const deductAmount = Math.round(dayRate(emp) * deductDays);
+          const { data: existingAdjust } = await supabase
+            .from('adjustments').select('id')
+            .eq('emp_id', leave.emp_id).eq('date', leave.date_from)
+            .eq('auto', true).like('note', `${URGENT_LEAVE_NOTE_PREFIX}%`).maybeSingle();
+          if (!existingAdjust && deductAmount > 0) {
+            await supabase.from('adjustments').insert({
+              emp_id: leave.emp_id, org_id: leave.org_id, date: leave.date_from,
+              type: 'other', amount: deductAmount, note, auto: true,
+            });
+          }
         }
       }
-    }
-    if (leave && status === 'rejected') {
-      await supabase.from('attendance')
-        .delete()
-        .eq('emp_id', leave.emp_id)
-        .gte('date', leave.date_from)
-        .lte('date', leave.date_to)
-        .eq('status', 'leave')
-        .eq('leave_type', leave.type);
+      if (status === 'rejected') {
+        await supabase.from('attendance').delete()
+          .eq('emp_id', leave.emp_id).gte('date', leave.date_from).lte('date', leave.date_to)
+          .eq('status', 'leave').eq('leave_type', leave.type);
+        await supabase.from('adjustments').delete()
+          .eq('emp_id', leave.emp_id).eq('date', leave.date_from)
+          .eq('auto', true).like('note', `${URGENT_LEAVE_NOTE_PREFIX}%`);
+      }
 
-      await supabase.from('adjustments')
-        .delete()
-        .eq('emp_id', leave.emp_id)
-        .eq('date', leave.date_from)
-        .eq('auto', true)
-        .like('note', `${URGENT_LEAVE_NOTE_PREFIX}%`);
+      await load();
+      if (sideWarn) alert((status === 'approved' ? 'อนุมัติแล้ว' : 'ปฏิเสธแล้ว') + ' — แต่ ' + sideWarn);
+    } catch (err) {
+      alert('ทำรายการไม่สำเร็จ: ' + (err?.message || 'กรุณาลองใหม่'));
+    } finally {
+      setLeaveBusy(null);
     }
-    load();
   }
 
   const tiles = [
@@ -337,8 +330,8 @@ export default function AdminDashboard() {
               <div style={{ fontSize: 13, color: 'var(--muted)' }}>{l.type} · {l.date_from} - {l.date_to}</div>
               {l.reason && <div style={{ fontSize: 13, marginTop: 2 }}>{l.reason}</div>}
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button className="btn" style={{ background: 'var(--accent)', color: '#fff', padding: '6px 14px', fontSize: 13 }} onClick={() => approveLeave(l.id, 'approved')}>อนุมัติ</button>
-                <button className="btn btn-danger" style={{ padding: '6px 14px', fontSize: 13 }} onClick={() => approveLeave(l.id, 'rejected')}>ปฏิเสธ</button>
+                <button className="btn" disabled={leaveBusy === l.id} style={{ background: 'var(--accent)', color: '#fff', padding: '6px 14px', fontSize: 13, opacity: leaveBusy === l.id ? 0.6 : 1 }} onClick={() => approveLeave(l.id, 'approved')}>{leaveBusy === l.id ? '...' : 'อนุมัติ'}</button>
+                <button className="btn btn-danger" disabled={leaveBusy === l.id} style={{ padding: '6px 14px', fontSize: 13, opacity: leaveBusy === l.id ? 0.6 : 1 }} onClick={() => approveLeave(l.id, 'rejected')}>ปฏิเสธ</button>
               </div>
             </div>
           ))}
