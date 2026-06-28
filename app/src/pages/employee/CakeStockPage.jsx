@@ -1433,8 +1433,9 @@ export default function CakeStockPage({ navigate }) {
                 onTouchMove={canReorder ? onTouchMove : undefined}
                 onTouchEnd={canReorder ? e => onTouchEnd(e, idx) : undefined}
                 style={{
-                  background: dragOverIdx === idx && dragActiveIdx !== idx ? 'var(--hover)' : item.is_open ? 'var(--surface)' : '#F1F1F3',
-                  border: pendingTotal > 0 ? '1.5px solid var(--accent)' : item.is_open ? '1.5px solid transparent' : '1.5px dashed #C9CCD1',
+                  background: dragOverIdx === idx && dragActiveIdx !== idx ? 'var(--hover)' : item.is_open ? 'var(--surface)' : '#E4E4E8',
+                  border: pendingTotal > 0 ? '1.5px solid var(--accent)' : item.is_open ? '1.5px solid transparent' : '1.5px solid #C2C5CC',
+                  borderLeft: item.is_open ? undefined : '5px solid #EF4444',
                   borderRadius: 14,
                   padding: '12px 14px',
                   boxShadow: item.is_open ? 'var(--shadow-sm)' : 'none',
@@ -1461,11 +1462,11 @@ export default function CakeStockPage({ navigate }) {
                     }
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: item.is_open ? 'var(--ink)' : '#9CA3AF', lineHeight: 1.3 }}>{item.name}</div>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: item.is_open ? 'var(--ink)' : '#7C818B', lineHeight: 1.3, textDecoration: item.is_open ? 'none' : 'line-through', textDecorationColor: '#C2C5CC' }}>{item.name}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
                       {item.is_open
                         ? <span style={{ fontSize: 10, fontWeight: 700, color: '#166534', background: '#DCFCE7', borderRadius: 8, padding: '2px 8px' }}>● เปิดขาย</span>
-                        : <span style={{ fontSize: 10, fontWeight: 700, color: '#B91C1C', background: '#FEE2E2', borderRadius: 8, padding: '2px 8px' }}>⛔ ปิดขาย</span>}
+                        : <span style={{ fontSize: 10, fontWeight: 800, color: '#fff', background: '#EF4444', borderRadius: 8, padding: '2px 8px' }}>⛔ ปิดขาย</span>}
                       <span style={{ fontSize: 10, color: 'var(--muted)', background: 'var(--bg)', borderRadius: 8, padding: '1px 7px' }}>
                         {catLabel(itemCat)}
                       </span>
