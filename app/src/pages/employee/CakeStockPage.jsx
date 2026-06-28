@@ -1271,15 +1271,48 @@ export default function CakeStockPage({ navigate }) {
         </div>
       )}
 
-      {/* Production claim banner */}
+      {/* Production claim banner — กดรับได้ตรงนี้เลย ไม่ต้องเข้ารายละเอียด */}
       {isMyBranch && Object.keys(prodClaims).length > 0 && (
-        <div style={{ margin: '8px 12px 0', background: '#E6F4F0', border: '1.5px solid var(--accent)', borderRadius: 14, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 36, height: 36, background: '#fff', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.2"><path d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 13h12l1-13"/></svg>
+        <div style={{ margin: '8px 12px 0', background: '#E6F4F0', border: '1.5px solid var(--accent)', borderRadius: 14, padding: '12px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <div style={{ width: 36, height: 36, background: '#fff', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.2"><path d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 13h12l1-13"/></svg>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>📦 ผลผลิตใหม่ {Object.keys(prodClaims).length} รายการ</div>
+              <div style={{ fontSize: 11, color: '#5a9a8a', marginTop: 1 }}>กดปุ่ม "รับ" เพื่อเข้าสต็อกได้เลย</div>
+            </div>
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>📦 ผลผลิตใหม่ {Object.keys(prodClaims).length} รายการ</div>
-            <div style={{ fontSize: 11, color: '#5a9a8a', marginTop: 1 }}>กดรายละเอียดแต่ละรายการเพื่อรับเข้าสต็อก</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {Object.keys(prodClaims).map(key => {
+              const entries = prodClaims[key] || [];
+              const sum = entries.reduce((s, e) => s + e.qty, 0);
+              const claimItem = items.find(it => it.name.toLowerCase() === key);
+              const e0 = entries[0] || {};
+              const busy = saving === claimItem?.id;
+              return (
+                <div key={key} style={{ background: '#fff', borderRadius: 10, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {e0.productName || claimItem?.name || key}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#5a9a8a' }}>
+                      ผลิตมา <b style={{ color: 'var(--accent)' }}>{sum} {e0.unit || 'ชิ้น'}</b>
+                      {e0.batch ? ` · ${e0.batch}` : ''}{e0.empName ? ` · ${e0.empName}` : ''}
+                    </div>
+                  </div>
+                  {claimItem ? (
+                    <button onClick={() => claimProduction(claimItem, entries)} disabled={busy}
+                      style={{ flexShrink: 0, padding: '8px 16px', borderRadius: 9, border: 'none', cursor: busy ? 'default' : 'pointer',
+                        background: busy ? '#CDE7DF' : 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 13, fontFamily: 'inherit' }}>
+                      {busy ? '…' : `✓ รับ +${sum}`}
+                    </button>
+                  ) : (
+                    <span style={{ flexShrink: 0, fontSize: 11, color: '#C2410C' }}>ไม่เจอเมนูนี้</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
