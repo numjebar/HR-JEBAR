@@ -500,24 +500,42 @@ export default function CakeStockPage({ navigate }) {
     }
   }
 
-  // Receive production into stock (semi-auto claim)
+  // Receive production into stock (รับผลผลิตเข้าสต็อก)
+  // เฟส 1 รวมข้อมูล: เรียก RPC claim_production (atomic + กันซ้ำที่ DB) — ถ้ายังไม่ได้วาง SQL จะ fallback วิธีเดิม
   async function claimProduction(item, entries) {
     if (!isMyBranch || !entries?.length) return;
-    const totalQty = entries.reduce((s, e) => s + e.qty, 0);
     const prev = stockMap[item.id] || 0;
-    const next = prev + totalQty;
     setSaving(item.id);
-    setStockMap(old => ({ ...old, [item.id]: next }));
     try {
-      const { error } = await supabase.from('cake_stock').upsert({
-        org_id: orgId, branch_id: activeBranchId, item_id: item.id,
-        qty: next, updated_by: empId, updated_at: new Date().toISOString(),
-      }, { onConflict: 'branch_id,item_id' });
-      if (error) throw error;
-      // Log each claimed entry with its ID in the note field
+      let finalQty = null;
+      let useFallback = false;
       for (const e of entries) {
-        await writeLog(item.id, item.name, 'production_claim', e.qty, next, e.id);
+        const { data, error } = await supabase.rpc('claim_production', {
+          p_entry_id: e.id, p_branch_id: activeBranchId, p_actor_name: empName,
+        });
+        if (error) {
+          const notInstalled = error.code === 'PGRST202' ||
+            /could not find the function|does not exist|schema cache/i.test(error.message || '');
+          if (notInstalled) { useFallback = true; break; }
+          throw error;
+        }
+        if (data && typeof data.qty === 'number') finalQty = data.qty;
       }
+      if (useFallback) {
+        // วิธีเดิม (client-side) — เผื่อยังไม่ได้ติดตั้ง RPC ใน Supabase
+        const totalQty = entries.reduce((s, e) => s + e.qty, 0);
+        const next = prev + totalQty;
+        const { error } = await supabase.from('cake_stock').upsert({
+          org_id: orgId, branch_id: activeBranchId, item_id: item.id,
+          qty: next, updated_by: empId, updated_at: new Date().toISOString(),
+        }, { onConflict: 'branch_id,item_id' });
+        if (error) throw error;
+        for (const e of entries) {
+          await writeLog(item.id, item.name, 'production_claim', e.qty, next, e.id);
+        }
+        finalQty = next;
+      }
+      setStockMap(old => ({ ...old, [item.id]: finalQty != null ? finalQty : prev }));
       // Remove from pending claims
       const claimedKey = item.name.toLowerCase();
       setProdClaims(prev => { const n = { ...prev }; delete n[claimedKey]; return n; });
