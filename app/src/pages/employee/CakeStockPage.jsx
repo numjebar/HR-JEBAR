@@ -619,7 +619,26 @@ export default function CakeStockPage({ navigate }) {
     await writeLog(item.id, item.name, newOpen ? 'open' : 'close', null, null, null);
   }
 
-  // Save price to cake_items (manual override — ปกติราคาจะ sync จาก Operate)
+  // Push ราคากลับขึ้น Operate (priceStore) — ให้ Operate เป็นต้นทางเดียว (เฟส 3 รวมข้อมูล)
+  // อ่าน state สดก่อนเขียน + แตะเฉพาะ priceStore ของเมนูที่ชื่อตรงกัน (ไม่แตะฟิลด์อื่น) เพื่อลดการชน
+  async function pushPriceToOperate(name, price) {
+    try {
+      const { data, error } = await supabase.from('jebar_app_state').select('db').eq('shop_code', 'jebar').limit(1).single();
+      if (error || !data?.db || !Array.isArray(data.db.menus)) return false;
+      const opDb = data.db;
+      const key = normName(name);
+      let touched = false;
+      const menus = opDb.menus.map(m => {
+        if (normName(m.name) === key) { touched = true; return { ...m, priceStore: price }; }
+        return m;
+      });
+      if (!touched) return false; // เป็น orphan — ใช้ปุ่ม "ส่งขึ้น Operate" สร้างก่อน
+      const { error: upErr } = await supabase.from('jebar_app_state').update({ db: { ...opDb, menus } }).eq('shop_code', 'jebar');
+      return !upErr;
+    } catch { return false; }
+  }
+
+  // Save price — เขียน cake_items + push กลับขึ้น Operate ให้เป็นค่าหลัก (ไม่งั้น sync รอบหน้าจะทับ)
   async function savePrice(item) {
     if (priceInput === '' || priceInput == null) { alert('กรุณาใส่ราคาก่อนบันทึก'); return; }
     const p = parseFloat(priceInput);
@@ -630,8 +649,16 @@ export default function CakeStockPage({ navigate }) {
       if (error) throw error;
       setItems(prev => prev.map(i => i.id === item.id ? { ...i, price: p } : i));
       setDetailItem(prev => prev ? { ...prev, price: p } : prev);
+      // ผลักขึ้น Operate (ต้นทางหลัก) — ถ้าเป็น orphan จะไม่เจอ ค่อยใช้ปุ่มส่งขึ้น Operate
+      const pushed = await pushPriceToOperate(item.name, p);
+      setOperateMenus(prev => prev.map(m => normName(m.name) === normName(item.name) ? { ...m, priceStore: p } : m));
       setPriceSavedId(item.id);
       setTimeout(() => setPriceSavedId(null), 2000);
+      if (!pushed) {
+        // ไม่เจอใน Operate — เตือนเบาๆ ว่าควรส่งขึ้นก่อน (ไม่ใช่ error)
+        setOperateSyncMsg('บันทึกราคาแล้ว — เมนูนี้ยังไม่มีใน Operate กด "ส่งขึ้น Operate" เพื่อให้ราคาตรงกันถาวร');
+        setTimeout(() => setOperateSyncMsg(''), 5000);
+      }
     } catch (err) {
       alert('บันทึกราคาไม่สำเร็จ: ' + (err?.message || 'กรุณาลองใหม่'));
     } finally {
