@@ -375,10 +375,14 @@ export default function CakeStockPage({ navigate }) {
 
   useEffect(() => { load(); }, [load]);
 
-  // Load today's production entries + already-claimed IDs
+  // Load today's production entries + already-claimed IDs (ต่อสาขา)
+  // เส้นทาง: ผลิต → employee_ops_entries(task_key=production, dispatches[]) → แต่ละสาขากดรับยอดของตัวเอง
+  // กันรับซ้ำด้วย cake_stock_log(action=production_claim, note=entryId, branch_id) — เป็นบัญชีกลางที่ Operate อ่าน/เขียนร่วม
   useEffect(() => {
-    if (!orgId) return;
+    if (!orgId || !activeBranchId || activeBranchId === 'all') { setProdClaims({}); setClaimedIds(new Set()); return; }
     const todayStr = new Date().toISOString().slice(0, 10);
+    const normB = s => (s || '').trim().toLowerCase().replace(/\s+/g, '');
+    const myBranchLabel = (branches.find(b => b.id === activeBranchId) || {}).label || '';
     Promise.all([
       supabase.from('employee_ops_entries')
         .select('id,payload,created_at')
@@ -391,6 +395,7 @@ export default function CakeStockPage({ navigate }) {
         .select('note')
         .eq('org_id', orgId)
         .eq('action', 'production_claim')
+        .eq('branch_id', activeBranchId)
         .gte('created_at', `${todayStr}T00:00:00`),
     ]).then(([{ data: prodData }, { data: claimData }]) => {
       const alreadyClaimed = new Set((claimData || []).map(c => c.note).filter(Boolean));
@@ -400,11 +405,21 @@ export default function CakeStockPage({ navigate }) {
         if (alreadyClaimed.has(String(e.id))) return;
         const name = (e.payload?.product || '').trim();
         if (!name) return;
+        // ยอดที่ส่งมาให้ "สาขานี้" จาก dispatches; ถ้าไม่มี dispatches (รายการเก่า) ใช้ยอดรวมทั้งก้อน
+        const dispatches = Array.isArray(e.payload?.dispatches) ? e.payload.dispatches : [];
+        let qtyForBranch;
+        if (dispatches.length) {
+          const d = dispatches.find(x => normB(x.branchName || x.branch_name || x.branch) === normB(myBranchLabel));
+          qtyForBranch = d ? (parseFloat(d.qty) || 0) : 0;
+        } else {
+          qtyForBranch = parseFloat(e.payload?.quantity || 0) || 0;
+        }
+        if (qtyForBranch <= 0) return; // ไม่ได้ส่งมาให้สาขานี้
         const key = name.toLowerCase();
         if (!grouped[key]) grouped[key] = [];
         grouped[key].push({
           id: String(e.id),
-          qty: parseFloat(e.payload?.quantity || 0) || 0,
+          qty: qtyForBranch,
           unit: e.payload?.unit || 'ชิ้น',
           batch: e.payload?.batch || '',
           jobNo: e.payload?.jobNo || '',
@@ -415,7 +430,7 @@ export default function CakeStockPage({ navigate }) {
       });
       setProdClaims(grouped);
     }).catch(() => {});
-  }, [orgId, activeBranchId]);
+  }, [orgId, activeBranchId, branches]);
 
   // isMyBranch: false in 'all' mode (read-only), true on own branch or if no branch assigned
   const isMyBranch = activeBranchId !== 'all' && (!myBranchId || activeBranchId === myBranchId);

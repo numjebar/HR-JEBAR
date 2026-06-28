@@ -1,1 +1,1 @@
-export const APP_VERSION = 'Build 2026.06.27-branch-detail-v131';
+export const APP_VERSION = 'Build 2026.06.28-prod-dispatch-v132';
