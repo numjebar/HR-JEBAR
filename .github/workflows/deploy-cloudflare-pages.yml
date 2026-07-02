@@ -12,6 +12,7 @@ jobs:
 
     permissions:
       contents: read
+      deployments: write
 
     steps:
       - name: Checkout
@@ -47,3 +48,4 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy app/dist --project-name hr-jebar --commit-dirty=true
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
