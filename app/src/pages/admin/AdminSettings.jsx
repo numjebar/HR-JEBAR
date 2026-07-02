@@ -63,11 +63,23 @@ export default function AdminSettings() {
     return (rules || []).map((r) => r.trim()).filter(Boolean);
   }
 
+  function cleanSpecialHolidays(holidays) {
+    const map = new Map();
+    (holidays || []).forEach((holiday) => {
+      const date = String(holiday?.date || '').trim();
+      const label = String(holiday?.label || '').trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date)) map.set(date, { date, label });
+    });
+    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }
+
   async function saveBranchRules() {
     if (!activeBranch) return;
     setBusy(true);
     const cleanedShopRules = cleanShopRules(shopRules);
-    await supabase.from('branches').update({ rules: branchRules, shop_rules: cleanedShopRules }).eq('id', activeBranch.id);
+    const cleanedBranchRules = { ...branchRules, specialHolidays: cleanSpecialHolidays(branchRules.specialHolidays) };
+    await supabase.from('branches').update({ rules: cleanedBranchRules, shop_rules: cleanedShopRules }).eq('id', activeBranch.id);
+    setBranchRules(cleanedBranchRules);
     setShopRules(cleanedShopRules);
     setBusy(false);
     load();
@@ -77,12 +89,14 @@ export default function AdminSettings() {
     setBusy(true);
     const cleanedGlobalShopRules = cleanShopRules(globalShopRules);
     const { data: st } = await supabase.from('org_settings').select('org_id,rules').eq('org_id', orgId).maybeSingle();
-    const mergedRules = { ...(st?.rules || {}), ...globalRules };
+    const cleanedGlobalRules = { ...globalRules, specialHolidays: cleanSpecialHolidays(globalRules.specialHolidays) };
+    const mergedRules = { ...(st?.rules || {}), ...cleanedGlobalRules };
     if (st) {
       await supabase.from('org_settings').update({ rules: mergedRules, shop_rules: cleanedGlobalShopRules }).eq('org_id', orgId);
     } else {
       await supabase.from('org_settings').insert({ org_id: orgId, rules: mergedRules, shop_rules: cleanedGlobalShopRules });
     }
+    setGlobalRules(mergedRules);
     setGlobalShopRules(cleanedGlobalShopRules);
     setBusy(false);
   }
@@ -187,6 +201,20 @@ export default function AdminSettings() {
     <div>
       <h1 style={{ fontWeight: 700, fontSize: 24, marginBottom: 24 }}>ตั้งค่ากฎ</h1>
 
+      <div className="card" style={{ padding: '20px 24px', marginBottom: 24, border: '1px solid rgba(13,122,70,.18)' }}>
+        <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 6, color: 'var(--accent)' }}>วันหยุดพิเศษ</div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>
+          เพิ่มวันที่ร้านหยุดพิเศษทั้งระบบได้ตรงนี้ ถ้าต้องการแยกตามสาขา ให้เลือกสาขาด้านล่างแล้วเพิ่มในช่องวันหยุดพิเศษของสาขานั้น
+        </div>
+        <SpecialHolidayEditor
+          holidays={globalRules.specialHolidays || []}
+          onChange={(holidays) => setGR('specialHolidays', holidays)}
+        />
+        <button className="btn btn-primary" onClick={saveGlobalRules} disabled={busy} style={{ fontSize: 14, marginTop: 12 }}>
+          {busy ? 'กำลังบันทึก...' : 'บันทึกวันหยุด Global'}
+        </button>
+      </div>
+
       {/* global anti-cheat */}
       <div className="card" style={{ padding: '20px 24px', marginBottom: 24 }}>
         <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 16 }}>🌐 การตั้งค่า Global (ทุกสาขา)</div>
@@ -229,6 +257,13 @@ export default function AdminSettings() {
                 <button className="btn btn-danger" style={{ fontSize: 13, padding: '6px 14px' }} onClick={() => deleteBranch(activeBranch.id)}>ลบสาขา</button>
               </div>
             </div>
+
+            <Section title="วันหยุดพิเศษของสาขานี้">
+              <SpecialHolidayEditor
+                holidays={branchRules.specialHolidays || []}
+                onChange={(holidays) => setR('specialHolidays', holidays)}
+              />
+            </Section>
 
             <Section title="⏰ เวลาทำงาน">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
@@ -477,6 +512,51 @@ function ShopRulesEditor({ rules, onChange }) {
         </div>
       ))}
       <button className="btn" onClick={add} style={{ background: 'var(--bg)', border: '1px dashed var(--line)', color: 'var(--muted)', fontSize: 13, alignSelf: 'flex-start', padding: '8px 16px' }}>+ เพิ่มข้อ</button>
+    </div>
+  );
+}
+
+function SpecialHolidayEditor({ holidays, onChange }) {
+  const visibleHolidays = holidays.length > 0 ? holidays : [{ date: '', label: '' }];
+  function add() { onChange([...(holidays || []), { date: '', label: '' }]); }
+  function update(i, patch) {
+    const list = holidays.length > 0 ? [...holidays] : [{ date: '', label: '' }];
+    list[i] = { ...(list[i] || {}), ...patch };
+    onChange(list);
+  }
+  function remove(i) { onChange((holidays || []).filter((_, idx) => idx !== i)); }
+
+  return (
+    <div style={{ display: 'grid', gap: 10 }}>
+      {visibleHolidays.map((holiday, i) => (
+        <div key={i} style={{ display: 'grid', gridTemplateColumns: '180px 1fr 36px', gap: 8, alignItems: 'center' }}>
+          <input
+            type="date"
+            value={holiday.date || ''}
+            onChange={(e) => update(i, { date: e.target.value })}
+          />
+          <input
+            value={holiday.label || ''}
+            onChange={(e) => update(i, { label: e.target.value })}
+            placeholder="ชื่อวันหยุด เช่น หยุดปีใหม่ / หยุดอบรม"
+          />
+          <button
+            type="button"
+            onClick={() => remove(i)}
+            style={{ background: 'none', border: 'none', color: 'var(--danger-fg)', cursor: 'pointer', fontSize: 20, padding: '0 4px' }}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="btn"
+        onClick={add}
+        style={{ background: 'var(--bg)', border: '1px dashed var(--line)', color: 'var(--muted)', fontSize: 13, alignSelf: 'flex-start', padding: '8px 16px' }}
+      >
+        + เพิ่มวันหยุดพิเศษ
+      </button>
     </div>
   );
 }

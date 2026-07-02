@@ -20,7 +20,7 @@ const NAV = [
   { path: '/admin/payroll', label: 'คำนวณเงิน', icon: '💰' },
   { path: '/admin/messages', label: 'ข้อความ', icon: '💬' },
   { path: '/admin/ops-inbox', label: 'งานร้านพนักงาน', icon: '🧾' },
-  { path: '/admin/settings', label: 'ตั้งค่ากฎ', icon: '⚙️' },
+  { path: '/admin/settings', label: 'กฎ/วันหยุด', icon: '⚙️' },
 ];
 
 export default function AdminShell() {

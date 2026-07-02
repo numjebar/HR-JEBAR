@@ -45,6 +45,7 @@ export const DEFAULT_RULES = {
   urgentLeaveDeductDays: 2,
   geoEnabled: true,
   requireSelfie: true,
+  specialHolidays: [],
 };
 
 // ---- distance (haversine) ----------------------------------------
@@ -136,15 +137,37 @@ export function dayRate(emp) {
   return Number(emp?.rate) || 0;
 }
 
-export function scheduledDaysInRange(range, dayOff) {
+export function normalizeSpecialHolidays(holidays) {
+  return (holidays || [])
+    .map((holiday) => {
+      if (typeof holiday === 'string') return { date: holiday.trim(), label: '' };
+      return {
+        date: String(holiday?.date || '').trim(),
+        label: String(holiday?.label || '').trim(),
+      };
+    })
+    .filter((holiday) => /^\d{4}-\d{2}-\d{2}$/.test(holiday.date));
+}
+
+function specialHolidaySet(holidays) {
+  return new Set(normalizeSpecialHolidays(holidays).map((holiday) => holiday.date));
+}
+
+export function isSpecialHoliday(date, rules) {
+  const iso = typeof date === 'string' ? date.slice(0, 10) : ymd(date);
+  return specialHolidaySet(rules?.specialHolidays).has(iso);
+}
+
+export function scheduledDaysInRange(range, dayOff, specialHolidays = []) {
   if (!range?.from || !range?.to) return 0;
   const start = parseYmd(range.from);
   const end = parseYmd(range.to);
   if (!start || !end || end < start) return 0;
   const blockedDays = new Set((dayOff || []).map(Number).filter((n) => Number.isInteger(n)));
+  const blockedDates = specialHolidaySet(specialHolidays);
   let total = 0;
   for (let cursor = new Date(start); cursor <= end; cursor = addDays(cursor, 1)) {
-    if (!blockedDays.has(cursor.getDay())) total += 1;
+    if (!blockedDays.has(cursor.getDay()) && !blockedDates.has(ymd(cursor))) total += 1;
   }
   return total;
 }
@@ -187,7 +210,7 @@ export function computePay(emp, recs, sales, adjusts, rules, range) {
     ? 1
     : emp.pay_type === 'weekly'
       ? scheduledDaysPerWeek(emp?.day_off)
-      : (scheduledDaysInRange(range, emp?.day_off) || 26);
+      : (scheduledDaysInRange(range, emp?.day_off, rules?.specialHolidays) || 26);
   const cycleDaysTotal = countDaysInRange(range);
   const cycleDaysElapsed = countDaysInRange(elapsedRange);
   const offDaysTotal = offDaysInRange(range, emp?.day_off);
@@ -339,7 +362,20 @@ export function rangeForEmployee(period, emp, anchor) {
 
 // ---- rules hierarchy ---------------------------------------------
 export function rulesFor(globalRules, branch, emp) {
-  return { ...DEFAULT_RULES, ...(globalRules || {}), ...(branch?.rules || {}), ...(emp?.rule_overrides || {}) };
+  const globalSpecialHolidays = normalizeSpecialHolidays(globalRules?.specialHolidays);
+  const branchSpecialHolidays = normalizeSpecialHolidays(branch?.rules?.specialHolidays);
+  const employeeSpecialHolidays = normalizeSpecialHolidays(emp?.rule_overrides?.specialHolidays);
+  const specialHolidayMap = new Map();
+  [...globalSpecialHolidays, ...branchSpecialHolidays, ...employeeSpecialHolidays].forEach((holiday) => {
+    specialHolidayMap.set(holiday.date, holiday);
+  });
+  return {
+    ...DEFAULT_RULES,
+    ...(globalRules || {}),
+    ...(branch?.rules || {}),
+    ...(emp?.rule_overrides || {}),
+    specialHolidays: Array.from(specialHolidayMap.values()).sort((a, b) => a.date.localeCompare(b.date)),
+  };
 }
 export function shopRulesFor(globalShopRules, branch) {
   const branchRules = (branch?.shop_rules || []).map((r) => String(r).trim()).filter(Boolean);
