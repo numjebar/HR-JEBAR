@@ -140,10 +140,11 @@ export function dayRate(emp) {
 export function normalizeSpecialHolidays(holidays) {
   return (holidays || [])
     .map((holiday) => {
-      if (typeof holiday === 'string') return { date: holiday.trim(), label: '' };
+      if (typeof holiday === 'string') return { date: holiday.trim(), label: '', paid: false };
       return {
         date: String(holiday?.date || '').trim(),
         label: String(holiday?.label || '').trim(),
+        paid: Boolean(holiday?.paid),
       };
     })
     .filter((holiday) => /^\d{4}-\d{2}-\d{2}$/.test(holiday.date));
@@ -156,6 +157,28 @@ function specialHolidaySet(holidays) {
 export function isSpecialHoliday(date, rules) {
   const iso = typeof date === 'string' ? date.slice(0, 10) : ymd(date);
   return specialHolidaySet(rules?.specialHolidays).has(iso);
+}
+
+export function paidSpecialHolidaysInRange(range, dayOff, specialHolidays = [], recs = []) {
+  if (!range?.from || !range?.to) return [];
+  const start = parseYmd(range.from);
+  const end = parseYmd(range.to);
+  if (!start || !end || end < start) return [];
+  const blockedDays = new Set((dayOff || []).map(Number).filter((n) => Number.isInteger(n)));
+  const recDates = new Set((recs || []).map((r) => r?.date).filter(Boolean));
+  const paidHolidayMap = new Map(
+    normalizeSpecialHolidays(specialHolidays)
+      .filter((holiday) => holiday.paid)
+      .map((holiday) => [holiday.date, holiday])
+  );
+  const result = [];
+  for (let cursor = new Date(start); cursor <= end; cursor = addDays(cursor, 1)) {
+    const iso = ymd(cursor);
+    if (!blockedDays.has(cursor.getDay()) && !recDates.has(iso) && paidHolidayMap.has(iso)) {
+      result.push(paidHolidayMap.get(iso));
+    }
+  }
+  return result;
 }
 
 export function scheduledDaysInRange(range, dayOff, specialHolidays = []) {
@@ -215,9 +238,10 @@ export function computePay(emp, recs, sales, adjusts, rules, range) {
   const cycleDaysElapsed = countDaysInRange(elapsedRange);
   const offDaysTotal = offDaysInRange(range, emp?.day_off);
   const offDaysElapsed = offDaysInRange(elapsedRange, emp?.day_off);
+  const paidSpecialHolidays = paidSpecialHolidaysInRange(range, emp?.day_off, rules?.specialHolidays, recs);
   const scheduledDaysElapsed = emp.pay_type === 'daily'
     ? Math.min(1, cycleDaysElapsed || 0)
-    : Math.max(0, cycleDaysElapsed - offDaysElapsed);
+    : scheduledDaysInRange(elapsedRange, emp?.day_off, rules?.specialHolidays);
   const effectiveDayRate = defaultDayRate;
   const effectiveHourRate = effectiveDayRate / Math.max(1, Number(rules.workHours || 8));
   const lateMins = [];
@@ -239,7 +263,8 @@ export function computePay(emp, recs, sales, adjusts, rules, range) {
     if (recOtMin) { otMin += recOtMin; otPay += (recOtMin / 60) * (rules.otMode === 'fixed' ? (rules.otRatePerHour || 0) : effectiveHourRate * rules.otMultiplier); }
   });
 
-  const paidUnits = daysWorked + paidLeaveDays;
+  const paidSpecialHolidayDays = paidSpecialHolidays.length;
+  const paidUnits = daysWorked + paidLeaveDays + paidSpecialHolidayDays;
   const base = effectiveDayRate * paidUnits;
 
   let lateBigDays = 0, lateMidDays = 0, lateMidUnits = 0;
@@ -278,6 +303,8 @@ export function computePay(emp, recs, sales, adjusts, rules, range) {
 
   return {
     daysWorked, leaveDays, paidLeaveDays, absentDays, lateMinTotal, lateDeduct,
+    paidSpecialHolidayDays,
+    paidSpecialHolidays,
     lateBigDays, lateMidDays, lateMidUnits,
     otMin, otPay, base, commission, bonus, damage, advance, otherDeduct,
     configuredRate: emp.rate,

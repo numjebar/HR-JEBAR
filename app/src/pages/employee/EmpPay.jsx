@@ -263,6 +263,7 @@ export default function EmpPay() {
         )}
         <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>
           คิดจ่าย {pay.paidUnits} วัน ที่ {THB(pay.effectiveDayRate)}/วัน
+          {pay.paidSpecialHolidayDays > 0 && ` · รวมวันหยุดได้เงิน ${pay.paidSpecialHolidayDays} วัน`}
         </div>
         <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 4 }}>
           {employee?.pay_type === 'weekly' && 'พนักงานรายสัปดาห์จะนับเฉพาะงวดสัปดาห์ปัจจุบันของพนักงานคนนี้'}

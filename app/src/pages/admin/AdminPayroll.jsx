@@ -394,7 +394,11 @@ export default function AdminPayroll() {
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 16 }}>
               <SummaryItem label="ค่าจ้างต่อวัน" value={`${THB(pay.configuredRate)} / วัน`} hint={pay.scheduledDaysLabel} />
-              <SummaryItem label="ค่าแรงงวดนี้" value={THB(pay.base)} hint={`คิดจ่าย ${pay.paidUnits} วัน · ${THB(pay.effectiveDayRate)}/วัน`} />
+              <SummaryItem
+                label="ค่าแรงงวดนี้"
+                value={THB(pay.base)}
+                hint={`คิดจ่าย ${pay.paidUnits} วัน${pay.paidSpecialHolidayDays > 0 ? ` · รวมวันหยุดได้เงิน ${pay.paidSpecialHolidayDays} วัน` : ''} · ${THB(pay.effectiveDayRate)}/วัน`}
+              />
               <SummaryItem
                 label="วันทำงานจริง"
                 value={`${pay.daysWorked} วัน`}
@@ -818,7 +822,7 @@ function PayDetails({ pay, rules }) {
           pay.configuredPayType === 'daily'
             ? null
             : `ถึงวันนี้ผ่านมา ${pay.cycleDaysElapsed || 0} วัน · ผ่านวันทำงานตามตารางแล้ว ${pay.scheduledDaysElapsed || 0} วัน · มาทำงานจริง ${pay.daysWorked} วัน`,
-          `คิดจ่าย ${pay.paidUnits} วัน${pay.paidLeaveDays > 0 ? ` (รวมลาจ่าย ${pay.paidLeaveDays} วัน)` : ''}`,
+          `คิดจ่าย ${pay.paidUnits} วัน${pay.paidLeaveDays > 0 ? ` (รวมลาจ่าย ${pay.paidLeaveDays} วัน)` : ''}${pay.paidSpecialHolidayDays > 0 ? ` (รวมวันหยุดได้เงิน ${pay.paidSpecialHolidayDays} วัน)` : ''}`,
         ].filter(Boolean)}
       />
       <DetailBox title="รายการหัก" rows={deduct} sign="-" />

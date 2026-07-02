@@ -68,7 +68,8 @@ export default function AdminSettings() {
     (holidays || []).forEach((holiday) => {
       const date = String(holiday?.date || '').trim();
       const label = String(holiday?.label || '').trim();
-      if (/^\d{4}-\d{2}-\d{2}$/.test(date)) map.set(date, { date, label });
+      const paid = Boolean(holiday?.paid);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date)) map.set(date, { date, label, paid });
     });
     return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
   }
@@ -517,10 +518,10 @@ function ShopRulesEditor({ rules, onChange }) {
 }
 
 function SpecialHolidayEditor({ holidays, onChange }) {
-  const visibleHolidays = holidays.length > 0 ? holidays : [{ date: '', label: '' }];
-  function add() { onChange([...(holidays || []), { date: '', label: '' }]); }
+  const visibleHolidays = holidays.length > 0 ? holidays : [{ date: '', label: '', paid: false }];
+  function add() { onChange([...(holidays || []), { date: '', label: '', paid: false }]); }
   function update(i, patch) {
-    const list = holidays.length > 0 ? [...holidays] : [{ date: '', label: '' }];
+    const list = holidays.length > 0 ? [...holidays] : [{ date: '', label: '', paid: false }];
     list[i] = { ...(list[i] || {}), ...patch };
     onChange(list);
   }
@@ -529,7 +530,7 @@ function SpecialHolidayEditor({ holidays, onChange }) {
   return (
     <div style={{ display: 'grid', gap: 10 }}>
       {visibleHolidays.map((holiday, i) => (
-        <div key={i} style={{ display: 'grid', gridTemplateColumns: '180px 1fr 36px', gap: 8, alignItems: 'center' }}>
+        <div key={i} style={{ display: 'grid', gridTemplateColumns: '160px 1fr 150px 36px', gap: 8, alignItems: 'center' }}>
           <input
             type="date"
             value={holiday.date || ''}
@@ -540,6 +541,13 @@ function SpecialHolidayEditor({ holidays, onChange }) {
             onChange={(e) => update(i, { label: e.target.value })}
             placeholder="ชื่อวันหยุด เช่น หยุดปีใหม่ / หยุดอบรม"
           />
+          <select
+            value={holiday.paid ? 'paid' : 'unpaid'}
+            onChange={(e) => update(i, { paid: e.target.value === 'paid' })}
+          >
+            <option value="unpaid">หยุดไม่ได้เงิน</option>
+            <option value="paid">หยุดได้เงิน</option>
+          </select>
           <button
             type="button"
             onClick={() => remove(i)}
