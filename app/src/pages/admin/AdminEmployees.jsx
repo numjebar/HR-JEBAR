@@ -173,6 +173,10 @@ function adjustmentTypeLabel(type) {
   return 'รายการอื่น';
 }
 
+function csvCell(value) {
+  return `"${String(value ?? '').replace(/"/g, '""')}"`;
+}
+
 function Avatar({ emp, size = 48 }) {
   const displayName = emp.nickname || emp.name || 'พนักงาน';
   const hasPhoto = !!emp.photo_url;
@@ -324,6 +328,54 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
       }
       return next;
     });
+  }
+
+  function exportHistoryExcel() {
+    if (!payRange) return;
+    const headers = ['พนักงาน', 'ชื่อเล่น', 'สาขา', 'ตั้งแต่วันที่', 'ถึงวันที่', 'วันที่', 'สถานะ', 'เวลาเข้า', 'เวลาออก', 'OT นาที', 'ระยะเช็กอิน (ม.)', 'รายการปรับเงิน'];
+    const rows = attendanceTimeline.map((entry) => {
+      const meta = attendanceStatusMeta(entry.kind);
+      const a = entry.row || {};
+      const dateAdjustments = adjustmentsByDate.get(entry.date) || [];
+      const adjustmentText = dateAdjustments.map((item) => {
+        const sign = item.type === 'bonus' ? '+' : '-';
+        return `${adjustmentTypeLabel(item.type)} ${sign}${Math.round(Number(item.amount || 0))} ${item.note || ''}`.trim();
+      }).join(' | ');
+      return [
+        emp.name,
+        emp.nickname || '',
+        br?.label || '',
+        payRange.from,
+        payRange.to,
+        entry.date,
+        meta.label,
+        a.clock_in || '',
+        a.clock_out || '',
+        a.ot_min || 0,
+        a.checkin_dist ?? '',
+        adjustmentText,
+      ];
+    });
+    const summaryRows = [
+      [],
+      ['สรุป', '', '', payRange.from, payRange.to],
+      ['วันทำงานจริง', timelineSummary.workedDays],
+      ['วันลา', timelineSummary.leaveDays],
+      ['วันหยุด', timelineSummary.offDays],
+      ['วันมีสิทธิ์รับค่าจ้าง', timelineSummary.payableDays],
+    ];
+    const csv = [headers, ...rows, ...summaryRows]
+      .map((row) => row.map(csvCell).join(','))
+      .join('\r\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `work-history-${emp.nickname || emp.name}-${payRange.from}-${payRange.to}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   }
 
   async function deleteEmp() {
@@ -484,6 +536,9 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
           </button>
           <button className="btn" onClick={() => shiftPayRange(1)} style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--muted)', padding: '7px 12px', fontSize: 13 }}>
             รอบถัดไป →
+          </button>
+          <button className="btn" onClick={exportHistoryExcel} disabled={!payRange} style={{ background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--ink)', padding: '7px 12px', fontSize: 13 }}>
+            Export Excel
           </button>
         </div>
 
