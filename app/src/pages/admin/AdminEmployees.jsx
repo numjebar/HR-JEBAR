@@ -246,6 +246,8 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
   const naturalPeriod = payrollPeriodForEmployee(emp, 'month');
   const [period, setPeriod] = useState(naturalPeriod);
   const [payAnchor, setPayAnchor] = useState(ymd(new Date()));
+  const [rangeMode, setRangeMode] = useState('cycle');
+  const [customRange, setCustomRange] = useState({ from: ymd(addDays(new Date(), -30)), to: ymd(new Date()) });
   const [att, setAtt] = useState([]);
   const [adj, setAdj] = useState([]);
   const [leaves, setLeaves] = useState([]);
@@ -267,7 +269,7 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
   const offDaysInTimeline = attendanceTimeline.filter((entry) => entry.kind === 'off');
 
   async function load() {
-    const range = rangeForEmployee(effectivePeriod, emp, payAnchor);
+    const range = rangeMode === 'custom' ? customRange : rangeForEmployee(effectivePeriod, emp, payAnchor);
     setPayRange(range);
     const [{ data: st }, { data: a }, { data: s }, { data: d }, { data: lv }] = await Promise.all([
       supabase.from('org_settings').select('*').eq('org_id', orgId).single(),
@@ -289,7 +291,7 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
     setPeriod(naturalPeriod);
   }, [emp?.id, naturalPeriod]);
 
-  useEffect(() => { load(); }, [effectivePeriod, emp?.id, payAnchor]);
+  useEffect(() => { load(); }, [effectivePeriod, emp?.id, payAnchor, rangeMode, customRange.from, customRange.to]);
 
   function scrollToHistory() {
     historyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -297,17 +299,31 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
 
   function selectPeriod(nextPeriod) {
     setPeriod(nextPeriod);
+    setRangeMode('cycle');
     setPayAnchor(ymd(new Date()));
   }
 
   function shiftPayRange(direction) {
     if (!payRange) return;
+    setRangeMode('cycle');
     const anchor = direction < 0 ? addDays(parseYmd(payRange.from), -1) : addDays(parseYmd(payRange.to), 1);
     setPayAnchor(ymd(anchor));
   }
 
   function resetPayRange() {
+    setRangeMode('cycle');
     setPayAnchor(ymd(new Date()));
+  }
+
+  function setCustomDate(key, value) {
+    setRangeMode('custom');
+    setCustomRange((prev) => {
+      const next = { ...prev, [key]: value };
+      if (next.from > next.to) {
+        return key === 'from' ? { from: value, to: value } : { from: value, to: value };
+      }
+      return next;
+    });
   }
 
   async function deleteEmp() {
@@ -449,7 +465,7 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
           <div>
             <div style={{ fontWeight: 700, fontSize: 18 }}>ประวัติวันทำงานย้อนหลัง</div>
             <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>
-              {payRange ? <>รอบคำนวณ <span className="num">{payRange.from}</span> - <span className="num">{payRange.to}</span></> : 'เลือกช่วงวันที่เพื่อดูประวัติ'}
+              {payRange ? <>{rangeMode === 'custom' ? 'ช่วงวันที่กำหนดเอง' : 'รอบคำนวณ'} <span className="num">{payRange.from}</span> - <span className="num">{payRange.to}</span></> : 'เลือกช่วงวันที่เพื่อดูประวัติ'}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -469,6 +485,17 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
           <button className="btn" onClick={() => shiftPayRange(1)} style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--muted)', padding: '7px 12px', fontSize: 13 }}>
             รอบถัดไป →
           </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 14 }}>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 5 }}>ตั้งแต่วันที่</label>
+            <input type="date" value={rangeMode === 'custom' ? customRange.from : (payRange?.from || '')} onChange={(e) => setCustomDate('from', e.target.value)} />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 5 }}>ถึงวันที่</label>
+            <input type="date" value={rangeMode === 'custom' ? customRange.to : (payRange?.to || '')} onChange={(e) => setCustomDate('to', e.target.value)} />
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 10 }}>
