@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
 import { addDays, computePay, dayRate, parseYmd, rulesFor, rangeForEmployee, THB, ymd } from '../../lib/payroll';
@@ -242,8 +242,10 @@ export default function AdminEmployees() {
 }
 
 function EmpDetail({ emp, branches, orgId, onBack }) {
+  const historyRef = useRef(null);
   const naturalPeriod = payrollPeriodForEmployee(emp, 'month');
   const [period, setPeriod] = useState(naturalPeriod);
+  const [payAnchor, setPayAnchor] = useState(ymd(new Date()));
   const [att, setAtt] = useState([]);
   const [adj, setAdj] = useState([]);
   const [leaves, setLeaves] = useState([]);
@@ -265,7 +267,7 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
   const offDaysInTimeline = attendanceTimeline.filter((entry) => entry.kind === 'off');
 
   async function load() {
-    const range = rangeForEmployee(effectivePeriod, emp);
+    const range = rangeForEmployee(effectivePeriod, emp, payAnchor);
     setPayRange(range);
     const [{ data: st }, { data: a }, { data: s }, { data: d }, { data: lv }] = await Promise.all([
       supabase.from('org_settings').select('*').eq('org_id', orgId).single(),
@@ -287,7 +289,26 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
     setPeriod(naturalPeriod);
   }, [emp?.id, naturalPeriod]);
 
-  useEffect(() => { load(); }, [effectivePeriod, emp?.id]);
+  useEffect(() => { load(); }, [effectivePeriod, emp?.id, payAnchor]);
+
+  function scrollToHistory() {
+    historyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function selectPeriod(nextPeriod) {
+    setPeriod(nextPeriod);
+    setPayAnchor(ymd(new Date()));
+  }
+
+  function shiftPayRange(direction) {
+    if (!payRange) return;
+    const anchor = direction < 0 ? addDays(parseYmd(payRange.from), -1) : addDays(parseYmd(payRange.to), 1);
+    setPayAnchor(ymd(anchor));
+  }
+
+  function resetPayRange() {
+    setPayAnchor(ymd(new Date()));
+  }
 
   async function deleteEmp() {
     if (!confirm(`ลบพนักงาน "${emp.name}" ออกจากระบบ?`)) return;
@@ -381,7 +402,8 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
           )}
           <div style={{ marginTop: 4, fontSize: 14, color: 'var(--muted)' }}>วันหยุดประจำ: {dayOffLabel(emp.day_off)}</div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <button className="btn" style={{ background: 'var(--accent)', color: '#fff', fontSize: 13 }} onClick={scrollToHistory}>ดูประวัติวันทำงาน</button>
           <button className="btn" style={{ background: 'var(--accent-soft)', color: 'var(--accent)', fontSize: 13 }} onClick={() => setShowEdit(true)}>แก้ไข</button>
           <button className="btn" style={{ background: 'var(--bg)', border: '1px solid var(--line)', fontSize: 13 }} onClick={() => setShowPinRecovery(true)}>PIN</button>
           <button className="btn" style={{ background: 'var(--bg)', border: '1px solid var(--line)', fontSize: 13 }} onClick={() => setShowMsg(true)}>ส่งข้อความ</button>
@@ -422,20 +444,52 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
         ))}
       </div>
 
-      {/* period toggle */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {periodOptions.map((p) => (
-          <button key={p.k} onClick={() => setPeriod(p.k)} className="btn" style={{ background: period === p.k ? 'var(--accent)' : 'var(--surface)', color: period === p.k ? '#fff' : 'var(--muted)', border: '1px solid var(--line)', padding: '7px 18px', fontSize: 14 }}>{p.l}</button>
-        ))}
-      </div>
-
-      {payRange && (
-        <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 16 }}>
-          รอบคำนวณของพนักงานนี้ ({emp.pay_type === 'weekly' ? 'รายสัปดาห์' : emp.pay_type === 'monthly' ? 'รายเดือน' : 'ปัจจุบัน'}):
-          {' '}
-          <span className="num">{payRange.from}</span> - <span className="num">{payRange.to}</span>
+      <div ref={historyRef} className="card" style={{ padding: '18px 20px', marginBottom: 20, scrollMarginTop: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 14 }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 18 }}>ประวัติวันทำงานย้อนหลัง</div>
+            <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>
+              {payRange ? <>รอบคำนวณ <span className="num">{payRange.from}</span> - <span className="num">{payRange.to}</span></> : 'เลือกช่วงวันที่เพื่อดูประวัติ'}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {periodOptions.map((p) => (
+              <button key={p.k} onClick={() => selectPeriod(p.k)} className="btn" style={{ background: period === p.k ? 'var(--accent)' : 'var(--surface)', color: period === p.k ? '#fff' : 'var(--muted)', border: '1px solid var(--line)', padding: '7px 14px', fontSize: 13 }}>{p.l}</button>
+            ))}
+          </div>
         </div>
-      )}
+
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+          <button className="btn" onClick={() => shiftPayRange(-1)} style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--muted)', padding: '7px 12px', fontSize: 13 }}>
+            ← รอบก่อน
+          </button>
+          <button className="btn" onClick={resetPayRange} style={{ background: payAnchor === ymd(new Date()) ? 'var(--accent-soft)' : 'var(--bg)', border: '1px solid var(--line)', color: 'var(--accent)', padding: '7px 12px', fontSize: 13 }}>
+            รอบปัจจุบัน
+          </button>
+          <button className="btn" onClick={() => shiftPayRange(1)} style={{ background: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--muted)', padding: '7px 12px', fontSize: 13 }}>
+            รอบถัดไป →
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 10 }}>
+          <div className="card" style={{ padding: 14 }}>
+            <div style={{ color: 'var(--muted)', fontSize: 12 }}>วันทำงานจริง</div>
+            <div className="num" style={{ fontSize: 24, fontWeight: 700 }}>{timelineSummary.workedDays}</div>
+          </div>
+          <div className="card" style={{ padding: 14 }}>
+            <div style={{ color: 'var(--muted)', fontSize: 12 }}>วันลา</div>
+            <div className="num" style={{ fontSize: 24, fontWeight: 700 }}>{timelineSummary.leaveDays}</div>
+          </div>
+          <div className="card" style={{ padding: 14 }}>
+            <div style={{ color: 'var(--muted)', fontSize: 12 }}>วันหยุด</div>
+            <div className="num" style={{ fontSize: 24, fontWeight: 700 }}>{timelineSummary.offDays}</div>
+          </div>
+          <div className="card" style={{ padding: 14 }}>
+            <div style={{ color: 'var(--muted)', fontSize: 12 }}>วันมีสิทธิ์รับค่าจ้าง</div>
+            <div className="num" style={{ fontSize: 24, fontWeight: 700 }}>{timelineSummary.payableDays}</div>
+          </div>
+        </div>
+      </div>
 
       {/* pay breakdown */}
       {pay && (
@@ -480,29 +534,10 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
       )}
 
       <div className="card" style={{ padding: '20px', marginBottom: 20 }}>
-        <div style={{ fontWeight: 600, marginBottom: 6 }}>ตารางสรุปรายวัน</div>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>วันหยุดในรอบประวัติ</div>
         <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 14 }}>
           ใช้วันที่จริงเป็นตัวอ้างอิงว่าแต่ละวันเป็นวันทำงาน วันหยุด วันลา วันขาด และมีรายการเบิก/โบนัสวันไหนบ้าง
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 10, marginBottom: 14 }}>
-          <div className="card" style={{ padding: 14 }}>
-            <div style={{ color: 'var(--muted)', fontSize: 12 }}>วันทำงานจริง</div>
-            <div className="num" style={{ fontSize: 24, fontWeight: 700 }}>{timelineSummary.workedDays}</div>
-          </div>
-          <div className="card" style={{ padding: 14 }}>
-            <div style={{ color: 'var(--muted)', fontSize: 12 }}>วันลา</div>
-            <div className="num" style={{ fontSize: 24, fontWeight: 700 }}>{timelineSummary.leaveDays}</div>
-          </div>
-          <div className="card" style={{ padding: 14 }}>
-            <div style={{ color: 'var(--muted)', fontSize: 12 }}>วันหยุด</div>
-            <div className="num" style={{ fontSize: 24, fontWeight: 700 }}>{timelineSummary.offDays}</div>
-          </div>
-          <div className="card" style={{ padding: 14 }}>
-            <div style={{ color: 'var(--muted)', fontSize: 12 }}>วันมีสิทธิ์รับค่าจ้าง</div>
-            <div className="num" style={{ fontSize: 24, fontWeight: 700 }}>{timelineSummary.payableDays}</div>
-          </div>
-        </div>
-        <div style={{ fontWeight: 600, marginBottom: 8 }}>รายการวันหยุดในรอบนี้</div>
         {offDaysInTimeline.length === 0 ? (
           <div style={{ color: 'var(--muted)', fontSize: 13 }}>ไม่มีวันหยุดที่ระบบคำนวณได้จากรอบนี้</div>
         ) : (
@@ -584,7 +619,7 @@ function EmpDetail({ emp, branches, orgId, onBack }) {
 
       {/* attendance */}
       <div className="card" style={{ padding: '20px' }}>
-        <div style={{ fontWeight: 600, marginBottom: 12 }}>ประวัติรายวัน / ลงเวลา</div>
+        <div style={{ fontWeight: 600, marginBottom: 12 }}>รายการลงเวลาตามรอบย้อนหลัง</div>
         {attendanceTimeline.map((entry) => {
           const meta = attendanceStatusMeta(entry.kind);
           const a = entry.row;
